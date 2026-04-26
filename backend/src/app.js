@@ -19,6 +19,10 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (server-to-server, curl)
     if (!origin) return callback(null, true);
+    // Always allow Capacitor Android/iOS origins
+    if (origin === 'https://localhost' || origin === 'capacitor://localhost' || origin === 'http://localhost') {
+      return callback(null, true);
+    }
     const allowed = (process.env.CORS_ORIGIN || 'http://localhost:5173')
       .split(',')
       .map((s) => s.trim());
