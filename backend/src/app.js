@@ -15,11 +15,9 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (server-to-server, curl)
     if (!origin) return callback(null, true);
-    // Always allow Capacitor Android/iOS origins
     if (origin === 'https://localhost' || origin === 'capacitor://localhost' || origin === 'http://localhost') {
       return callback(null, true);
     }
@@ -35,7 +33,10 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-}));
+};
+
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000,
