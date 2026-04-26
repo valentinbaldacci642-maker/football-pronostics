@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    @apply bg-dark-900 text-white font-sans antialiased;
+    background-image: radial-gradient(ellipse at 20% 0%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+                      radial-gradient(ellipse at 80% 100%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
+    min-height: 100vh;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-dark-800; }
+  ::-webkit-scrollbar-thumb { @apply bg-dark-600 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-dark-500; }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-dark-800/80 backdrop-blur-sm border border-white/5 rounded-xl;
+  }
+  .stat-bar {
+    @apply h-1.5 rounded-full bg-dark-600 overflow-hidden;
+  }
+  .stat-bar-fill {
+    @apply h-full rounded-full transition-all duration-700 ease-out;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .btn-primary {
+    @apply bg-brand-500 hover:bg-brand-600 text-white font-semibold px-4 py-2 rounded-lg transition-all duration-200 active:scale-95;
+  }
+  .btn-ghost {
+    @apply bg-white/5 hover:bg-white/10 text-white/80 hover:text-white font-medium px-4 py-2 rounded-lg transition-all duration-200;
+  }
+  .tab-active {
+    @apply bg-brand-500/20 text-brand-400 border-brand-500/50;
+  }
+  .tab-inactive {
+    @apply text-white/50 hover:text-white/80 hover:bg-white/5 border-transparent;
+  }
+  .live-indicator {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-danger/20 text-danger text-xs font-bold;
+  }
+  .confidence-bar {
+    @apply h-2 rounded-full overflow-hidden bg-dark-600;
+  }
+  .value-badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gold-500/15 text-gold-400 text-xs font-bold border border-gold-500/30;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-brand-400 to-brand-600 bg-clip-text text-transparent;
+  }
+  .text-gradient-gold {
+    @apply bg-gradient-to-r from-gold-400 to-gold-600 bg-clip-text text-transparent;
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}

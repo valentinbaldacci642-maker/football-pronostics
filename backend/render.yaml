@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: football-pronostics-api
+    env: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: API_FOOTBALL_KEY
+        sync: false   # à renseigner dans le dashboard Render
+      - key: CORS_ORIGIN
+        sync: false   # mettre l'URL Netlify ex: https://ton-app.netlify.app
+      - key: RATE_LIMIT_MAX
+        value: 2000

@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables — NEVER commit these (contain API keys)
+.env
+.env.local
+.env.production
+**/.env
+**/.env.local
+**/.env.production
+
+# Build output
+dist/
+build/
+.vite/
+
+# Capacitor generated platforms (rebuilt with npx cap sync)
+android/
+ios/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

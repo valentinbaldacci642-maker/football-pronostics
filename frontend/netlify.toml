@@ -1,0 +1,31 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Headers pour le Service Worker PWA
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/workbox-*.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# HTTPS strict
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+
+# Redirect SPA (React Router)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
