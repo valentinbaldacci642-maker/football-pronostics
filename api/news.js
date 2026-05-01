@@ -31,18 +31,25 @@ function parseItems(xml, source) {
   let m;
   while ((m = itemRe.exec(xml)) !== null && items.length < 15) {
     const body = m[1];
-    const tag = function(name) {
-      const r = body.match(new RegExp('<' + name + '[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/' + name + '>', 'i'));
-      return r ? r[1].trim() : '';
-    };
-    const title = tag('title');
-    const linkText = tag('link');
+
+    const titleM = body.match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
+    const title = titleM ? titleM[1].trim() : '';
+
+    const linkM = body.match(/<link[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/i);
+    const linkText = linkM ? linkM[1].trim() : '';
     const linkAttr = (body.match(/<link[^>]+href="([^"]+)"/) || [])[1] || '';
     const link = linkText || linkAttr;
-    const pubDate = tag('pubDate') || tag('updated');
-    const desc = tag('description') || tag('summary') || '';
+
+    const pubM = body.match(/<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i) || body.match(/<updated[^>]*>([\s\S]*?)<\/updated>/i);
+    const pubDate = pubM ? pubM[1].trim() : '';
+
+    const descM = body.match(/<description[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i) ||
+                  body.match(/<summary[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/summary>/i);
+    const desc = descM ? descM[1] : '';
+
     const mcUrl = (body.match(/media:(?:content|thumbnail)[^>]+url="([^"]+)"/) || [])[1] || null;
     const imgUrl = (desc.match(/<img[^>]+src=["']([^"']+)["']/) || [])[1] || null;
+
     if (title && link) {
       items.push({
         title: title,
