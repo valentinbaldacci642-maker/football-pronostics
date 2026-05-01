@@ -50,7 +50,7 @@ export default defineConfig({
           // API backend Render — NetworkFirst: données fraîches, fallback cache si hors ligne
           {
             urlPattern: ({ url }) =>
-              url.hostname.includes('onrender.com') || url.pathname.startsWith('/api/'),
+              url.hostname.includes('onrender.com') || url.hostname.includes('vercel.app'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
