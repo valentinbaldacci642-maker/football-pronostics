@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ExternalLink, RefreshCw, Newspaper, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { newsApi } from '../services/api';
+
 
 const FEEDS = [
   { url: 'https://news.google.com/rss/search?q=football+ligue+1+france&hl=fr&gl=FR&ceid=FR:fr', source: 'Google News' },
@@ -173,15 +173,9 @@ export default function News() {
     setLoading(true);
     setError(null);
     try {
-      // Try backend first (cached), fall back to direct RSS fetch
-      let articles = [];
-      try {
-        const data = await newsApi.getLatest();
-        articles = data?.articles || [];
-        if (articles.length === 0) throw new Error('empty');
-      } catch {
-        articles = await fetchDirectRSS();
-      }
+      const res = await fetch('https://football-pronostics-tau.vercel.app/api/news');
+      const data = await res.json();
+      const articles = data?.articles || [];
       setArticles(articles);
     } catch (err) {
       setError('Impossible de charger les actualités');
