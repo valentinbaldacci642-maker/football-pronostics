@@ -59,7 +59,9 @@ function parseFeedXML(xml, source) {
 async function fetchDirectRSS() {
   const results = await Promise.allSettled(
     FEEDS.map(async (feed) => {
-      const res = await fetch(`${PROXY}${encodeURIComponent(feed.url)}`, { signal: AbortSignal.timeout(12000) });
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 12000);
+      const res = await fetch(`${PROXY}${encodeURIComponent(feed.url)}`, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
       const xml = await res.text();
       if (!xml?.trim().startsWith('<')) return [];
       return parseFeedXML(xml, feed.source);
@@ -176,6 +178,7 @@ export default function News() {
       try {
         const data = await newsApi.getLatest();
         articles = data?.articles || [];
+        if (articles.length === 0) throw new Error('empty');
       } catch {
         articles = await fetchDirectRSS();
       }
