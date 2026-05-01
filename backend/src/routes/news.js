@@ -9,7 +9,7 @@ const parser = new Parser({
 const FEEDS = [
   { url: 'https://news.google.com/rss/search?q=football+ligue1&hl=fr&gl=FR&ceid=FR:fr', source: 'Google News' },
   { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
-  { url: 'https://feeds.bbci.co.uk/sport/football/rss.xml', source: 'BBC Sport' },
+  { url: 'https://www.footmercato.net/rss', source: 'Foot Mercato' },
   { url: 'https://www.lequipe.fr/rss/actu_rss_football.xml', source: "L'Équipe" },
 ];
 

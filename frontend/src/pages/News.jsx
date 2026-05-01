@@ -8,7 +8,7 @@ import { newsApi } from '../services/api';
 const FEEDS = [
   { url: 'https://news.google.com/rss/search?q=football+ligue1&hl=fr&gl=FR&ceid=FR:fr', source: 'Google News' },
   { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
-  { url: 'https://feeds.bbci.co.uk/sport/football/rss.xml', source: 'BBC Sport' },
+  { url: 'https://www.footmercato.net/rss', source: 'Foot Mercato' },
   { url: 'https://www.lequipe.fr/rss/actu_rss_football.xml', source: "L'Équipe" },
 ];
 
@@ -75,7 +75,7 @@ async function fetchDirectRSS() {
 const SOURCE_COLORS = {
   "Google News": { bg: 'bg-blue-500/15 text-blue-400',    dot: 'bg-blue-400' },
   "RMC Sport":   { bg: 'bg-brand-500/15 text-brand-400',  dot: 'bg-brand-400' },
-  "BBC Sport":   { bg: 'bg-red-500/15 text-red-400',      dot: 'bg-red-400' },
+  "Foot Mercato": { bg: 'bg-red-500/15 text-red-400',     dot: 'bg-red-400' },
   "L'Équipe":    { bg: 'bg-gold-500/15 text-gold-400',    dot: 'bg-gold-400' },
 };
 
