@@ -66,7 +66,7 @@ function LeagueGroup({ league, matches, defaultExpanded = false }) {
         ) : (
           <div className="w-5 h-5 rounded bg-dark-600 text-[10px] text-white/30 flex items-center justify-center">⚽</div>
         )}
-        <span className={clsx('text-sm font-bold', isPriority ? 'text-white/90' : 'text-white/60')}>
+        <span className={clsx('text-sm font-heading font-bold tracking-wide', isPriority ? 'text-white/80' : 'text-white/45')}>
           {league?.name}
         </span>
         {league?.country && (
@@ -171,8 +171,8 @@ export default function Matchs() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white">Matchs du Jour</h1>
-          <p className="text-sm text-white/40 mt-0.5">
+          <h1 className="font-display text-4xl text-white tracking-wide leading-none">Matchs <span className="text-brand-400">du Jour</span></h1>
+          <p className="text-sm text-white/35 font-heading font-medium mt-1">
             {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
           </p>
         </div>
@@ -192,8 +192,8 @@ export default function Matchs() {
             { label: 'Terminés', value: finishedMatches, color: 'text-white/30' },
           ].map((s) => (
             <div key={s.label} className="glass-card px-3 py-2.5 text-center">
-              <p className={`text-lg font-black tabular-nums ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-white/30">{s.label}</p>
+              <p className={`stat-number text-xl tabular-nums ${s.color}`}>{s.value}</p>
+              <p className="text-[11px] text-white/25 font-heading font-medium">{s.label}</p>
             </div>
           ))}
         </div>
@@ -207,8 +207,8 @@ export default function Matchs() {
               key={id}
               onClick={() => setActiveTab(id)}
               className={clsx(
-                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap',
-                activeTab === id ? 'bg-dark-700 text-white' : 'text-white/40 hover:text-white/70'
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-heading font-semibold transition-all whitespace-nowrap tracking-wide',
+                activeTab === id ? 'bg-dark-700 text-white shadow-inset-glow' : 'text-white/35 hover:text-white/60'
               )}
             >
               {id === 'live' && (

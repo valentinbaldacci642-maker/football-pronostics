@@ -12,8 +12,8 @@ export default function Favorites() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white">Mes Favoris</h1>
-          <p className="text-sm text-white/40 mt-0.5">{fixtureData.length} match{fixtureData.length > 1 ? 's' : ''} sauvegardé{fixtureData.length > 1 ? 's' : ''}</p>
+          <h1 className="font-display text-4xl text-white tracking-wide leading-none">Mes <span className="text-gold-400">Favoris</span></h1>
+          <p className="text-sm text-white/35 font-heading font-medium mt-1">{fixtureData.length} match{fixtureData.length > 1 ? 's' : ''} sauvegardé{fixtureData.length > 1 ? 's' : ''}</p>
         </div>
         {fixtureData.length > 0 && (
           <button onClick={clear} className="flex items-center gap-2 text-xs text-red-400/60 hover:text-red-400 transition-colors">

@@ -1,0 +1,330 @@
+import { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Users, AlertTriangle, ArrowLeftRight, Info, ArrowLeft, MapPin, Calendar, Trophy } from 'lucide-react';
+import { teamsApi } from '../services/api';
+import { Spinner, ErrorState } from '../components/ui/Loading';
+import { format, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
+
+const POSITION_ORDER = { G: 1, D: 2, M: 3, F: 4 };
+const POSITION_LABELS = { G: 'Gardiens', D: 'Défenseurs', M: 'Milieux', F: 'Attaquants' };
+const POSITION_COLORS = { G: 'text-amber-400 bg-amber-500/10', D: 'text-blue-400 bg-blue-500/10', M: 'text-green-400 bg-green-500/10', F: 'text-red-400 bg-red-500/10' };
+
+export default function Team() {
+  const { id } = useParams();
+  const [tab, setTab] = useState('effectif');
+  const [teamData, setTeamData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await teamsApi.getById(id);
+        setTeamData(data?.response?.[0] || null);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [id]);
+
+  if (loading) return (
+    <div className="flex justify-center items-center h-64"><Spinner /></div>
+  );
+  if (error) return <ErrorState message={error} />;
+  if (!teamData) return <ErrorState message="Équipe introuvable" />;
+
+  const { team, venue } = teamData;
+  const tabs = [
+    { key: 'effectif', label: 'Effectif', icon: Users },
+    { key: 'blessures', label: 'Blessures', icon: AlertTriangle },
+    { key: 'transferts', label: 'Transferts', icon: ArrowLeftRight },
+  ];
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-6">
+      {/* Back */}
+      <Link to="/leagues" className="flex items-center gap-2 text-white/40 hover:text-white/70 text-sm transition-colors w-fit">
+        <ArrowLeft className="w-4 h-4" />
+        Retour
+      </Link>
+
+      {/* Header */}
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-5">
+          <img src={team.logo} alt={team.name} className="w-20 h-20 object-contain" onError={e => e.target.style.display='none'} />
+          <div className="flex-1 min-w-0">
+            <h1 className="font-display text-4xl text-white tracking-wide leading-none">{team.name}</h1>
+            <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-white/50">
+              {team.country && (
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" /> {team.country}
+                </span>
+              )}
+              {team.founded && (
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" /> Fondé en {team.founded}
+                </span>
+              )}
+              {team.national && (
+                <span className="flex items-center gap-1.5 text-brand-400">
+                  <Trophy className="w-3.5 h-3.5" /> Équipe nationale
+                </span>
+              )}
+            </div>
+            {venue?.name && (
+              <p className="text-xs text-white/30 mt-1.5">{venue.name}{venue.city ? ` · ${venue.city}` : ''}{venue.capacity ? ` · ${Number(venue.capacity).toLocaleString('fr')} places` : ''}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        {tabs.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+              tab === key ? 'bg-brand-500/20 border-brand-500/40 text-brand-300' : 'border-white/10 text-white/40 hover:text-white/70'
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        {tab === 'effectif' && (
+          <motion.div key="effectif" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            <SquadTab teamId={id} />
+          </motion.div>
+        )}
+        {tab === 'blessures' && (
+          <motion.div key="blessures" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            <InjuriesTab teamId={id} />
+          </motion.div>
+        )}
+        {tab === 'transferts' && (
+          <motion.div key="transferts" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            <TransfersTab teamId={id} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function SquadTab({ teamId }) {
+  const [squad, setSquad] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await teamsApi.getSquad(teamId);
+        setSquad(data?.response?.[0]?.players || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [teamId]);
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
+  if (error) return <ErrorState message={error} />;
+  if (!squad.length) return <Empty emoji="👥" text="Effectif non disponible" />;
+
+  const grouped = squad.reduce((acc, p) => {
+    const pos = p.position?.[0]?.toUpperCase() || 'M';
+    if (!acc[pos]) acc[pos] = [];
+    acc[pos].push(p);
+    return acc;
+  }, {});
+
+  const sortedPositions = Object.keys(grouped).sort((a, b) => (POSITION_ORDER[a] || 9) - (POSITION_ORDER[b] || 9));
+
+  return (
+    <div className="space-y-4">
+      {sortedPositions.map((pos) => (
+        <div key={pos} className="glass-card overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-white/5 bg-white/3">
+            <span className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${POSITION_COLORS[pos] || 'text-white/50 bg-white/5'}`}>
+              {POSITION_LABELS[pos] || pos}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y divide-white/3 sm:divide-y-0">
+            {grouped[pos].map((player) => (
+              <div key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/3 transition-colors sm:border-b sm:border-white/3">
+                <div className="w-10 h-10 rounded-full bg-dark-700 overflow-hidden flex-shrink-0">
+                  <img src={player.photo} alt={player.name} className="w-full h-full object-cover" onError={e => e.target.style.display='none'} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white/90 truncate">{player.name}</p>
+                  <p className="text-xs text-white/30">{player.age ? `${player.age} ans` : ''}{player.number ? ` · #${player.number}` : ''}</p>
+                </div>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-md flex-shrink-0 ${POSITION_COLORS[pos] || 'text-white/50 bg-white/5'}`}>
+                  {pos}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InjuriesTab({ teamId }) {
+  const [injuries, setInjuries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await teamsApi.getInjuries(teamId, 2024);
+        setInjuries(data?.response || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [teamId]);
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
+  if (error) return <ErrorState message={error} />;
+  if (!injuries.length) return <Empty emoji="✅" text="Aucune blessure enregistrée" sub="Tous les joueurs sont disponibles" />;
+
+  const unique = injuries.reduce((acc, item) => {
+    const pid = item.player?.id;
+    if (pid && !acc.find(x => x.player?.id === pid)) acc.push(item);
+    return acc;
+  }, []);
+
+  return (
+    <div className="glass-card divide-y divide-white/5">
+      {unique.map((item, i) => {
+        const { player, fixture } = item;
+        const type = (player.type || '').toLowerCase();
+        const isMissing = type.includes('miss') || type.includes('absent');
+        return (
+          <div key={i} className="flex items-center gap-3 px-4 py-3">
+            <div className="w-10 h-10 rounded-full bg-dark-700 overflow-hidden flex-shrink-0">
+              <img src={player.photo} alt={player.name} className="w-full h-full object-cover" onError={e => e.target.style.display='none'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white/90">{player.name}</p>
+              <p className="text-xs text-white/40">{player.reason || player.type || 'Blessure'}</p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <span className={`text-xs font-bold px-2 py-1 rounded-lg ${isMissing ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                {isMissing ? 'Absent' : 'Incertain'}
+              </span>
+              {fixture?.date && (
+                <p className="text-xs text-white/25 mt-0.5">{format(parseISO(fixture.date), 'd MMM', { locale: fr })}</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TransfersTab({ teamId }) {
+  const [transfers, setTransfers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await teamsApi.getTransfers(teamId);
+        setTransfers(data?.response || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [teamId]);
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
+  if (error) return <ErrorState message={error} />;
+  if (!transfers.length) return <Empty emoji="↔️" text="Aucun transfert disponible" />;
+
+  const recent = transfers
+    .flatMap(t => (t.transfers || []).map(tr => ({ player: t.player, ...tr })))
+    .filter(t => t.date)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 30);
+
+  return (
+    <div className="glass-card divide-y divide-white/5">
+      {recent.map((tr, i) => {
+        const isIn = tr.teams?.in?.id === Number(teamId);
+        const otherTeam = isIn ? tr.teams?.out : tr.teams?.in;
+        const fee = tr.type;
+        const isFree = (fee || '').toLowerCase().includes('free') || (fee || '').toLowerCase().includes('gratuit');
+        const isLoan = (fee || '').toLowerCase().includes('loan') || (fee || '').toLowerCase().includes('prêt');
+        return (
+          <div key={i} className="flex items-center gap-3 px-4 py-3">
+            <div className="w-10 h-10 rounded-full bg-dark-700 overflow-hidden flex-shrink-0">
+              <img src={tr.player?.photo} alt={tr.player?.name} className="w-full h-full object-cover" onError={e => e.target.style.display='none'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white/90 truncate">{tr.player?.name}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`text-xs font-bold ${isIn ? 'text-green-400' : 'text-red-400'}`}>
+                  {isIn ? '↙ Arrivée' : '↗ Départ'}
+                </span>
+                {otherTeam?.name && (
+                  <span className="text-xs text-white/30">· {otherTeam.name}</span>
+                )}
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0 space-y-0.5">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                isFree ? 'bg-white/10 text-white/50' :
+                isLoan ? 'bg-blue-500/20 text-blue-400' :
+                fee ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-white/30'
+              }`}>
+                {isFree ? 'Gratuit' : isLoan ? 'Prêt' : fee || '?'}
+              </span>
+              {tr.date && (
+                <p className="text-xs text-white/25">{format(parseISO(tr.date), 'MMM yyyy', { locale: fr })}</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Empty({ emoji, text, sub }) {
+  return (
+    <div className="glass-card p-12 text-center">
+      <p className="text-4xl mb-3">{emoji}</p>
+      <p className="text-white/60 font-semibold">{text}</p>
+      {sub && <p className="text-white/30 text-sm mt-1">{sub}</p>}
+    </div>
+  );
+}

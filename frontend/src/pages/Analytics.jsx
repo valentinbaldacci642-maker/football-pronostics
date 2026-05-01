@@ -80,8 +80,8 @@ export default function Analytics() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-white">Dashboard Analytics</h1>
-        <p className="text-sm text-white/40 mt-0.5">Performance globale des pronostics — Saison 2024/2025</p>
+        <h1 className="font-display text-4xl text-white tracking-wide leading-none">Dashboard <span className="text-brand-400">Analytics</span></h1>
+        <p className="text-sm text-white/35 font-heading font-medium mt-1">Performance globale · Saison 2024/2025</p>
       </div>
 
       {/* KPIs */}
@@ -150,22 +150,36 @@ export default function Analytics() {
 
       {/* Confidence distribution */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-bold text-white/80 mb-4 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-white/80 mb-5 flex items-center gap-2">
           <Activity className="w-4 h-4 text-blue-400" />
           Distribution des niveaux de confiance
         </h3>
-        <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={simulatedData.confidence} layout="vertical" margin={{ left: 120, right: 20 }}>
-            <XAxis type="number" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis type="category" dataKey="label" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }} axisLine={false} tickLine={false} width={120} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`${v}%`, 'Part']} />
-            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-              {simulatedData.confidence.map((e, i) => (
-                <Cell key={i} fill={e.color} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        <div className="space-y-3">
+          {simulatedData.confidence.map((item, i) => (
+            <div key={i} className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="text-white/70 font-medium">{item.label}</span>
+                </div>
+                <span className="font-bold tabular-nums" style={{ color: item.color }}>{item.value}%</span>
+              </div>
+              <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${item.value}%` }}
+                  transition={{ duration: 0.7, delay: i * 0.1, ease: 'easeOut' }}
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: item.color }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-white/30">
+          <span>Total pronostics simulés</span>
+          <span className="font-bold text-white/50">~100 pronos</span>
+        </div>
       </div>
 
       {/* Top Scorers */}

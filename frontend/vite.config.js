@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'pwa-64x64.png', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: 'PronoStats — Pronostics Football',
-        short_name: 'PronoStats',
+        name: 'PronosDesFoufous',
+        short_name: 'PronosDesFoufous',
         description: 'Meilleurs pronostics football du jour avec indice de confiance réel',
         theme_color: '#0f172a',
         background_color: '#0f172a',

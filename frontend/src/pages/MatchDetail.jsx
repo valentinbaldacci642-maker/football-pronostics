@@ -7,6 +7,7 @@ import { usePredictions, useOdds, useScorers } from '../hooks/usePredictions';
 import { useFavoritesStore } from '../store';
 import PredictionWidget from '../components/match/PredictionWidget';
 import { MatchWinnerOdds, OverUnderOdds, BTTSOdds, ExactScoreOdds, ValueBetsList } from '../components/match/OddsTable';
+import BookmakersComparison from '../components/match/BookmakersComparison';
 import { GoalsHistogram } from '../components/match/ProbabilityChart';
 import ScorerPredictions from '../components/match/ScorerPredictions';
 import { LoadingPage, ErrorState } from '../components/ui/Loading';
@@ -86,14 +87,14 @@ export default function MatchDetail() {
           <div className="flex flex-col items-center gap-2">
             {score ? (
               <div className="flex items-center gap-3">
-                <span className="text-5xl font-black text-white tabular-nums">{score.home}</span>
-                <span className="text-2xl text-white/20">—</span>
-                <span className="text-5xl font-black text-white tabular-nums">{score.away}</span>
+                <span className="font-display text-6xl text-white tabular-nums tracking-wider">{score.home}</span>
+                <span className="font-display text-2xl text-white/15 tracking-widest">—</span>
+                <span className="font-display text-6xl text-white tabular-nums tracking-wider">{score.away}</span>
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-3xl font-black text-white/20">VS</p>
-                <p className="text-lg font-bold text-brand-400 mt-1">{formatMatchDate(fix?.date)}</p>
+                <p className="font-display text-4xl text-white/15 tracking-widest">VS</p>
+                <p className="text-sm font-heading font-semibold text-brand-400 mt-1">{formatMatchDate(fix?.date)}</p>
               </div>
             )}
             {status.type === 'live' ? (
@@ -176,37 +177,12 @@ export default function MatchDetail() {
                 awayTeam={away?.name}
               />
             )}
-            {analysis?.predictions?.mostLikelyScores && (
-              <div className="glass-card p-4">
-                <div className="flex items-start justify-between mb-1">
-                  <h4 className="text-xs text-white/40 uppercase tracking-wider font-semibold">Scores les plus probables</h4>
-                  <span className="text-xs text-blue-400/60 font-medium">Modèle Poisson (xG)</span>
-                </div>
-                <p className="text-xs text-white/20 mb-4">
-                  Calculé à partir des xG attendus — différent des cotes bookmakers (onglet Cotes)
-                </p>
-                <GoalsHistogram
-                  data={analysis.predictions.mostLikelyScores.map((s) => ({
-                    score: `${s.home}-${s.away}`,
-                    prob: s.prob,
-                  }))}
-                />
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {analysis.predictions.mostLikelyScores.slice(0, 6).map((s, i) => (
-                    <div key={i} className={clsx(
-                      'flex items-center justify-between px-3 py-2 rounded-lg border text-xs',
-                      i === 0 ? 'bg-blue-500/15 border-blue-500/30' : 'bg-dark-700 border-white/5'
-                    )}>
-                      <span className={clsx('font-bold font-mono text-sm', i === 0 ? 'text-blue-400' : 'text-white')}>
-                        {s.home}-{s.away}
-                      </span>
-                      <span className={clsx(i === 0 ? 'text-blue-300' : 'text-white/30')}>
-                        {s.prob?.toFixed(1)}% <span className="text-white/20">(xG)</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {analysis?.predictions?.expectedGoals && (
+              <PoissonMatrix
+                xG={analysis.predictions.expectedGoals}
+                homeTeam={home?.name}
+                awayTeam={away?.name}
+              />
             )}
           </div>
         )}
@@ -229,6 +205,7 @@ export default function MatchDetail() {
                 </>
               )}
             </div>
+            <BookmakersComparison fixtureId={id} homeTeam={home?.name} awayTeam={away?.name} />
           </div>
         )}
 
@@ -338,6 +315,106 @@ function EventsTab({ events, home, away }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function poissonProb(lambda, k) {
+  let logP = -lambda + k * Math.log(lambda);
+  for (let i = 1; i <= k; i++) logP -= Math.log(i);
+  return Math.exp(logP) * 100;
+}
+
+function buildMatrix(homeXG, awayXG, max = 5) {
+  const cells = [];
+  for (let h = 0; h <= max; h++) {
+    for (let a = 0; a <= max; a++) {
+      cells.push({ h, a, prob: parseFloat((poissonProb(homeXG, h) * poissonProb(awayXG, a) / 100).toFixed(2)) });
+    }
+  }
+  return cells;
+}
+
+function greenColor(prob, maxProb) {
+  const t = Math.min(1, prob / maxProb);
+  // light green (t=0) → dark green (t=1)
+  const r = Math.round(220 - t * 185);
+  const g = Math.round(252 - t * 130);
+  const b = Math.round(231 - t * 210);
+  return `rgb(${r},${g},${b})`;
+}
+
+function PoissonMatrix({ xG, homeTeam, awayTeam }) {
+  const MAX = 5;
+  const cells = buildMatrix(xG.home, xG.away, MAX);
+  const maxProb = Math.max(...cells.map((c) => c.prob));
+  const cols = Array.from({ length: MAX + 1 }, (_, i) => i);
+  const rows = Array.from({ length: MAX + 1 }, (_, i) => i);
+
+  return (
+    <div className="glass-card p-4">
+      <div className="flex items-start justify-between mb-1">
+        <h4 className="text-xs text-white/40 uppercase tracking-wider font-semibold">Matrice des scores — Modèle Poisson</h4>
+        <span className="text-xs text-blue-400/60 font-medium">xG</span>
+      </div>
+      <p className="text-xs text-white/20 mb-4">
+        Probabilité de chaque score exact · xG dom. {xG.home} / ext. {xG.away}
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr>
+              <th className="p-1.5 text-white/30 font-medium text-left w-16">
+                <span className="text-white/20">Dom. \ Ext.</span>
+              </th>
+              {cols.map((a) => (
+                <th key={a} className="p-1.5 text-center text-white/50 font-bold w-12">{a}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((h) => (
+              <tr key={h}>
+                <td className="p-1.5 text-white/50 font-bold text-center">{h}</td>
+                {cols.map((a) => {
+                  const cell = cells.find((c) => c.h === h && c.a === a);
+                  const bg = greenColor(cell.prob, maxProb);
+                  const isTop = cell.prob === maxProb;
+                  return (
+                    <td
+                      key={a}
+                      className="p-0 text-center"
+                      title={`${h}-${a}: ${cell.prob}%`}
+                    >
+                      <div
+                        className={clsx('mx-0.5 my-0.5 rounded-lg flex flex-col items-center justify-center h-11 w-full transition-all', isTop && 'ring-1 ring-white/40')}
+                        style={{ backgroundColor: bg }}
+                      >
+                        <span className="font-black text-xs text-gray-800">{cell.prob.toFixed(1)}</span>
+                        <span className="text-gray-600 text-[10px] leading-none">%</span>
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center gap-3 mt-3 justify-end">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: greenColor(0, 1) }} />
+          <span className="text-xs text-white/30">Faible</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: greenColor(0.5, 1) }} />
+          <span className="text-xs text-white/30">Moyen</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: greenColor(1, 1) }} />
+          <span className="text-xs text-white/30">Élevé</span>
+        </div>
+      </div>
     </div>
   );
 }

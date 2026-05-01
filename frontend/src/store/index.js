@@ -9,7 +9,6 @@ export const useFixturesStore = create((set, get) => ({
   viewMode: 'today',
   isLoading: false,
   error: null,
-
   setFixtures: (fixtures) => set({ fixtures }),
   setLiveFixtures: (liveFixtures) => set({ liveFixtures }),
   setSelectedDate: (date) => set({ selectedDate: date }),
@@ -55,3 +54,110 @@ export const useUIStore = create((set) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
   setActiveTab: (tab) => set({ activeTab: tab }),
 }));
+
+export const useHistoryStore = create(
+  persist(
+    (set, get) => ({
+      entries: [],
+
+      savePronostics: (pronostics) => {
+        const today = new Date().toISOString().split('T')[0];
+        const existing = get().entries.map((e) => e.fixtureId);
+        const newEntries = pronostics
+          .filter((p) => !existing.includes(p.fixture?.fixture?.id))
+          .map((p) => ({
+            fixtureId: p.fixture?.fixture?.id,
+            date: today,
+            savedAt: new Date().toISOString(),
+            homeTeam: p.fixture?.teams?.home?.name,
+            awayTeam: p.fixture?.teams?.away?.name,
+            homeLogo: p.fixture?.teams?.home?.logo,
+            awayLogo: p.fixture?.teams?.away?.logo,
+            league: p.fixture?.league?.name,
+            leagueLogo: p.fixture?.league?.logo,
+            pick: p.pick?.selection,
+            pickLabel: p.pick?.selectionLabel,
+            odd: p.pick?.odd,
+            confidence: p.confidence,
+            result: null,
+            finalScore: null,
+            mise: null,
+          }));
+        if (newEntries.length > 0) {
+          set((s) => ({ entries: [...newEntries, ...s.entries].slice(0, 500) }));
+        }
+      },
+
+      resolveResult: (fixtureId, homeGoals, awayGoals) => set((s) => ({
+        entries: s.entries.map((e) => {
+          if (e.fixtureId !== fixtureId || e.result) return e;
+          const pick = (e.pick || '').toLowerCase();
+          let result = 'loss';
+          if (pick === 'home' && homeGoals > awayGoals) result = 'win';
+          else if (pick === 'draw' && homeGoals === awayGoals) result = 'win';
+          else if (pick === 'away' && awayGoals > homeGoals) result = 'win';
+          else if (pick.includes('over') && (homeGoals + awayGoals) > parseFloat(pick.replace(/[^0-9.]/g, ''))) result = 'win';
+          else if (pick.includes('under') && (homeGoals + awayGoals) < parseFloat(pick.replace(/[^0-9.]/g, ''))) result = 'win';
+          return { ...e, result, finalScore: `${homeGoals}-${awayGoals}` };
+        }),
+      })),
+
+      setMise: (fixtureId, amount) => set((s) => ({
+        entries: s.entries.map((e) =>
+          e.fixtureId === fixtureId ? { ...e, mise: amount === '' ? null : parseFloat(amount) || null } : e
+        ),
+      })),
+
+      getStats: () => {
+        const settled = get().entries.filter((e) => e.result === 'win' || e.result === 'loss');
+        const wins = settled.filter((e) => e.result === 'win').length;
+        const rate = settled.length > 0 ? Math.round((wins / settled.length) * 100) : null;
+        const roi = settled.reduce((acc, e) => {
+          if (e.result === 'win') return acc + (parseFloat(e.odd || 1) - 1);
+          return acc - 1;
+        }, 0);
+        return {
+          total: get().entries.length,
+          settled: settled.length,
+          wins,
+          losses: settled.length - wins,
+          rate,
+          roi: settled.length > 0 ? parseFloat((roi / settled.length * 100).toFixed(1)) : null,
+        };
+      },
+
+      getBankrollStats: () => {
+        const settled = get().entries.filter((e) => e.result && e.mise > 0);
+        const totalMise = settled.reduce((s, e) => s + e.mise, 0);
+        const totalReturn = settled.reduce((s, e) => {
+          if (e.result === 'win') return s + e.mise * parseFloat(e.odd || 1);
+          return s;
+        }, 0);
+        const pnl = totalReturn - totalMise;
+        const roi = totalMise > 0 ? parseFloat((pnl / totalMise * 100).toFixed(1)) : null;
+        return { totalMise, totalReturn, pnl, roi, count: settled.length };
+      },
+
+      getBankrollCurve: () => {
+        const settled = get().entries
+          .filter((e) => e.result && e.mise > 0)
+          .sort((a, b) => new Date(a.savedAt) - new Date(b.savedAt));
+        let running = 0;
+        return settled.map((e, i) => {
+          const pnl = e.result === 'win'
+            ? e.mise * (parseFloat(e.odd || 1) - 1)
+            : -e.mise;
+          running += pnl;
+          return {
+            n: i + 1,
+            label: `${e.homeTeam?.split(' ')[0]} vs ${e.awayTeam?.split(' ')[0]}`,
+            pnl: parseFloat(pnl.toFixed(2)),
+            running: parseFloat(running.toFixed(2)),
+            result: e.result,
+          };
+        });
+      },
+    }),
+    { name: 'pronostats-history-v2' }
+  )
+);

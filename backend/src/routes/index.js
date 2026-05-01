@@ -11,5 +11,6 @@ router.use('/analysis', require('./analysis'));
 router.use('/scorers', require('./scorers'));
 router.use('/pronostics', require('./pronostics'));
 router.use('/cache', require('./cacheAdmin'));
+router.use('/news', require('./news'));
 
 module.exports = router;

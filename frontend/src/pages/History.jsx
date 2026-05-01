@@ -1,0 +1,334 @@
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { useHistoryStore } from '../store';
+import { format, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import clsx from 'clsx';
+
+const RESULT_CONFIG = {
+  win:  { label: 'Gagné',    color: 'text-brand-400', bg: 'bg-brand-500/15 border-brand-500/30', icon: Check },
+  loss: { label: 'Perdu',    color: 'text-danger',    bg: 'bg-danger/15 border-danger/30',       icon: X },
+  null: { label: 'En cours', color: 'text-white/30',  bg: 'bg-white/5 border-white/10',          icon: Clock },
+};
+
+const CustomTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-dark-700 border border-white/10 rounded-xl px-3 py-2 text-xs">
+      <p className="text-white/50 font-heading mb-1">{d.label}</p>
+      <p className={clsx('font-display text-lg', d.running >= 0 ? 'text-brand-400' : 'text-danger')}>
+        {d.running >= 0 ? '+' : ''}{d.running}€
+      </p>
+      <p className={clsx('font-heading text-xs', d.pnl >= 0 ? 'text-brand-400/70' : 'text-danger/70')}>
+        {d.pnl >= 0 ? '+' : ''}{d.pnl}€ ce pari
+      </p>
+    </div>
+  );
+};
+
+export default function History() {
+  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise } = useHistoryStore();
+  const [filter, setFilter] = useState('all');
+  const [tab, setTab] = useState('liste');
+  const [search, setSearch] = useState('');
+  const stats = getStats();
+  const bkStats = getBankrollStats();
+  const curve = getBankrollCurve();
+
+  const byResult = entries.filter((e) => {
+    if (filter === 'pending') return !e.result;
+    if (filter === 'win') return e.result === 'win';
+    if (filter === 'loss') return e.result === 'loss';
+    return true;
+  });
+
+  const filtered = tab === 'recherche' && search.trim()
+    ? entries.filter((e) =>
+        e.homeTeam?.toLowerCase().includes(search.toLowerCase()) ||
+        e.awayTeam?.toLowerCase().includes(search.toLowerCase())
+      )
+    : byResult;
+
+  const teamStats = search.trim() && tab === 'recherche' ? (() => {
+    const settled = filtered.filter(e => e.result === 'win' || e.result === 'loss');
+    const wins = settled.filter(e => e.result === 'win').length;
+    return { total: filtered.length, settled: settled.length, wins, rate: settled.length > 0 ? Math.round(wins / settled.length * 100) : null };
+  })() : null;
+
+  const grouped = filtered.reduce((acc, e) => {
+    const day = e.date || e.savedAt?.split('T')[0] || 'unknown';
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(e);
+    return acc;
+  }, {});
+  const sortedDays = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="font-display text-4xl text-white tracking-wide leading-none">Historique <span className="text-brand-400">Pronos</span></h1>
+        <p className="text-sm text-white/35 font-heading font-medium mt-1">Tous les pronostics générés par le site</p>
+      </div>
+
+      {/* Stats globales */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        {[
+          { label: 'Total', value: stats.total, color: 'text-white', icon: BarChart3 },
+          { label: 'Réussite', value: stats.rate !== null ? `${stats.rate}%` : '—', color: stats.rate >= 55 ? 'text-brand-400' : stats.rate !== null ? 'text-gold-400' : 'text-white/30', icon: Target },
+          { label: 'Gagnés', value: stats.wins, color: 'text-brand-400', icon: Check },
+          { label: 'ROI', value: stats.roi !== null ? `${stats.roi > 0 ? '+' : ''}${stats.roi}%` : '—', color: stats.roi > 0 ? 'text-brand-400' : stats.roi !== null ? 'text-danger' : 'text-white/30', icon: TrendingUp },
+        ].map(({ label, value, color, icon: Icon }) => (
+          <div key={label} className="glass-card px-3.5 py-3 flex items-center gap-3">
+            <Icon className={`w-4 h-4 flex-shrink-0 ${color}`} />
+            <div className="min-w-0">
+              <p className={`stat-number text-xl leading-none ${color}`}>{value}</p>
+              <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">{label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        {[
+          { id: 'liste', label: 'Liste', icon: BarChart3 },
+          { id: 'bankroll', label: 'Bankroll', icon: Wallet },
+          { id: 'recherche', label: 'Équipe', icon: Search },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-heading font-semibold border transition-all ${
+              tab === id ? 'bg-brand-500/15 border-brand-500/35 text-brand-400' : 'border-white/[0.08] text-white/35 hover:text-white/60'
+            }`}
+          >
+            <Icon className="w-4 h-4" /> {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── BANKROLL TAB ── */}
+      {tab === 'bankroll' && (
+        <div className="space-y-4">
+          {/* Bankroll stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {[
+              { label: 'Total misé', value: bkStats.totalMise > 0 ? `${bkStats.totalMise.toFixed(0)}€` : '—', color: 'text-white' },
+              { label: 'Retour', value: bkStats.totalReturn > 0 ? `${bkStats.totalReturn.toFixed(0)}€` : '—', color: 'text-white' },
+              { label: 'P&L', value: bkStats.count > 0 ? `${bkStats.pnl >= 0 ? '+' : ''}${bkStats.pnl.toFixed(1)}€` : '—', color: bkStats.pnl >= 0 ? 'text-brand-400' : 'text-danger' },
+              { label: 'ROI réel', value: bkStats.roi !== null ? `${bkStats.roi >= 0 ? '+' : ''}${bkStats.roi}%` : '—', color: bkStats.roi >= 0 ? 'text-brand-400' : 'text-danger' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="glass-card px-3.5 py-3">
+                <p className={`stat-number text-xl leading-none ${color}`}>{value}</p>
+                <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Courbe */}
+          {curve.length >= 2 ? (
+            <div className="glass-card p-4">
+              <p className="text-xs font-heading font-semibold text-white/35 uppercase tracking-wider mb-4">Courbe P&L cumulé (€)</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={curve} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="n" tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 11 }} axisLine={false} tickLine={false} width={40}
+                    tickFormatter={(v) => `${v > 0 ? '+' : ''}${v}€`} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" strokeDasharray="4 4" />
+                  <Line
+                    type="monotone"
+                    dataKey="running"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }}
+                    activeDot={{ r: 5, fill: '#22c55e' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="glass-card p-8 text-center">
+              <Wallet className="w-10 h-10 text-white/10 mx-auto mb-3" />
+              <p className="text-white/40 font-heading font-semibold">Entrez vos mises dans l'onglet Liste</p>
+              <p className="text-white/20 text-xs font-heading mt-1">La courbe apparaîtra après 2 paris résolus avec mise</p>
+            </div>
+          )}
+
+          {/* Liste avec mises */}
+          <div className="space-y-2">
+            {entries.filter(e => e.result).map((entry) => (
+              <EntryCard key={entry.fixtureId || entry.savedAt} entry={entry} setMise={setMise} showMise />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── RECHERCHE TAB ── */}
+      {tab === 'recherche' && (
+        <>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Chercher une équipe..."
+              className="w-full bg-dark-800 border border-white/[0.07] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-brand-500/40 font-heading"
+              autoFocus
+            />
+          </div>
+          {teamStats && search.trim() && (
+            <div className="glass-card px-4 py-3 flex items-center gap-4 flex-wrap">
+              <span className="text-sm text-white/40 font-heading">"{search}" :</span>
+              <span className="text-sm text-white/60 font-heading font-semibold">{teamStats.total} pronos</span>
+              {teamStats.settled > 0 && (
+                <>
+                  <span className={`stat-number text-lg ${teamStats.rate >= 55 ? 'text-brand-400' : 'text-gold-400'}`}>{teamStats.rate}%</span>
+                  <span className="text-sm text-brand-400 font-heading font-semibold">{teamStats.wins}W</span>
+                  <span className="text-sm text-danger font-heading font-semibold">{teamStats.settled - teamStats.wins}L</span>
+                </>
+              )}
+            </div>
+          )}
+          <div className="space-y-2">
+            {filtered.map((entry) => (
+              <EntryCard key={entry.fixtureId || entry.savedAt} entry={entry} setMise={setMise} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── LISTE TAB ── */}
+      {tab === 'liste' && (
+        <>
+          <div className="flex gap-2">
+            {[['all', 'Tous'], ['pending', 'En cours'], ['win', 'Gagnés'], ['loss', 'Perdus']].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setFilter(val)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-heading font-semibold border transition-all ${
+                  filter === val ? 'bg-brand-500/15 border-brand-500/35 text-brand-400' : 'border-white/[0.08] text-white/35 hover:text-white/60'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {entries.length === 0 && (
+            <div className="glass-card p-12 text-center">
+              <BookOpen className="w-12 h-12 text-white/10 mx-auto mb-3" />
+              <p className="text-white/50 font-heading font-semibold">Aucun pronostic enregistré</p>
+              <p className="text-white/25 text-sm mt-1 font-heading max-w-xs mx-auto">
+                Les pronos générés sur la page d'accueil s'enregistreront ici automatiquement
+              </p>
+            </div>
+          )}
+
+          {filtered.length === 0 && entries.length > 0 && (
+            <div className="glass-card p-8 text-center">
+              <p className="text-white/35 text-sm font-heading">Aucun prono dans cette catégorie</p>
+            </div>
+          )}
+
+          <div className="space-y-6">
+            {sortedDays.map((day) => (
+              <div key={day}>
+                <p className="text-xs font-heading font-semibold text-white/25 uppercase tracking-widest mb-2 px-1">
+                  {day !== 'unknown' ? format(parseISO(day), 'EEEE d MMMM yyyy', { locale: fr }) : 'Date inconnue'}
+                </p>
+                <div className="space-y-2">
+                  {grouped[day].map((entry) => (
+                    <EntryCard key={entry.fixtureId || entry.savedAt} entry={entry} setMise={setMise} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function EntryCard({ entry, setMise, showMise = false }) {
+  const res = RESULT_CONFIG[entry.result] || RESULT_CONFIG[null];
+  const ResIcon = res.icon;
+  const [miseInput, setMiseInput] = useState(entry.mise != null ? String(entry.mise) : '');
+
+  const pnl = entry.result === 'win' && entry.mise
+    ? entry.mise * (parseFloat(entry.odd || 1) - 1)
+    : entry.result === 'loss' && entry.mise
+    ? -entry.mise
+    : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card px-4 py-3"
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border ${res.bg}`}>
+          <ResIcon className={`w-3.5 h-3.5 ${res.color}`} />
+        </div>
+
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <img src={entry.homeLogo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
+          <span className="text-sm font-heading font-semibold text-white/75 truncate">{entry.homeTeam}</span>
+          <span className="text-xs text-white/20 flex-shrink-0">vs</span>
+          <span className="text-sm font-heading font-semibold text-white/75 truncate">{entry.awayTeam}</span>
+          <img src={entry.awayLogo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
+        </div>
+
+        {entry.finalScore && (
+          <span className="font-display text-base text-white tabular-nums flex-shrink-0">{entry.finalScore}</span>
+        )}
+        {entry.odd && (
+          <span className="text-sm font-display text-gold-400 flex-shrink-0">@{parseFloat(entry.odd).toFixed(2)}</span>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between mt-2 ml-11 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          {entry.leagueLogo && (
+            <img src={entry.leagueLogo} alt="" className="w-3 h-3 object-contain" onError={e => e.target.style.display='none'} />
+          )}
+          <span className="text-xs text-white/30 font-heading">{entry.league}</span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {entry.pickLabel && (
+            <span className="text-xs font-heading font-semibold text-brand-300 bg-brand-500/10 px-2 py-0.5 rounded-md">{entry.pickLabel}</span>
+          )}
+          {/* Mise input */}
+          <div className="flex items-center gap-1 bg-dark-700 border border-white/[0.07] rounded-lg px-2 py-0.5">
+            <Euro className="w-3 h-3 text-white/25" />
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={miseInput}
+              onChange={(e) => {
+                setMiseInput(e.target.value);
+                setMise(entry.fixtureId, e.target.value);
+              }}
+              placeholder="Mise"
+              className="w-14 bg-transparent text-xs text-white placeholder:text-white/20 focus:outline-none font-mono"
+            />
+          </div>
+          {/* P&L display */}
+          {pnl !== null && (
+            <span className={`text-xs font-display ${pnl >= 0 ? 'text-brand-400' : 'text-danger'}`}>
+              {pnl >= 0 ? '+' : ''}{pnl.toFixed(1)}€
+            </span>
+          )}
+          <span className={`text-xs font-heading font-semibold ${res.color}`}>{res.label}</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+}

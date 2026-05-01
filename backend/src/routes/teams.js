@@ -8,6 +8,25 @@ router.get('/search', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/:id/squad', async (req, res, next) => {
+  try {
+    res.json(await api.getTeamSquad(req.params.id));
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/injuries', async (req, res, next) => {
+  try {
+    const { season } = req.query;
+    res.json(await api.getTeamInjuries(req.params.id, season));
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/transfers', async (req, res, next) => {
+  try {
+    res.json(await api.getTransfers(req.params.id));
+  } catch (err) { next(err); }
+});
+
 router.get('/:id/statistics', async (req, res, next) => {
   try {
     const { season, league } = req.query;

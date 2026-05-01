@@ -32,6 +32,31 @@ function StatComparison({ label, home, away }) {
   );
 }
 
+function getRecOdd(rec, odds, homeTeam, awayTeam) {
+  const advice = (rec?.advice || '').toLowerCase();
+  const dc = odds?.doubleChance;
+  const mw = odds?.matchWinner?.odds;
+
+  // Double chance : parse which combo from advice text
+  const isDoubleChance = advice.includes('double chance') || advice.includes(' or ');
+  if (isDoubleChance && dc) {
+    const hasHome = homeTeam && advice.includes(homeTeam.toLowerCase().substring(0, 4));
+    const hasAway = awayTeam && advice.includes(awayTeam.toLowerCase().substring(0, 4));
+    const hasDraw = advice.includes('draw') || advice.includes('nul');
+    if (hasDraw && hasAway) return dc.drawAway?.odd;
+    if (hasDraw && hasHome) return dc.homeDraw?.odd;
+    if (hasHome && hasAway) return dc.homeAway?.odd;
+  }
+
+  // Simple 1X2
+  if (!mw) return odds?.bestBet?.odd;
+  const w = (rec?.winner || '').toLowerCase();
+  if (w === 'draw') return mw.draw;
+  if (homeTeam && w.includes(homeTeam.toLowerCase().substring(0, 4))) return mw.home;
+  if (awayTeam && w.includes(awayTeam.toLowerCase().substring(0, 4))) return mw.away;
+  return odds?.bestBet?.odd;
+}
+
 export default function PredictionWidget({ analysis, homeTeam, awayTeam }) {
   if (!analysis) return null;
 
@@ -44,6 +69,7 @@ export default function PredictionWidget({ analysis, homeTeam, awayTeam }) {
   const comp = predictions?.goalsComparison;
   const xG = predictions?.expectedGoals;
   const bestBet = odds?.bestBet;
+  const recOdd = rec ? getRecOdd(rec, odds, homeTeam, awayTeam) : null;
 
   return (
     <div className="space-y-4">
@@ -58,9 +84,16 @@ export default function PredictionWidget({ analysis, homeTeam, awayTeam }) {
             <div className="w-8 h-8 rounded-lg bg-brand-gradient flex items-center justify-center flex-shrink-0">
               <Target className="w-4 h-4 text-white" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs text-brand-400 font-semibold mb-0.5">Recommandation API</p>
-              <p className="text-sm text-white/90">{rec.advice}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm text-white/90">{rec.advice}</p>
+                {recOdd && (
+                  <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 font-black text-sm">
+                    {recOdd.toFixed(2)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </motion.div>

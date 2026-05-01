@@ -46,6 +46,9 @@ export const teamsApi = {
   getById: (id) => api.get(`/teams/${id}`),
   search: (name) => api.get('/teams/search', { params: { name } }),
   getStatistics: (id, season, league) => api.get(`/teams/${id}/statistics`, { params: { season, league } }),
+  getSquad: (id) => api.get(`/teams/${id}/squad`),
+  getInjuries: (id, season) => api.get(`/teams/${id}/injuries`, { params: { season } }),
+  getTransfers: (id) => api.get(`/teams/${id}/transfers`),
 };
 
 export const leaguesApi = {
@@ -70,6 +73,10 @@ export const scorersApi = {
 
 export const pronosticsApi = {
   getBestToday: () => api.get('/pronostics/today'),
+};
+
+export const newsApi = {
+  getLatest: () => api.get('/news'),
 };
 
 export default api;

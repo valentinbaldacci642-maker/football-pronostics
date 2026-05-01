@@ -181,9 +181,23 @@ class ApiFootballService {
     return this.request('/players', { search: name }, config.cache.ttlTeams);
   }
 
+  // ─── Squad ────────────────────────────────────────────────────────────────
+  async getTeamSquad(teamId) {
+    return this.request('/players/squads', { team: teamId }, config.cache.ttlTeams);
+  }
+
   // ─── Injuries ─────────────────────────────────────────────────────────────
   async getInjuries(fixtureId) {
     return this.request('/injuries', { fixture: fixtureId }, config.cache.ttlFixtures);
+  }
+
+  async getTeamInjuries(teamId, season = 2024) {
+    return this.request('/injuries', { team: teamId, season }, config.cache.ttlTeams);
+  }
+
+  // ─── Transfers ────────────────────────────────────────────────────────────
+  async getTransfers(teamId) {
+    return this.request('/transfers', { team: teamId }, config.cache.ttlTeams);
   }
   getQuota() {
     return {
