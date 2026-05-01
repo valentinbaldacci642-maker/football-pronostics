@@ -42,7 +42,6 @@ function parseItems(xml, source) {
     const pubDate = tag('pubDate') || tag('updated');
     const desc = tag('description') || tag('summary') || '';
     const mcUrl = (body.match(/media:(?:content|thumbnail)[^>]+url="([^"]+)"/) || [])[1] || null;
-    const encUrl = (body.match(/<enclosure[^>]+url="([^"]+)"[^>]+type="image/) || [])[1] || null;
     const imgUrl = (desc.match(/<img[^>]+src=["']([^"']+)["']/) || [])[1] || null;
     if (title && link) {
       items.push({
@@ -50,7 +49,7 @@ function parseItems(xml, source) {
         link: link,
         pubDate: pubDate ? safeIso(pubDate) : null,
         source: source,
-        image: mcUrl || encUrl || imgUrl || null,
+        image: mcUrl || imgUrl || null,
         summary: desc.replace(/<[^>]*>/g, '').slice(0, 180).trim(),
       });
     }
@@ -61,8 +60,6 @@ function parseItems(xml, source) {
 const FEEDS = [
   { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
   { url: 'https://www.90min.com/fr/posts.rss', source: '90min' },
-  { url: 'https://www.footmercato.net/rss/', source: 'Foot Mercato' },
-  { url: 'https://www.lequipe.fr/rss/actu_rss.xml', source: "L'Equipe" },
 ];
 
 let cache = { data: null, ts: 0 };
@@ -70,7 +67,6 @@ const TTL = 15 * 60 * 1000;
 
 module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
   res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate');
 
   if (cache.data && Date.now() - cache.ts < TTL) {
@@ -80,10 +76,12 @@ module.exports = async function(req, res) {
   const results = await Promise.allSettled(
     FEEDS.map(async function(feed) {
       const xml = await fetchUrl(feed.url);
-      return parseItems(xml, feed.source);
+      const items = parseItems(xml, feed.source);
+      return items;
     })
   );
 
+  const errors = results.filter(function(r) { return r.status === 'rejected'; }).map(function(r) { return r.reason && r.reason.message; });
   const articles = results
     .filter(function(r) { return r.status === 'fulfilled'; })
     .reduce(function(acc, r) { return acc.concat(r.value); }, [])
@@ -91,6 +89,8 @@ module.exports = async function(req, res) {
     .sort(function(a, b) { return new Date(b.pubDate || 0) - new Date(a.pubDate || 0); })
     .slice(0, 40);
 
-  cache = { data: { articles: articles }, ts: Date.now() };
-  res.json({ articles: articles });
+  const out = { articles: articles };
+  if (errors.length) out.errors = errors;
+  cache = { data: out, ts: Date.now() };
+  res.json(out);
 };
