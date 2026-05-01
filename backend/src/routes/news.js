@@ -1,17 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const Parser = require('rss-parser');
-const parser = new Parser({ timeout: 8000 });
+const parser = new Parser({
+  timeout: 10000,
+  headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0)' },
+});
 
 const FEEDS = [
+  { url: 'https://news.google.com/rss/search?q=football+ligue1&hl=fr&gl=FR&ceid=FR:fr', source: 'Google News' },
   { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
-  { url: 'https://www.lequipe.fr/rss/actu_rss.xml', source: "L'Équipe" },
   { url: 'https://feeds.bbci.co.uk/sport/football/rss.xml', source: 'BBC Sport' },
-  { url: 'https://www.goal.com/feeds/fr/news', source: 'Goal.com' },
+  { url: 'https://www.lequipe.fr/rss/actu_rss_football.xml', source: "L'Équipe" },
 ];
 
 let cache = { data: null, ts: 0 };
-const TTL = 15 * 60 * 1000; // 15 min
+const TTL = 15 * 60 * 1000;
 
 router.get('/', async (req, res, next) => {
   try {
@@ -28,9 +31,9 @@ router.get('/', async (req, res, next) => {
           pubDate: item.isoDate || item.pubDate || null,
           source: feed.source,
           image:
-            item.enclosure?.url ||
             item['media:content']?.['$']?.url ||
             item['media:thumbnail']?.['$']?.url ||
+            item.enclosure?.url ||
             null,
           summary: (item.contentSnippet || item.summary || '')
             .replace(/<[^>]*>/g, '')

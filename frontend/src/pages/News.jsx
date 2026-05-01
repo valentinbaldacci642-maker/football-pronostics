@@ -1,21 +1,90 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ExternalLink, RefreshCw, Newspaper, Clock } from 'lucide-react';
-import { newsApi } from '../services/api';
-import { formatDistanceToNow, parseISO } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { newsApi } from '../services/api';
 
+const FEEDS = [
+  { url: 'https://news.google.com/rss/search?q=football+ligue1&hl=fr&gl=FR&ceid=FR:fr', source: 'Google News' },
+  { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
+  { url: 'https://feeds.bbci.co.uk/sport/football/rss.xml', source: 'BBC Sport' },
+  { url: 'https://www.lequipe.fr/rss/actu_rss_football.xml', source: "L'Équipe" },
+];
+
+const PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
+
+function extractImage(item) {
+  const mediaNS = 'http://search.yahoo.com/mrss/';
+  const mc = item.getElementsByTagNameNS(mediaNS, 'content')[0]
+    || item.getElementsByTagNameNS(mediaNS, 'thumbnail')[0];
+  if (mc?.getAttribute('url')) return mc.getAttribute('url');
+  const enc = item.querySelector('enclosure');
+  if (enc) {
+    const t = enc.getAttribute('type') || '';
+    const u = enc.getAttribute('url') || '';
+    if (t.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(u)) return u;
+  }
+  return null;
+}
+
+function parseFeedXML(xml, source) {
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  return Array.from(doc.querySelectorAll('item'))
+    .slice(0, 15)
+    .map((item) => {
+      const get = (tag) => item.querySelector(tag)?.textContent?.trim() || '';
+      const linkEl = item.getElementsByTagName('link')[0];
+      const link = linkEl?.textContent?.trim() || linkEl?.getAttribute('href') || '';
+      const rawDate = get('pubDate') || get('updated');
+      let image = extractImage(item);
+      if (!image) {
+        const desc = item.querySelector('description')?.textContent || '';
+        const m = desc.match(/<img[^>]+src=["']([^"']+)["']/);
+        if (m) image = m[1];
+      }
+      const description = item.querySelector('description')?.textContent || '';
+      return {
+        title: get('title'),
+        link,
+        pubDate: rawDate ? (() => { try { return new Date(rawDate).toISOString(); } catch { return null; } })() : null,
+        source,
+        image,
+        summary: description.replace(/<[^>]*>/g, '').slice(0, 180).trim(),
+      };
+    })
+    .filter((a) => a.title && a.link);
+}
+
+async function fetchDirectRSS() {
+  const results = await Promise.allSettled(
+    FEEDS.map(async (feed) => {
+      const res = await fetch(`${PROXY}${encodeURIComponent(feed.url)}`, { signal: AbortSignal.timeout(12000) });
+      const xml = await res.text();
+      if (!xml?.trim().startsWith('<')) return [];
+      return parseFeedXML(xml, feed.source);
+    })
+  );
+  return results
+    .filter((r) => r.status === 'fulfilled')
+    .flatMap((r) => r.value)
+    .filter((a) => a.title && a.link)
+    .sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0))
+    .slice(0, 40);
+}
 const SOURCE_COLORS = {
-  "RMC Sport":  { bg: 'bg-blue-500/15 text-blue-400',  dot: 'bg-blue-400' },
-  "L'Équipe":   { bg: 'bg-brand-500/15 text-brand-400', dot: 'bg-brand-400' },
-  "BBC Sport":  { bg: 'bg-red-500/15 text-red-400',     dot: 'bg-red-400' },
-  "Goal.com":   { bg: 'bg-gold-500/15 text-gold-400',   dot: 'bg-gold-400' },
+  "Google News": { bg: 'bg-blue-500/15 text-blue-400',    dot: 'bg-blue-400' },
+  "RMC Sport":   { bg: 'bg-brand-500/15 text-brand-400',  dot: 'bg-brand-400' },
+  "BBC Sport":   { bg: 'bg-red-500/15 text-red-400',      dot: 'bg-red-400' },
+  "L'Équipe":    { bg: 'bg-gold-500/15 text-gold-400',    dot: 'bg-gold-400' },
 };
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   try {
-    return formatDistanceToNow(parseISO(dateStr), { addSuffix: true, locale: fr });
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return formatDistanceToNow(d, { addSuffix: true, locale: fr });
   } catch {
     return '';
   }
@@ -103,10 +172,17 @@ export default function News() {
     setLoading(true);
     setError(null);
     try {
-      const data = await newsApi.getLatest();
-      setArticles(data?.articles || []);
+      // Try backend first (cached), fall back to direct RSS fetch
+      let articles = [];
+      try {
+        const data = await newsApi.getLatest();
+        articles = data?.articles || [];
+      } catch {
+        articles = await fetchDirectRSS();
+      }
+      setArticles(articles);
     } catch (err) {
-      setError(err.message);
+      setError('Impossible de charger les actualités');
     } finally {
       setLoading(false);
     }
