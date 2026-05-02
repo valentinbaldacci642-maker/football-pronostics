@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Menu, X } from 'lucide-react';
-import { useUIStore } from '../../store';
+import { Search } from 'lucide-react';
 import { teamsApi } from '../../services/api';
 
 export default function Navbar() {
-  const { sidebarOpen, setSidebarOpen } = useUIStore();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -33,20 +31,13 @@ export default function Navbar() {
         borderBottom: '1px solid rgba(255,255,255,0.05)',
       }}
     >
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="lg:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-white/[0.06] hover:bg-white/10 transition-colors"
-      >
-        {sidebarOpen ? <X className="w-4.5 h-4.5 w-[18px] h-[18px]" /> : <Menu className="w-[18px] h-[18px]" />}
-      </button>
-
       <Link to="/" className="flex items-center gap-2 lg:hidden flex-shrink-0">
         <img src="/ball.webp" alt="logo" className="w-7 h-7 rounded-lg object-cover" style={{ filter: 'drop-shadow(0 0 6px rgba(34,197,94,0.35))' }} />
         <span className="font-display text-base text-white tracking-wider">PronosDesFoufous</span>
       </Link>
 
       {/* Search */}
-      <div className="flex-1 max-w-sm relative ml-auto lg:ml-0">
+      <div className="flex-1 max-w-sm relative lg:ml-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
           {searching && (

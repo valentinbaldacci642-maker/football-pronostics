@@ -2,6 +2,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
+import BottomNav from './components/common/BottomNav';
 import PageTransition from './components/common/PageTransition';
 import Home from './pages/Home';
 import Matchs from './pages/Matchs';
@@ -22,7 +23,7 @@ export default function App() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         <Navbar />
-        <main className="flex-1 px-4 md:px-6 lg:px-8 pb-8 pt-20">
+        <main className="flex-1 px-4 md:px-6 lg:px-8 pb-24 lg:pb-8 pt-20">
           <AnimatePresence mode="wait" initial={false}>
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<PageTransition><Home /></PageTransition>} />
@@ -39,6 +40,7 @@ export default function App() {
           </AnimatePresence>
         </main>
       </div>
+      <BottomNav />
     </div>
   );
 }
