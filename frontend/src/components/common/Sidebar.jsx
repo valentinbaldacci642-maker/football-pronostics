@@ -8,8 +8,8 @@ import { useUIStore } from '../../store';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
-  { to: '/', icon: Flame, label: 'Pronostics', exact: true },
-  { to: '/matchs', icon: Calendar, label: 'Matchs' },
+  { to: '/', icon: Flame, label: 'Accueil', exact: true },
+  { to: '/matchs', icon: Calendar, label: 'Matchs/Pronostics' },
   { to: '/leagues', icon: Trophy, label: 'Ligues' },
   { to: '/worldcup', icon: Globe2, label: 'Coupe du Monde' },
   { to: '/news', icon: Newspaper, label: 'Actu Football' },

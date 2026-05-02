@@ -6,10 +6,12 @@ import { fr } from 'date-fns/locale';
 
 
 const FEEDS = [
-  { url: 'https://news.google.com/rss/search?q=football+ligue+1+france&hl=fr&gl=FR&ceid=FR:fr', source: 'Google News' },
-  { url: 'https://news.google.com/rss/search?q=football+transfert+mercato&hl=fr&gl=FR&ceid=FR:fr', source: 'Google News' },
   { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
   { url: 'https://www.90min.com/fr/posts.rss', source: '90min' },
+  { url: 'https://www.lequipe.fr/rss/actu_rss_Football.xml', source: "L'Équipe" },
+  { url: 'https://www.maxifoot.fr/rss/rss.php', source: 'Maxifoot' },
+  { url: 'https://www.footmercato.net/flux-rss/rss.xml', source: 'Foot Mercato' },
+  { url: 'https://news.google.com/rss/search?q=football+ligue+1+france&hl=fr&gl=FR&ceid=FR:fr', source: 'Google News' },
 ];
 
 const PROXY = 'https://api.allorigins.win/raw?url=';
@@ -75,9 +77,12 @@ async function fetchDirectRSS() {
     .slice(0, 40);
 }
 const SOURCE_COLORS = {
-  "Google News": { bg: 'bg-blue-500/15 text-blue-400',    dot: 'bg-blue-400' },
-  "RMC Sport":   { bg: 'bg-brand-500/15 text-brand-400',  dot: 'bg-brand-400' },
-  "90min":       { bg: 'bg-gold-500/15 text-gold-400',    dot: 'bg-gold-400' },
+  "Google News":  { bg: 'bg-blue-500/15 text-blue-400',    dot: 'bg-blue-400' },
+  "RMC Sport":    { bg: 'bg-brand-500/15 text-brand-400',  dot: 'bg-brand-400' },
+  "90min":        { bg: 'bg-gold-500/15 text-gold-400',    dot: 'bg-gold-400' },
+  "L'Équipe":     { bg: 'bg-red-500/15 text-red-400',      dot: 'bg-red-400' },
+  "Maxifoot":     { bg: 'bg-violet-500/15 text-violet-400', dot: 'bg-violet-400' },
+  "Foot Mercato": { bg: 'bg-orange-500/15 text-orange-400', dot: 'bg-orange-400' },
 };
 
 function timeAgo(dateStr) {
@@ -173,12 +178,24 @@ export default function News() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('https://football-pronostics-tau.vercel.app/api/news');
+      const res = await fetch(
+        `https://football-pronostics-tau.vercel.app/api/news.js?_=${Date.now()}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const articles = data?.articles || [];
-      setArticles(articles);
-    } catch (err) {
-      setError('Impossible de charger les actualités');
+      const arts = data?.articles ?? [];
+      if (arts.length === 0) throw new Error('empty');
+      setArticles(arts);
+    } catch (primaryErr) {
+      console.error('[News] vercel fetch failed:', primaryErr.message);
+      try {
+        const arts = await fetchDirectRSS();
+        if (arts.length === 0) throw new Error('empty');
+        setArticles(arts);
+      } catch (fallbackErr) {
+        console.error('[News] fallback failed:', fallbackErr.message);
+        setError(`Erreur: ${primaryErr.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -244,7 +261,7 @@ export default function News() {
       ) : error ? (
         <div className="glass-card p-10 text-center space-y-3">
           <div className="font-display text-3xl text-danger/50">ERR</div>
-          <p className="text-white/40 font-heading">{error}</p>
+          <p className="text-white/40 font-heading font-mono text-xs">{error}</p>
           <button onClick={load} className="btn-primary mt-2">Réessayer</button>
         </div>
       ) : filtered.length === 0 ? (

@@ -251,7 +251,7 @@ export default function Home() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-4xl text-white tracking-wide leading-none mb-1">
-            Meilleurs <span className="text-gradient-neon">Pronostics</span>
+            Meilleur <span className="text-gradient-neon">Prono du Jour</span>
           </h1>
           <p className="text-sm text-white/35 font-heading font-medium">
             {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })} · Analyse IA + données en direct
@@ -315,11 +315,7 @@ export default function Home() {
       )}
 
       {/* Loading */}
-      {loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} />)}
-        </div>
-      )}
+      {loading && <Skeleton />}
 
       {/* Error */}
       {!loading && error && (
@@ -351,18 +347,11 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <PronosticCard pronostic={pronostics[0]} featured index={0} />
-            </div>
-            {pronostics.slice(1).map((p, i) => (
-              <PronosticCard key={p.fixture.fixture.id} pronostic={p} index={i + 1} />
-            ))}
-          </div>
+          <PronosticCard pronostic={pronostics[0]} featured index={0} />
 
           <div className="text-center pt-2">
             <Link to="/matchs" className="inline-flex items-center gap-2 text-sm text-white/25 hover:text-white/50 font-heading font-medium transition-colors">
-              Voir tous les matchs <ChevronRight className="w-4 h-4" />
+              Tous les pronostics <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
         </>

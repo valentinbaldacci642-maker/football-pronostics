@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, AlertTriangle, ArrowLeftRight, Info, ArrowLeft, MapPin, Calendar, Trophy } from 'lucide-react';
+import { Users, AlertTriangle, ArrowLeftRight, Info, ArrowLeft, MapPin, Calendar, Trophy, Star } from 'lucide-react';
 import { teamsApi } from '../services/api';
 import { Spinner, ErrorState } from '../components/ui/Loading';
+import { useFavoriteTeamsStore } from '../store';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -41,6 +42,8 @@ export default function Team() {
   if (!teamData) return <ErrorState message="Équipe introuvable" />;
 
   const { team, venue } = teamData;
+  const { toggleTeam, isTeamFavorite } = useFavoriteTeamsStore();
+  const isFav = isTeamFavorite(team.id);
   const tabs = [
     { key: 'effectif', label: 'Effectif', icon: Users },
     { key: 'blessures', label: 'Blessures', icon: AlertTriangle },
@@ -60,7 +63,15 @@ export default function Team() {
         <div className="flex items-center gap-5">
           <img src={team.logo} alt={team.name} className="w-20 h-20 object-contain" onError={e => e.target.style.display='none'} />
           <div className="flex-1 min-w-0">
-            <h1 className="font-display text-4xl text-white tracking-wide leading-none">{team.name}</h1>
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="font-display text-4xl text-white tracking-wide leading-none">{team.name}</h1>
+              <button
+                onClick={() => toggleTeam({ id: team.id, name: team.name, logo: team.logo, country: team.country })}
+                className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isFav ? 'bg-gold-500/20 text-gold-400' : 'bg-dark-700/60 text-white/25 hover:text-gold-400 hover:bg-gold-500/10'}`}
+              >
+                <Star className={`w-4 h-4 ${isFav ? 'fill-gold-400' : ''}`} />
+              </button>
+            </div>
             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-white/50">
               {team.country && (
                 <span className="flex items-center gap-1.5">

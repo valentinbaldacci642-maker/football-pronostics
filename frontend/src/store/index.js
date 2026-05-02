@@ -34,6 +34,22 @@ export const useFavoritesStore = create(
   )
 );
 
+export const useFavoriteTeamsStore = create(
+  persist(
+    (set, get) => ({
+      favoriteTeams: [],
+      toggleTeam: (team) => {
+        const current = get().favoriteTeams;
+        const exists = current.some((t) => t.id === team.id);
+        set({ favoriteTeams: exists ? current.filter((t) => t.id !== team.id) : [...current, team] });
+      },
+      isTeamFavorite: (teamId) => get().favoriteTeams.some((t) => t.id === teamId),
+      clearTeams: () => set({ favoriteTeams: [] }),
+    }),
+    { name: 'pronostats-favorite-teams' }
+  )
+);
+
 export const useLeaguesStore = create(
   persist(
     (set) => ({
