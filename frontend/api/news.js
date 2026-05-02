@@ -54,7 +54,7 @@ async function fetchFeed(feed) {
   }
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate');
   try {
