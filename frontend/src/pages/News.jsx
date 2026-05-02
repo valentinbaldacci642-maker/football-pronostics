@@ -177,9 +177,7 @@ export default function News() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `https://football-pronostics-tau.vercel.app/api/news`
-      );
+      const res = await fetch(`/api/news`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const arts = data?.articles ?? [];

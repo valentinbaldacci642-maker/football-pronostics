@@ -65,8 +65,11 @@ function parseItems(xml, source) {
 }
 
 const FEEDS = [
-  { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
-  { url: 'https://www.90min.com/fr/posts.rss', source: '90min' },
+  { url: 'https://news.google.com/rss/search?q=site:rmcsport.bfmtv.com+football&hl=fr&gl=FR&ceid=FR:fr', source: 'RMC Sport' },
+  { url: 'https://news.google.com/rss/search?q=site:90min.com+football&hl=fr&gl=FR&ceid=FR:fr', source: '90min' },
+  { url: 'https://news.google.com/rss/search?q=site:lequipe.fr+football&hl=fr&gl=FR&ceid=FR:fr', source: "L'Équipe" },
+  { url: 'https://news.google.com/rss/search?q=site:maxifoot.fr&hl=fr&gl=FR&ceid=FR:fr', source: 'Maxifoot' },
+  { url: 'https://news.google.com/rss/search?q=site:footmercato.net&hl=fr&gl=FR&ceid=FR:fr', source: 'Foot Mercato' },
 ];
 
 module.exports = async function(req, res) {
