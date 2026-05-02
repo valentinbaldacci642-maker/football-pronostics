@@ -67,9 +67,9 @@ function parseItems(xml, source) {
 const FEEDS = [
   { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
   { url: 'https://www.90min.com/fr/posts.rss', source: '90min' },
-  { url: 'https://www.lequipe.fr/rss/actu_rss_Football.xml', source: "L'Équipe" },
-  { url: 'https://www.maxifoot.fr/rss/rss.php', source: 'Maxifoot' },
-  { url: 'https://www.footmercato.net/flux-rss/rss.xml', source: 'Foot Mercato' },
+  { url: 'https://news.google.com/rss/search?q=site:lequipe.fr+football&hl=fr&gl=FR&ceid=FR:fr', source: "L'Équipe" },
+  { url: 'https://news.google.com/rss/search?q=site:maxifoot.fr&hl=fr&gl=FR&ceid=FR:fr', source: 'Maxifoot' },
+  { url: 'https://news.google.com/rss/search?q=site:footmercato.net&hl=fr&gl=FR&ceid=FR:fr', source: 'Foot Mercato' },
 ];
 
 module.exports = async function(req, res) {
