@@ -6,8 +6,8 @@ import { fr } from 'date-fns/locale';
 
 
 const FEEDS = [
-  { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
-  { url: 'https://www.90min.com/fr/posts.rss', source: '90min' },
+  { url: 'https://news.google.com/rss/search?q=site:rmcsport.bfmtv.com+football&hl=fr&gl=FR&ceid=FR:fr', source: 'RMC Sport' },
+  { url: 'https://news.google.com/rss/search?q=site:90min.com+football&hl=fr&gl=FR&ceid=FR:fr', source: '90min' },
   { url: 'https://news.google.com/rss/search?q=site:lequipe.fr+football&hl=fr&gl=FR&ceid=FR:fr', source: "L'Équipe" },
   { url: 'https://news.google.com/rss/search?q=site:maxifoot.fr&hl=fr&gl=FR&ceid=FR:fr', source: 'Maxifoot' },
   { url: 'https://news.google.com/rss/search?q=site:footmercato.net&hl=fr&gl=FR&ceid=FR:fr', source: 'Foot Mercato' },
@@ -178,7 +178,7 @@ export default function News() {
     setError(null);
     try {
       const res = await fetch(
-        `https://football-pronostics-tau.vercel.app/api/news.js?_=${Date.now()}`
+        `https://football-pronostics-tau.vercel.app/api/news.js`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
