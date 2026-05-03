@@ -71,6 +71,37 @@ export const useUIStore = create((set) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
 }));
 
+export const useBetsStore = create(
+  persist(
+    (set, get) => ({
+      bets: [],
+
+      addBet: (bet) => set((s) => ({
+        bets: [{ ...bet, id: Date.now(), createdAt: new Date().toISOString(), resultat: 'attente' }, ...s.bets],
+      })),
+
+      updateResultat: (id, resultat) => set((s) => ({
+        bets: s.bets.map((b) => b.id === id ? { ...b, resultat } : b),
+      })),
+
+      deleteBet: (id) => set((s) => ({ bets: s.bets.filter((b) => b.id !== id) })),
+
+      getStats: () => {
+        const bets = get().bets;
+        const settled = bets.filter((b) => b.resultat !== 'attente');
+        const wins = bets.filter((b) => b.resultat === 'gagne');
+        const totalMise = settled.reduce((s, b) => s + b.mise, 0);
+        const totalGagne = wins.reduce((s, b) => s + b.gainPotentiel, 0);
+        const pnl = totalGagne - totalMise;
+        const roi = totalMise > 0 ? parseFloat((pnl / totalMise * 100).toFixed(1)) : null;
+        const taux = settled.length > 0 ? Math.round((wins.length / settled.length) * 100) : null;
+        return { totalMise, totalGagne, pnl, roi, taux, wins: wins.length, losses: settled.length - wins.length, settled: settled.length, total: bets.length };
+      },
+    }),
+    { name: 'pronostats-bets-v1' }
+  )
+);
+
 export const useHistoryStore = create(
   persist(
     (set, get) => ({

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Search, Trophy, ChevronRight, BarChart2, List } from 'lucide-react';
-import { leaguesApi } from '../services/api';
+import { Search, Trophy, ChevronRight, BarChart2, List, Award } from 'lucide-react';
+import { leaguesApi, playersApi } from '../services/api';
 import { SkeletonCard, EmptyState, ErrorState } from '../components/ui/Loading';
 
 const TOP_LEAGUES_IDS = [39, 140, 78, 135, 61, 2, 3, 1, 94, 88];
@@ -160,28 +160,47 @@ function CompetitionsTab() {
 
 function StandingsTab() {
   const [selected, setSelected] = useState(STANDINGS_LEAGUES[0]);
+  const [subTab, setSubTab] = useState('classement'); // 'classement' | 'buteurs'
   const [standings, setStandings] = useState(null);
+  const [scorers, setScorers] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('all'); // 'all' | 'home' | 'away'
+  const [viewMode, setViewMode] = useState('all');
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      setStandings(null);
-      try {
-        const data = await leaguesApi.getStandings(selected.id, selected.season);
-        const groups = data?.response?.[0]?.league?.standings;
-        setStandings(groups || []);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [selected]);
+    if (subTab === 'classement') {
+      const load = async () => {
+        setLoading(true);
+        setError(null);
+        setStandings(null);
+        try {
+          const data = await leaguesApi.getStandings(selected.id, selected.season);
+          const groups = data?.response?.[0]?.league?.standings;
+          setStandings(groups || []);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+      load();
+    } else {
+      const load = async () => {
+        setLoading(true);
+        setError(null);
+        setScorers(null);
+        try {
+          const data = await playersApi.getTopScorers(selected.id, selected.season);
+          setScorers(data?.response || []);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+      load();
+    }
+  }, [selected, subTab]);
 
   return (
     <div className="space-y-4">
@@ -203,38 +222,137 @@ function StandingsTab() {
         ))}
       </div>
 
-      {/* View mode: All / Home / Away */}
+      {/* Sub-tab: Classement / Buteurs */}
       <div className="flex gap-1 p-1 bg-dark-800 rounded-xl w-fit">
-        {[['all', 'Global'], ['home', 'Domicile'], ['away', 'Extérieur']].map(([mode, label]) => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-heading font-semibold transition-all ${
-              viewMode === mode ? 'bg-dark-700 text-white' : 'text-white/35 hover:text-white/60'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        <button
+          onClick={() => setSubTab('classement')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-heading font-semibold transition-all ${
+            subTab === 'classement' ? 'bg-dark-700 text-white' : 'text-white/35 hover:text-white/60'
+          }`}
+        >
+          <BarChart2 className="w-3.5 h-3.5" />
+          Classement
+        </button>
+        <button
+          onClick={() => setSubTab('buteurs')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-heading font-semibold transition-all ${
+            subTab === 'buteurs' ? 'bg-dark-700 text-white' : 'text-white/35 hover:text-white/60'
+          }`}
+        >
+          <Award className="w-3.5 h-3.5" />
+          Buteurs
+        </button>
       </div>
 
-      {loading ? (
-        <div className="glass-card p-6 space-y-2">
-          {[...Array(12)].map((_, i) => (
-            <div key={i} className="h-9 skeleton rounded-lg" />
-          ))}
-        </div>
-      ) : error ? (
-        <ErrorState message={error} />
-      ) : standings && standings.length > 0 ? (
-        <div className="space-y-6">
-          {standings.map((group, gi) => (
-            <StandingsGroup key={gi} group={group} leagueId={selected.id} viewMode={viewMode} />
-          ))}
-        </div>
-      ) : standings && standings.length === 0 ? (
-        <EmptyState title="Classement non disponible" icon="📊" />
-      ) : null}
+      {subTab === 'classement' && (
+        <>
+          {/* View mode: All / Home / Away */}
+          <div className="flex gap-1 p-1 bg-dark-800 rounded-xl w-fit">
+            {[['all', 'Global'], ['home', 'Domicile'], ['away', 'Extérieur']].map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-heading font-semibold transition-all ${
+                  viewMode === mode ? 'bg-dark-700 text-white' : 'text-white/35 hover:text-white/60'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {loading ? (
+            <div className="glass-card p-6 space-y-2">
+              {[...Array(12)].map((_, i) => <div key={i} className="h-9 skeleton rounded-lg" />)}
+            </div>
+          ) : error ? (
+            <ErrorState message={error} />
+          ) : standings && standings.length > 0 ? (
+            <div className="space-y-6">
+              {standings.map((group, gi) => (
+                <StandingsGroup key={gi} group={group} leagueId={selected.id} viewMode={viewMode} />
+              ))}
+            </div>
+          ) : standings && standings.length === 0 ? (
+            <EmptyState title="Classement non disponible" icon="📊" />
+          ) : null}
+        </>
+      )}
+
+      {subTab === 'buteurs' && (
+        <>
+          {loading ? (
+            <div className="glass-card p-6 space-y-3">
+              {[...Array(10)].map((_, i) => <div key={i} className="h-14 skeleton rounded-xl" />)}
+            </div>
+          ) : error ? (
+            <ErrorState message={error} />
+          ) : scorers && scorers.length > 0 ? (
+            <TopScorersTable scorers={scorers} />
+          ) : scorers && scorers.length === 0 ? (
+            <EmptyState title="Aucun buteur disponible" icon="⚽" />
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+function TopScorersTable({ scorers }) {
+  const maxGoals = scorers[0]?.statistics?.[0]?.goals?.total || 1;
+  return (
+    <div className="glass-card overflow-hidden">
+      <div className="px-4 py-3 border-b border-white/[0.05] flex items-center gap-2">
+        <Award className="w-4 h-4 text-gold-400" />
+        <span className="text-sm font-heading font-semibold text-white/70">Top Buteurs</span>
+      </div>
+      <div className="divide-y divide-white/[0.04]">
+        {scorers.slice(0, 15).map((entry, i) => {
+          const player = entry.player;
+          const stats = entry.statistics?.[0];
+          const goals = stats?.goals?.total || 0;
+          const assists = stats?.goals?.assists || 0;
+          const team = stats?.team;
+          const pct = Math.round((goals / maxGoals) * 100);
+
+          return (
+            <div key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
+              <span className={`w-5 text-center font-mono text-xs flex-shrink-0 ${i === 0 ? 'text-gold-400 font-bold' : i === 1 ? 'text-white/50' : i === 2 ? 'text-amber-600/80' : 'text-white/20'}`}>
+                {i + 1}
+              </span>
+              <img
+                src={player.photo}
+                alt=""
+                className="w-9 h-9 rounded-full object-cover flex-shrink-0 bg-dark-700"
+                onError={(e) => { e.target.src = 'https://media.api-sports.io/football/players/0.png'; }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-heading font-semibold text-white/85 truncate">{player.name}</span>
+                  {team?.logo && (
+                    <img src={team.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={(e) => e.target.style.display = 'none'} />
+                  )}
+                </div>
+                <div className="mt-1 h-1 bg-white/[0.07] rounded-full overflow-hidden w-full">
+                  <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0 text-right">
+                <div>
+                  <span className="text-base font-display text-white">{goals}</span>
+                  <span className="text-[10px] text-white/30 font-heading ml-0.5">buts</span>
+                </div>
+                {assists > 0 && (
+                  <div>
+                    <span className="text-sm font-mono text-gold-400/70">{assists}</span>
+                    <span className="text-[10px] text-white/25 font-heading ml-0.5">pss</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

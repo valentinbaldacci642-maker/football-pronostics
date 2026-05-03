@@ -177,7 +177,8 @@ export default function News() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/news`);
+      const base = import.meta.env.VITE_VERCEL_URL || '';
+      const res = await fetch(`${base}/api/news`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const arts = data?.articles ?? [];
