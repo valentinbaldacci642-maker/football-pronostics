@@ -57,6 +57,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
+app.get('/version', (req, res) => {
+  res.json({ version: '1.1.0', deployed: new Date().toISOString() });
+});
+
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });

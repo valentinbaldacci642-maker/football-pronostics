@@ -36,7 +36,7 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   const away = fix.teams?.away;
   const league = fix.league;
   const matchTime = formatTime(fix.fixture?.date);
-  const probs = analysis?.consensusProbs || analysis?.predictions?.probabilities;
+  const probs = analysis?.consensusProbs || analysis?.predictions?.probabilities || analysis?.odds?.matchWinner?.fairProbs;
   const homeProb = probs?.home || 0;
   const drawProb = probs?.draw || 0;
   const awayProb = probs?.away || 0;

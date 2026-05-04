@@ -23,10 +23,12 @@ const removeMarginShin = (odds) => {
   // Shin z-parameter estimation
   const z = Math.sqrt(margin / (margin + valid.length));
 
-  return implied.map((p) => {
-    const fair = (Math.sqrt(z * z + 4 * (1 - z) * p) - z) / (2 * (1 - z));
-    return Math.min(Math.max(fair * 100, 0), 100);
+  const fairs = implied.map((p) => {
+    return (Math.sqrt(z * z + 4 * (1 - z) * p) - z) / (2 * (1 - z));
   });
+  const fairSum = fairs.reduce((a, b) => a + b, 0);
+  if (fairSum === 0) return fairs.map(() => 0);
+  return fairs.map((f) => Math.min(Math.max((f / fairSum) * 100, 0), 100));
 };
 
 /**
