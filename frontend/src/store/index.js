@@ -217,15 +217,31 @@ export const useHistoryStore = create(
       },
 
       getBankrollStats: () => {
-        const settled = get().entries.filter((e) => e.result && e.mise > 0);
+        const bets = get().entries.filter((e) => e.mise > 0);
+        const settled = bets.filter((e) => e.result);
+        const pending = bets.filter((e) => !e.result);
+
         const totalMise = settled.reduce((s, e) => s + e.mise, 0);
         const totalReturn = settled.reduce((s, e) => {
           if (e.result === 'win') return s + e.mise * parseFloat(e.actualOdd || e.odd || 1);
           return s;
         }, 0);
         const pnl = totalReturn - totalMise;
+
+        // Cash committed in pending bets (sitting with the bookie, not in your pocket)
+        const pendingCommitted = pending.reduce((s, e) => s + e.mise, 0);
+        const pendingCount = pending.length;
+
         const roi = totalMise > 0 ? parseFloat((pnl / totalMise * 100).toFixed(1)) : null;
-        return { totalMise, totalReturn, pnl, roi, count: settled.length };
+        return {
+          totalMise,
+          totalReturn,
+          pnl,
+          roi,
+          count: settled.length,
+          pendingCommitted,
+          pendingCount,
+        };
       },
 
       getBankrollCurve: () => {

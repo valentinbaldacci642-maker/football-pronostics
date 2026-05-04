@@ -61,7 +61,10 @@ export default function History() {
   const stats = getStats();
   const bkStats = getBankrollStats();
   const curve = getBankrollCurve();
-  const currentBankroll = initialBankroll + (bkStats.pnl || 0);
+  // Live bankroll = initial + settled P&L − pending stakes (cash committed at bookie).
+  // This makes the bankroll react the moment a stake is entered, not only after
+  // auto-resolve marks the bet as W/L.
+  const currentBankroll = initialBankroll + (bkStats.pnl || 0) - (bkStats.pendingCommitted || 0);
 
   const byResult = entries.filter((e) => {
     if (filter === 'pending') return !e.result;
@@ -211,17 +214,29 @@ export default function History() {
               </p>
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-white/[0.05]">
-              <span className="text-xs text-white/40 font-heading">Bankroll actuelle</span>
-              <span className={clsx(
-                'text-2xl font-display tracking-wider',
-                currentBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
-              )}>
-                {currentBankroll.toFixed(0)} €
-                <span className="text-xs text-white/30 ml-2 font-mono">
-                  ({bkStats.pnl >= 0 ? '+' : ''}{bkStats.pnl.toFixed(0)}€)
+            <div className="pt-2 border-t border-white/[0.05] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-white/40 font-heading">Bankroll dispo (cash chez toi)</span>
+                <span className={clsx(
+                  'text-2xl font-display tracking-wider',
+                  currentBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
+                )}>
+                  {currentBankroll.toFixed(0)} €
+                  <span className="text-xs text-white/30 ml-2 font-mono">
+                    ({bkStats.pnl >= 0 ? '+' : ''}{bkStats.pnl.toFixed(0)}€)
+                  </span>
                 </span>
-              </span>
+              </div>
+              {bkStats.pendingCommitted > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-white/30 font-heading">
+                    En jeu (paris en attente · {bkStats.pendingCount})
+                  </span>
+                  <span className="text-gold-400/80 font-mono">
+                    {bkStats.pendingCommitted.toFixed(0)} €
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Reset actions */}

@@ -47,9 +47,10 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   const isFav = isFavorite(fixtureId);
   const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
   const { setMise, setActualOdd, entries, getBankrollStats } = useHistoryStore();
-  // Kelly resizes itself against the LIVE bankroll, not the static starting amount.
-  // Live bankroll = initial + cumulative P&L from settled bets with mise.
-  const liveBankroll = initialBankroll + (getBankrollStats().pnl || 0);
+  // Kelly resizes itself against the LIVE bankroll = the cash you actually have.
+  // Live = initial + settled P&L − pending stakes (cash currently with bookie).
+  const _bk = getBankrollStats();
+  const liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
   const suggestedStake = pick?.isValue && pick?.odd && pick?.probability
     ? kellyStake(pick.probability, pick.odd, liveBankroll, kFrac)
     : 0;
