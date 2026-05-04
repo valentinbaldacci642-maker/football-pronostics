@@ -47,7 +47,7 @@ export default defineConfig({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
         runtimeCaching: [
           // API backend Render — NetworkFirst: données fraîches, fallback cache si hors ligne
           {
