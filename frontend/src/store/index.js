@@ -91,7 +91,7 @@ export const EDGE_MODE_THRESHOLD = {
 export const useBankrollStore = create(
   persist(
     (set, get) => ({
-      initialBankroll: 1000,
+      initialBankroll: 0,
       kellyFraction: 0.25,
       edgeMode: 'standard',
       setInitialBankroll: (amount) => set({ initialBankroll: Math.max(0, parseFloat(amount) || 0) }),
@@ -99,7 +99,7 @@ export const useBankrollStore = create(
       setEdgeMode: (mode) => set({
         edgeMode: ['conservative', 'standard', 'aggressive'].includes(mode) ? mode : 'standard',
       }),
-      reset: () => set({ initialBankroll: 1000, kellyFraction: 0.25, edgeMode: 'standard' }),
+      reset: () => set({ initialBankroll: 0, kellyFraction: 0.25, edgeMode: 'standard' }),
     }),
     { name: 'pronostats-bankroll-v1' }
   )

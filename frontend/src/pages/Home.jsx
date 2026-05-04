@@ -214,18 +214,24 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
 
           {/* Real bookmaker odd — only relevant when user has placed a stake */}
           {hasMise && (
-            <div className="flex items-center justify-end gap-1.5">
-              <span className="text-[11px] text-white/30 font-heading">Ma cote chez le bookie:</span>
-              <input
-                type="number"
-                min="1"
-                step="0.01"
-                placeholder={pick.odd.toFixed(2)}
-                value={oddInput}
-                onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); setActualOdd(fixtureId, e.target.value); }}
-                onClick={(e) => e.stopPropagation()}
-                className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
-              />
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="flex items-center gap-1 text-[11px] font-heading text-brand-400/80">
+                <Target className="w-3 h-3" />
+                Pari enregistré dans Historique pronos
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-white/30 font-heading">Ma cote:</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder={pick.odd.toFixed(2)}
+                  value={oddInput}
+                  onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); setActualOdd(fixtureId, e.target.value); }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+                />
+              </div>
             </div>
           )}
         </div>
@@ -328,8 +334,10 @@ export default function Home() {
       });
       const data = res?.data || [];
       setPronostics(data);
-      // Only persist today's pronostics in history (avoids bloating with future days)
-      if (data.length > 0 && date === dayOptions[0].iso) savePronostics(data);
+      // Persist pronostics in history regardless of day so the user can record
+      // a stake (mise) and bookmaker odd on future-day picks. setMise/setActualOdd
+      // need an existing entry with the matching fixtureId to update.
+      if (data.length > 0) savePronostics(data);
     } catch (err) {
       setError(err.message);
     } finally {

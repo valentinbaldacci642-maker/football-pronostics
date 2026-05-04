@@ -37,7 +37,7 @@ export default function History() {
     const ok = window.confirm(
       'Reset complet ?\n\n' +
       '- Tout l\'historique des pronos sera supprimé\n' +
-      '- Bankroll de départ remise à 1000 €\n' +
+      '- Bankroll de départ remise à 0 €\n' +
       '- Mode Standard, 1/4 Kelly\n\n' +
       'Cette action est irréversible.'
     );
@@ -49,7 +49,7 @@ export default function History() {
   const handleResetBankrollOnly = () => {
     const ok = window.confirm(
       'Réinitialiser uniquement la bankroll ?\n\n' +
-      'Les paramètres reviennent aux valeurs par défaut (1000 €, ¼ Kelly, Standard) ' +
+      'Les paramètres reviennent aux valeurs par défaut (0 €, ¼ Kelly, Standard) ' +
       'mais l\'historique des pronos est conservé.'
     );
     if (!ok) return;
