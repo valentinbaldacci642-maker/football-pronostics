@@ -46,9 +46,12 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   const { toggle, isFavorite } = useFavoritesStore();
   const isFav = isFavorite(fixtureId);
   const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
-  const { setMise, setActualOdd, entries } = useHistoryStore();
+  const { setMise, setActualOdd, entries, getBankrollStats } = useHistoryStore();
+  // Kelly resizes itself against the LIVE bankroll, not the static starting amount.
+  // Live bankroll = initial + cumulative P&L from settled bets with mise.
+  const liveBankroll = initialBankroll + (getBankrollStats().pnl || 0);
   const suggestedStake = pick?.isValue && pick?.odd && pick?.probability
-    ? kellyStake(pick.probability, pick.odd, initialBankroll, kFrac)
+    ? kellyStake(pick.probability, pick.odd, liveBankroll, kFrac)
     : 0;
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
   const [miseInput, setMiseInput] = useState(existingEntry?.mise != null ? String(existingEntry.mise) : '');
