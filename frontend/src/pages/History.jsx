@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { useHistoryStore, useBankrollStore } from '../store';
+import { useHistoryStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -31,7 +31,7 @@ const CustomTooltip = ({ active, payload }) => {
 
 export default function History() {
   const { entries, getStats, getBankrollStats, getBankrollCurve, setMise } = useHistoryStore();
-  const { initialBankroll, kellyFraction, setInitialBankroll, setKellyFraction } = useBankrollStore();
+  const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode } = useBankrollStore();
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('liste');
   const [search, setSearch] = useState('');
@@ -116,7 +116,7 @@ export default function History() {
       {/* ── BANKROLL TAB ── */}
       {tab === 'bankroll' && (
         <div className="space-y-4">
-          {/* Settings: initial bankroll + Kelly fraction */}
+          {/* Settings: initial bankroll + Kelly fraction + edge mode */}
           <div className="glass-card p-4 space-y-3">
             <p className="text-xs font-heading font-semibold text-white/35 uppercase tracking-wider">Paramètres bankroll</p>
             <div className="grid grid-cols-2 gap-3">
@@ -145,6 +145,41 @@ export default function History() {
                 </select>
               </label>
             </div>
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-white/40 font-heading">Mode de sélection des pronos</span>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'conservative', label: 'Conservateur', sub: 'edge ≥ 8%', color: 'brand' },
+                  { id: 'standard',     label: 'Standard',    sub: 'edge ≥ 5%', color: 'gold' },
+                  { id: 'aggressive',   label: 'Aggressif',   sub: 'tout',      color: 'red' },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setEdgeMode(m.id)}
+                    className={clsx(
+                      'flex flex-col items-center gap-0.5 px-2 py-2.5 rounded-lg border text-xs font-heading transition-all',
+                      edgeMode === m.id
+                        ? m.color === 'brand'
+                          ? 'bg-brand-500/15 border-brand-500/40 text-brand-400'
+                          : m.color === 'gold'
+                          ? 'bg-gold-500/15 border-gold-500/40 text-gold-400'
+                          : 'bg-red-500/15 border-red-500/40 text-red-400'
+                        : 'border-white/[0.08] text-white/40 hover:text-white/70'
+                    )}
+                  >
+                    <span className="font-bold">{m.label}</span>
+                    <span className="text-[10px] opacity-60 font-mono">{m.sub}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-white/25 font-heading leading-relaxed pt-1">
+                {edgeMode === 'conservative' && 'Très peu de pronos par jour, edge confortable, variance faible. Idéal si tu débutes ou si tu veux des paris ultra-fiables.'}
+                {edgeMode === 'standard' && 'Recommandé. Volume modéré, edge minimum 5% (au-dessus de la marge d’erreur du modèle).'}
+                {edgeMode === 'aggressive' && 'Tous les pronostics affichés (value bets + classiques). Beaucoup de volume mais variance élevée.'}
+              </p>
+            </div>
+
             <div className="flex items-center justify-between pt-2 border-t border-white/[0.05]">
               <span className="text-xs text-white/40 font-heading">Bankroll actuelle</span>
               <span className={clsx(

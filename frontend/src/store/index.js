@@ -73,17 +73,33 @@ export const useUIStore = create((set) => ({
 
 /**
  * Bankroll & Kelly criterion settings.
+ *
  * Kelly fraction defaults to 0.25 (quarter Kelly) — standard recommendation
  * to dampen variance vs full Kelly which is mathematically optimal but very volatile.
+ *
+ * edgeMode:
+ *   - 'conservative': only pick value bets with edge ≥ 8% (fewer, higher quality)
+ *   - 'standard'    : only pick value bets with edge ≥ 5% (recommended)
+ *   - 'aggressive'  : show all pronostics including non-value picks (more volume)
  */
+export const EDGE_MODE_THRESHOLD = {
+  conservative: 8,
+  standard: 5,
+  aggressive: 0, // 0 = no edge requirement, show all pronos
+};
+
 export const useBankrollStore = create(
   persist(
     (set, get) => ({
       initialBankroll: 1000,
       kellyFraction: 0.25,
+      edgeMode: 'standard',
       setInitialBankroll: (amount) => set({ initialBankroll: Math.max(0, parseFloat(amount) || 0) }),
       setKellyFraction: (frac) => set({ kellyFraction: Math.max(0, Math.min(1, parseFloat(frac) || 0)) }),
-      reset: () => set({ initialBankroll: 1000, kellyFraction: 0.25 }),
+      setEdgeMode: (mode) => set({
+        edgeMode: ['conservative', 'standard', 'aggressive'].includes(mode) ? mode : 'standard',
+      }),
+      reset: () => set({ initialBankroll: 1000, kellyFraction: 0.25, edgeMode: 'standard' }),
     }),
     { name: 'pronostats-bankroll-v1' }
   )

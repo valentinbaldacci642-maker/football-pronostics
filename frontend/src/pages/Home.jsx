@@ -7,7 +7,7 @@ import { formatTime } from '../utils/format';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
-import { useHistoryStore, useFavoritesStore, useBankrollStore } from '../store';
+import { useHistoryStore, useFavoritesStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
 import { kellyStake } from '../utils/kelly';
 
 function getConfidenceConfig(score) {
@@ -247,6 +247,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [valueOnly, setValueOnly] = useState(false);
+  const { edgeMode } = useBankrollStore();
   const { getStats, savePronostics } = useHistoryStore();
   const histStats = getStats();
 
@@ -415,11 +416,29 @@ export default function Home() {
 
               {(() => {
                 const others = pronostics.slice(1);
-                const filtered = valueOnly ? others.filter((p) => p.pick?.isValue) : others;
+                const minEdge = EDGE_MODE_THRESHOLD[edgeMode] ?? 5;
+                // Edge mode filter applied first (only relevant when valueOnly or
+                // when conservative mode wants to hide weak value bets):
+                //   - aggressive (minEdge=0): keep all
+                //   - standard (minEdge=5): require isValue
+                //   - conservative (minEdge=8): require isValue && edge >= 8
+                const passEdgeMode = (p) => {
+                  if (minEdge === 0) return true;
+                  if (!p.pick?.isValue) return false;
+                  return (p.pick?.edge ?? 0) >= minEdge;
+                };
+                const base = edgeMode === 'aggressive' ? others : others.filter(passEdgeMode);
+                const filtered = valueOnly ? base.filter((p) => p.pick?.isValue) : base;
+
                 if (filtered.length === 0) {
+                  const msg = valueOnly
+                    ? 'Aucun value bet supplémentaire détecté aujourd’hui'
+                    : edgeMode === 'conservative'
+                    ? `Aucun pronostic ne dépasse l’edge ≥ ${minEdge}% aujourd’hui`
+                    : 'Aucun pronostic supplémentaire';
                   return (
                     <div className="text-center text-xs text-white/30 py-4 font-heading">
-                      Aucun value bet supplémentaire détecté aujourd'hui
+                      {msg}
                     </div>
                   );
                 }
