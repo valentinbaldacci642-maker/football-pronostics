@@ -357,17 +357,16 @@ function PoissonMatrix({ xG, homeTeam, awayTeam }) {
         <h4 className="text-xs text-white/40 uppercase tracking-wider font-semibold">Matrice des scores — Modèle Poisson</h4>
         <span className="text-xs text-blue-400/60 font-medium">xG</span>
       </div>
-      <p className="text-xs text-white/20 mb-4">
+      <p className="text-xs text-white/20 mb-1">
         Probabilité de chaque score exact · xG dom. {xG.home} / ext. {xG.away}
-        {xG.source === 'season' && xG.sampleSize?.home != null && xG.sampleSize?.away != null && (
-          <span className="ml-1.5 text-brand-400/70">
-            · saison en cours ·{' '}
-            {xG.sampleSize.home === xG.sampleSize.away
-              ? `${xG.sampleSize.home} matchs joués`
-              : `${xG.sampleSize.home} / ${xG.sampleSize.away} matchs joués`}
-          </span>
-        )}
       </p>
+      {xG.source === 'season' && xG.sampleSize?.home != null && xG.sampleSize?.away != null && (
+        <div className="text-xs text-brand-400/70 mb-4 space-y-0.5">
+          <div>{homeTeam || 'Domicile'} · {xG.sampleSize.home} matchs joués cette saison</div>
+          <div>{awayTeam || 'Extérieur'} · {xG.sampleSize.away} matchs joués cette saison</div>
+        </div>
+      )}
+      {(!xG.source || xG.source !== 'season') && <div className="mb-4" />}
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
           <thead>
