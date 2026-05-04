@@ -146,6 +146,13 @@ export default function History() {
               </label>
             </div>
 
+            <p className="text-[11px] text-white/25 font-heading leading-relaxed pt-1">
+              {kellyFraction == 0.1 && '1/10 Kelly · Mises très petites (~1-2% de la bankroll). Très peu de variance, croissance lente. Idéal si tu débutes ou si ton modèle n’est pas encore validé sur 50+ paris settlés.'}
+              {kellyFraction == 0.25 && '1/4 Kelly · Mises modérées (~2-5%). Équilibre optimal entre croissance et variance, recommandé par la majorité des parieurs pro. Réduit drastiquement la variance par rapport à Full Kelly tout en captant 80% de la croissance théorique.'}
+              {kellyFraction == 0.5 && '1/2 Kelly · Mises élevées (~5-10%). Croissance rapide mais variance significative. Réservé si tu as un ROI réel mesuré >10% sur 100+ paris et que tu acceptes des swings de bankroll de ±30% sur des séries.'}
+              {kellyFraction == 1 && 'Full Kelly · Mathématiquement optimal long terme MAIS variance énorme. Une mauvaise série peut couper ta bankroll en 2 même avec un edge correct. Déconseillé sauf si tu as une certitude absolue sur tes probabilités.'}
+            </p>
+
             <div className="flex flex-col gap-1.5">
               <span className="text-xs text-white/40 font-heading">Mode de sélection des pronos</span>
               <div className="grid grid-cols-3 gap-2">

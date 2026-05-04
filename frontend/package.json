@@ -13,6 +13,7 @@
     "android:open": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor/app": "^6.0.3",
     "@capacitor/core": "^6.1.2",
     "axios": "^1.6.2",
     "clsx": "^2.0.0",
@@ -30,8 +31,8 @@
     "@capacitor/cli": "^6.1.2",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.1",
     "@vite-pwa/assets-generator": "^0.2.6",
+    "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.55.0",
     "eslint-plugin-react": "^7.33.2",

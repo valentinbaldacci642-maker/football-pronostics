@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Star, Share2, Clock, MapPin, Users } from 'lucide-react';
 import { useFixtureDetail } from '../hooks/useFixtures';
@@ -18,7 +18,18 @@ const TABS = ['Analyse', 'Cotes', 'Statistiques', 'Événements', 'Compositions'
 
 export default function MatchDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [tab, setTab] = useState('Analyse');
+
+  const goBack = () => {
+    // Use browser history when there is one (came from /matchs, /history, etc.)
+    // Fallback to home when the user opened the match page directly.
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  };
   const { fixture, stats, events, lineups, loading, error } = useFixtureDetail(id);
   const { analysis, loading: analysisLoading } = usePredictions(id);
   const { oddsAnalysis } = useOdds(id);
@@ -43,10 +54,10 @@ export default function MatchDetail() {
     >
       {/* Back */}
       <div className="flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm">
+        <button onClick={goBack} className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm">
           <ArrowLeft className="w-4 h-4" />
           Retour
-        </Link>
+        </button>
         <div className="flex items-center gap-2">
           <button
             onClick={() => toggle(parseInt(id))}

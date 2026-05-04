@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
+import { App as CapacitorApp } from '@capacitor/app';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
 import BottomNav from './components/common/BottomNav';
@@ -17,6 +19,25 @@ import News from './pages/News';
 
 export default function App() {
   const location = useLocation();
+
+  // Hardware back button on Android: navigate back in WebView history rather
+  // than exiting the app or always returning to home. Only exits when there
+  // is no history left (i.e. on the entry page).
+  useEffect(() => {
+    let removeListener = () => {};
+    CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      if (canGoBack && window.history.length > 1) {
+        window.history.back();
+      } else {
+        CapacitorApp.exitApp();
+      }
+    }).then((handle) => {
+      removeListener = () => handle.remove();
+    }).catch(() => {
+      // Plugin not available (web/PWA context) — ignore
+    });
+    return () => removeListener();
+  }, []);
 
   return (
     <div className="flex min-h-screen">
