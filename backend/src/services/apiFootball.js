@@ -197,7 +197,7 @@ class ApiFootballService {
 
   // ─── Transfers ────────────────────────────────────────────────────────────
   async getTransfers(teamId) {
-    return this.request('/transfers', { team: teamId }, config.cache.ttlTeams);
+    return this.request('/transfers', { team: teamId }, config.cache.ttlTransfers);
   }
   getQuota() {
     return {

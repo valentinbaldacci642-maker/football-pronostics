@@ -306,6 +306,27 @@ class AnalysisService {
   }
 
   _findBestBet(analysis) {
+    // 1X2 is always the primary pick when there is a clear favourite
+    if (analysis.matchWinner) {
+      const { fairProbs, odds } = analysis.matchWinner;
+      const maxProb = Math.max(fairProbs.home, fairProbs.draw, fairProbs.away);
+      const outcome = maxProb === fairProbs.home ? 'home' : maxProb === fairProbs.draw ? 'draw' : 'away';
+      const label = outcome === 'home' ? '1' : outcome === 'draw' ? 'X' : '2';
+
+      // If 1X2 has a clear favourite (≥50%), return it directly — never let secondary
+      // markets (O/U, BTTS) override a decisive signal like Chelsea 70%
+      if (maxProb >= 50) {
+        return {
+          market: '1X2',
+          selection: label,
+          prob: maxProb,
+          odd: odds[outcome],
+          confidence: getConfidenceLevel(maxProb),
+        };
+      }
+    }
+
+    // Only compare secondary markets when 1X2 is genuinely uncertain (<50%)
     const candidates = [];
 
     if (analysis.matchWinner) {
@@ -313,38 +334,20 @@ class AnalysisService {
       const maxProb = Math.max(fairProbs.home, fairProbs.draw, fairProbs.away);
       const outcome = maxProb === fairProbs.home ? 'home' : maxProb === fairProbs.draw ? 'draw' : 'away';
       const label = outcome === 'home' ? '1' : outcome === 'draw' ? 'X' : '2';
-      candidates.push({
-        market: '1X2',
-        selection: label,
-        prob: maxProb,
-        odd: odds[outcome],
-        confidence: getConfidenceLevel(maxProb),
-      });
+      candidates.push({ market: '1X2', selection: label, prob: maxProb, odd: odds[outcome], confidence: getConfidenceLevel(maxProb) });
     }
 
     if (analysis.goalsOverUnder?.lines['2.5']) {
       const { over, under } = analysis.goalsOverUnder.lines['2.5'];
       const best = (over?.fairProb || 0) > (under?.fairProb || 0) ? over : under;
       const label = best === over ? 'Over 2.5' : 'Under 2.5';
-      candidates.push({
-        market: 'O/U 2.5',
-        selection: label,
-        prob: best.fairProb,
-        odd: best.odd,
-        confidence: getConfidenceLevel(best.fairProb),
-      });
+      candidates.push({ market: 'O/U 2.5', selection: label, prob: best.fairProb, odd: best.odd, confidence: getConfidenceLevel(best.fairProb) });
     }
 
     if (analysis.btts) {
       const { fairProbs, odds } = analysis.btts;
       const best = fairProbs.yes > fairProbs.no ? 'yes' : 'no';
-      candidates.push({
-        market: 'BTTS',
-        selection: best === 'yes' ? 'Oui' : 'Non',
-        prob: fairProbs[best],
-        odd: odds[best],
-        confidence: getConfidenceLevel(fairProbs[best]),
-      });
+      candidates.push({ market: 'BTTS', selection: best === 'yes' ? 'Oui' : 'Non', prob: fairProbs[best], odd: odds[best], confidence: getConfidenceLevel(fairProbs[best]) });
     }
 
     return candidates.sort((a, b) => b.prob - a.prob)[0] || null;
@@ -442,9 +445,12 @@ class AnalysisService {
   }
 
   _calcExpectedGoals(team, opponent) {
-    const attackStrength = (team.avgGoals || 1.2) / 1.4;
-    const defenseWeakness = (opponent.avgConceded || 1.2) / 1.2;
-    return Math.max(0.1, attackStrength * defenseWeakness * 1.4);
+    // parseFloat handles string "0" from API (which is truthy, bypassing || fallback)
+    const attack = parseFloat(team.avgGoals) || 1.2;
+    const conceded = parseFloat(opponent.avgConceded) || 1.2;
+    const attackStrength = attack / 1.4;
+    const defenseWeakness = conceded / 1.2;
+    return Math.max(0.3, attackStrength * defenseWeakness * 1.4);
   }
 
   _calcRecommendationConfidence(home, draw, away) {
