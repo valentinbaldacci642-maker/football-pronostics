@@ -359,16 +359,13 @@ function PoissonMatrix({ xG, homeTeam, awayTeam }) {
       </div>
       <p className="text-xs text-white/20 mb-4">
         Probabilité de chaque score exact · xG dom. {xG.home} / ext. {xG.away}
-        {xG.source === 'season' && (
+        {xG.source === 'season' && xG.sampleSize?.home != null && xG.sampleSize?.away != null && (
           <span className="ml-1.5 text-brand-400/70">
-            · saison complète
-            {xG.sampleSize?.home != null && xG.sampleSize?.away != null
-              ? ` (${xG.sampleSize.home}/${xG.sampleSize.away} matchs)`
-              : ''}
+            · saison en cours ·{' '}
+            {xG.sampleSize.home === xG.sampleSize.away
+              ? `${xG.sampleSize.home} matchs joués`
+              : `${xG.sampleSize.home} / ${xG.sampleSize.away} matchs joués`}
           </span>
-        )}
-        {xG.source === 'last_5' && (
-          <span className="ml-1.5 text-gold-400/70">· 5 derniers matchs</span>
         )}
       </p>
       <div className="overflow-x-auto">
