@@ -232,11 +232,11 @@ export default function Home() {
   const { getStats, savePronostics } = useHistoryStore();
   const histStats = getStats();
 
-  const load = async () => {
+  const load = async ({ force = false } = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await pronosticsApi.getBestToday();
+      const res = await pronosticsApi.getBestToday({ force });
       const data = res?.data || [];
       setPronostics(data);
       if (data.length > 0) savePronostics(data);
@@ -284,7 +284,7 @@ export default function Home() {
             </Link>
           )}
           <button
-            onClick={load}
+            onClick={() => load({ force: true })}
             disabled={loading}
             className="btn-ghost !px-2.5 !py-2 flex items-center gap-2"
           >
