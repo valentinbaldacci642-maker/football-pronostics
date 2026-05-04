@@ -189,12 +189,19 @@ export const useHistoryStore = create(
         ),
       })),
 
+      setActualOdd: (fixtureId, value) => set((s) => ({
+        entries: s.entries.map((e) =>
+          e.fixtureId === fixtureId ? { ...e, actualOdd: value === '' ? null : parseFloat(value) || null } : e
+        ),
+      })),
+
       getStats: () => {
         const settled = get().entries.filter((e) => e.result === 'win' || e.result === 'loss');
         const wins = settled.filter((e) => e.result === 'win').length;
         const rate = settled.length > 0 ? Math.round((wins / settled.length) * 100) : null;
+        // Use actualOdd (user-entered real bookie odd) when present; fall back to system odd
         const roi = settled.reduce((acc, e) => {
-          if (e.result === 'win') return acc + (parseFloat(e.odd || 1) - 1);
+          if (e.result === 'win') return acc + (parseFloat(e.actualOdd || e.odd || 1) - 1);
           return acc - 1;
         }, 0);
         return {
@@ -211,7 +218,7 @@ export const useHistoryStore = create(
         const settled = get().entries.filter((e) => e.result && e.mise > 0);
         const totalMise = settled.reduce((s, e) => s + e.mise, 0);
         const totalReturn = settled.reduce((s, e) => {
-          if (e.result === 'win') return s + e.mise * parseFloat(e.odd || 1);
+          if (e.result === 'win') return s + e.mise * parseFloat(e.actualOdd || e.odd || 1);
           return s;
         }, 0);
         const pnl = totalReturn - totalMise;
@@ -226,7 +233,7 @@ export const useHistoryStore = create(
         let running = 0;
         return settled.map((e, i) => {
           const pnl = e.result === 'win'
-            ? e.mise * (parseFloat(e.odd || 1) - 1)
+            ? e.mise * (parseFloat(e.actualOdd || e.odd || 1) - 1)
             : -e.mise;
           running += pnl;
           return {

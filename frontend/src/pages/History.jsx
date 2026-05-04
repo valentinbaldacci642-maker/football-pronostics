@@ -400,12 +400,17 @@ export default function History() {
 }
 
 function EntryCard({ entry, setMise, showMise = false }) {
+  const setActualOdd = useHistoryStore((s) => s.setActualOdd);
   const res = RESULT_CONFIG[entry.result] || RESULT_CONFIG[null];
   const ResIcon = res.icon;
   const [miseInput, setMiseInput] = useState(entry.mise != null ? String(entry.mise) : '');
+  const [oddInput, setOddInput] = useState(entry.actualOdd != null ? String(entry.actualOdd) : '');
 
+  // Use the user-entered actual bookmaker odd when present, otherwise the
+  // system-suggested odd from when the prono was generated.
+  const effectiveOdd = parseFloat(entry.actualOdd || entry.odd || 1);
   const pnl = entry.result === 'win' && entry.mise
-    ? entry.mise * (parseFloat(entry.odd || 1) - 1)
+    ? entry.mise * (effectiveOdd - 1)
     : entry.result === 'loss' && entry.mise
     ? -entry.mise
     : null;
@@ -464,6 +469,27 @@ function EntryCard({ entry, setMise, showMise = false }) {
               className="w-14 bg-transparent text-xs text-white placeholder:text-white/20 focus:outline-none font-mono"
             />
           </div>
+          {/* Actual bookie odd input — only relevant when user has placed a stake */}
+          {parseFloat(miseInput) > 0 && (
+            <div
+              className="flex items-center gap-1 bg-dark-700 border border-white/[0.07] rounded-lg px-2 py-0.5"
+              title="Cote réelle obtenue chez ton bookmaker (laisse vide pour utiliser la cote système)"
+            >
+              <span className="text-[10px] text-white/25 font-mono">@</span>
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                value={oddInput}
+                onChange={(e) => {
+                  setOddInput(e.target.value);
+                  setActualOdd(entry.fixtureId, e.target.value);
+                }}
+                placeholder={entry.odd ? parseFloat(entry.odd).toFixed(2) : '—'}
+                className="w-12 bg-transparent text-xs text-white placeholder:text-white/20 focus:outline-none font-mono"
+              />
+            </div>
+          )}
           {/* P&L display */}
           {pnl !== null && (
             <span className={`text-xs font-display ${pnl >= 0 ? 'text-brand-400' : 'text-danger'}`}>

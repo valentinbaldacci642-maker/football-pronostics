@@ -46,12 +46,16 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   const { toggle, isFavorite } = useFavoritesStore();
   const isFav = isFavorite(fixtureId);
   const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
-  const { setMise, entries } = useHistoryStore();
+  const { setMise, setActualOdd, entries } = useHistoryStore();
   const suggestedStake = pick?.isValue && pick?.odd && pick?.probability
     ? kellyStake(pick.probability, pick.odd, initialBankroll, kFrac)
     : 0;
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
   const [miseInput, setMiseInput] = useState(existingEntry?.mise != null ? String(existingEntry.mise) : '');
+  const [oddInput, setOddInput] = useState(
+    existingEntry?.actualOdd != null ? String(existingEntry.actualOdd) : ''
+  );
+  const hasMise = parseFloat(miseInput) > 0;
 
   return (
     <motion.div
@@ -173,35 +177,49 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         </div>
       )}
 
-      {/* Kelly stake suggestion + actual stake input (when there's a pick with odds) */}
+      {/* Kelly stake suggestion + actual stake/odd input (when there's a pick with odds) */}
       {pick?.odd && (
-        <div className="flex items-center justify-between gap-3 pl-3 pr-1 -mt-2">
-          <div className="flex items-center gap-2 min-w-0">
-            {suggestedStake > 0 && (
-              <span className="text-[11px] text-gold-400/70 font-heading whitespace-nowrap">
-                Suggérée: <span className="font-display tracking-wider">{suggestedStake.toFixed(0)} €</span>
-              </span>
-            )}
+        <div className="flex flex-col gap-1.5 pl-3 pr-1 -mt-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              {suggestedStake > 0 && (
+                <span className="text-[11px] text-gold-400/70 font-heading whitespace-nowrap">
+                  Suggérée: <span className="font-display tracking-wider">{suggestedStake.toFixed(0)} €</span>
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-white/30 font-heading">Ma mise:</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="—"
+                value={miseInput}
+                onChange={(e) => { e.stopPropagation(); setMiseInput(e.target.value); setMise(fixtureId, e.target.value); }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+              />
+              <span className="text-[11px] text-white/30">€</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-white/30 font-heading">Ma mise:</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              placeholder="—"
-              value={miseInput}
-              onChange={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setMiseInput(e.target.value);
-                setMise(fixtureId, e.target.value);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
-            />
-            <span className="text-[11px] text-white/30">€</span>
-          </div>
+
+          {/* Real bookmaker odd — only relevant when user has placed a stake */}
+          {hasMise && (
+            <div className="flex items-center justify-end gap-1.5">
+              <span className="text-[11px] text-white/30 font-heading">Ma cote chez le bookie:</span>
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                placeholder={pick.odd.toFixed(2)}
+                value={oddInput}
+                onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); setActualOdd(fixtureId, e.target.value); }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+              />
+            </div>
+          )}
         </div>
       )}
 
