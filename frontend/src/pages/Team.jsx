@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, AlertTriangle, ArrowLeftRight, Info, ArrowLeft, MapPin, Calendar, Trophy, Star } from 'lucide-react';
-import { teamsApi } from '../services/api';
+import { Users, AlertTriangle, ArrowLeftRight, ArrowLeft, MapPin, Calendar, Trophy, Star, BarChart2, Clock } from 'lucide-react';
+import { teamsApi, fixturesApi } from '../services/api';
 import { Spinner, ErrorState } from '../components/ui/Loading';
 import { useFavoriteTeamsStore } from '../store';
 import { format, parseISO } from 'date-fns';
@@ -45,8 +45,10 @@ export default function Team() {
   const { toggleTeam, isTeamFavorite } = useFavoriteTeamsStore();
   const isFav = isTeamFavorite(team.id);
   const tabs = [
-    { key: 'effectif', label: 'Effectif', icon: Users },
-    { key: 'blessures', label: 'Blessures', icon: AlertTriangle },
+    { key: 'effectif',   label: 'Effectif',   icon: Users },
+    { key: 'resultats',  label: 'Résultats',  icon: BarChart2 },
+    { key: 'calendrier', label: 'Calendrier', icon: Clock },
+    { key: 'blessures',  label: 'Blessures',  icon: AlertTriangle },
     { key: 'transferts', label: 'Transferts', icon: ArrowLeftRight },
   ];
 
@@ -97,7 +99,7 @@ export default function Team() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -116,6 +118,16 @@ export default function Team() {
         {tab === 'effectif' && (
           <motion.div key="effectif" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
             <SquadTab teamId={id} />
+          </motion.div>
+        )}
+        {tab === 'resultats' && (
+          <motion.div key="resultats" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            <ResultsTab teamId={id} />
+          </motion.div>
+        )}
+        {tab === 'calendrier' && (
+          <motion.div key="calendrier" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            <CalendrierTab teamId={id} />
           </motion.div>
         )}
         {tab === 'blessures' && (
@@ -197,6 +209,141 @@ function SquadTab({ teamId }) {
   );
 }
 
+function ResultsTab({ teamId }) {
+  const [fixtures, setFixtures] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await fixturesApi.getByTeam(teamId, { last: 10 });
+        const list = (data?.response || []).sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
+        setFixtures(list);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [teamId]);
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
+  if (error) return <ErrorState message={error} />;
+  if (!fixtures.length) return <Empty emoji="📊" text="Aucun résultat disponible" />;
+
+  return (
+    <div className="glass-card divide-y divide-white/[0.05]">
+      {fixtures.map((item) => {
+        const { fixture, teams, goals, league } = item;
+        const isHome = teams.home.id === Number(teamId);
+        const myGoals = isHome ? goals?.home : goals?.away;
+        const theirGoals = isHome ? goals?.away : goals?.home;
+        const isWin = myGoals != null && theirGoals != null && myGoals > theirGoals;
+        const isLoss = myGoals != null && theirGoals != null && myGoals < theirGoals;
+        const isDraw = myGoals != null && theirGoals != null && myGoals === theirGoals;
+        const resultLabel = isWin ? 'V' : isDraw ? 'N' : isLoss ? 'D' : '?';
+        const resultColor = isWin
+          ? 'bg-brand-500/20 text-brand-400'
+          : isDraw
+          ? 'bg-white/10 text-white/50'
+          : isLoss
+          ? 'bg-red-500/20 text-red-400'
+          : 'bg-white/5 text-white/30';
+
+        return (
+          <div key={fixture.id} className="flex items-center gap-3 px-4 py-3">
+            <span className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-display font-bold flex-shrink-0 ${resultColor}`}>
+              {resultLabel}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <img src={teams.home.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
+                  <span className={`text-sm font-semibold truncate max-w-[80px] sm:max-w-[120px] ${teams.home.id === Number(teamId) ? 'text-white/90' : 'text-white/50'}`}>
+                    {teams.home.name}
+                  </span>
+                </div>
+                <span className="text-sm font-display font-bold text-white flex-shrink-0">
+                  {goals?.home ?? '-'} – {goals?.away ?? '-'}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-sm font-semibold truncate max-w-[80px] sm:max-w-[120px] ${teams.away.id === Number(teamId) ? 'text-white/90' : 'text-white/50'}`}>
+                    {teams.away.name}
+                  </span>
+                  <img src={teams.away.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
+                </div>
+              </div>
+              <p className="text-xs text-white/25 mt-0.5">
+                {format(parseISO(fixture.date), 'd MMM yyyy', { locale: fr })}
+                {league?.name ? ` · ${league.name}` : ''}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CalendrierTab({ teamId }) {
+  const [fixtures, setFixtures] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await fixturesApi.getByTeam(teamId, { next: 5 });
+        setFixtures(data?.response || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [teamId]);
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
+  if (error) return <ErrorState message={error} />;
+  if (!fixtures.length) return <Empty emoji="📅" text="Aucun match à venir" />;
+
+  return (
+    <div className="glass-card divide-y divide-white/[0.05]">
+      {fixtures.map((item) => {
+        const { fixture, teams, league } = item;
+        const isHome = teams.home.id === Number(teamId);
+        const opponent = isHome ? teams.away : teams.home;
+
+        return (
+          <div key={fixture.id} className="flex items-center gap-4 px-4 py-3">
+            <div className="w-10 h-10 rounded-xl bg-dark-700 p-1.5 flex-shrink-0 flex items-center justify-center">
+              <img src={opponent.logo} alt={opponent.name} className="w-full h-full object-contain" onError={e => e.target.style.display='none'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white/90 truncate">
+                <span className="text-white/35 text-xs font-normal mr-1.5">{isHome ? 'vs' : '@'}</span>
+                {opponent.name}
+              </p>
+              <p className="text-xs text-white/30 mt-0.5">
+                {format(parseISO(fixture.date), "EEE d MMM · HH'h'mm", { locale: fr })}
+              </p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <img src={league?.logo} alt={league?.name} className="w-5 h-5 object-contain ml-auto mb-0.5" onError={e => e.target.style.display='none'} />
+              <p className="text-[10px] text-white/25 truncate max-w-[80px]">{league?.name}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function InjuriesTab({ teamId }) {
   const [injuries, setInjuries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -206,7 +353,7 @@ function InjuriesTab({ teamId }) {
     const load = async () => {
       setLoading(true);
       try {
-        const data = await teamsApi.getInjuries(teamId, 2024);
+        const data = await teamsApi.getInjuries(teamId, 2025);
         setInjuries(data?.response || []);
       } catch (err) {
         setError(err.message);

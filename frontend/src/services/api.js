@@ -27,6 +27,7 @@ export const fixturesApi = {
   getLive: () => api.get('/fixtures/live'),
   getById: (id) => api.get(`/fixtures/${id}`),
   getByDate: (date, league) => api.get('/fixtures', { params: { date, league } }),
+  getByTeam: (teamId, { last, next, season } = {}) => api.get('/fixtures', { params: { team: teamId, last, next, season } }),
   getStatistics: (id) => api.get(`/fixtures/${id}/statistics`),
   getEvents: (id) => api.get(`/fixtures/${id}/events`),
   getLineups: (id) => api.get(`/fixtures/${id}/lineups`),

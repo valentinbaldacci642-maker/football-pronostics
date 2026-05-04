@@ -8,12 +8,12 @@ import { SkeletonCard, EmptyState, ErrorState } from '../components/ui/Loading';
 const TOP_LEAGUES_IDS = [39, 140, 78, 135, 61, 2, 3, 1, 94, 88];
 
 const STANDINGS_LEAGUES = [
-  { id: 39,  name: 'Premier League',    flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', season: 2024 },
-  { id: 140, name: 'La Liga',           flag: '🇪🇸', season: 2024 },
-  { id: 78,  name: 'Bundesliga',        flag: '🇩🇪', season: 2024 },
-  { id: 135, name: 'Serie A',           flag: '🇮🇹', season: 2024 },
-  { id: 61,  name: 'Ligue 1',           flag: '🇫🇷', season: 2024 },
-  { id: 2,   name: 'Champions League',  flag: '🏆', season: 2024 },
+  { id: 39,  name: 'Premier League',    flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', season: 2025 },
+  { id: 140, name: 'La Liga',           flag: '🇪🇸', season: 2025 },
+  { id: 78,  name: 'Bundesliga',        flag: '🇩🇪', season: 2025 },
+  { id: 135, name: 'Serie A',           flag: '🇮🇹', season: 2025 },
+  { id: 61,  name: 'Ligue 1',           flag: '🇫🇷', season: 2025 },
+  { id: 2,   name: 'Champions League',  flag: '🏆', season: 2025 },
 ];
 
 export default function Leagues() {

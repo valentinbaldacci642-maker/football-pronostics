@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 
 router.get('/', async (req, res, next) => {
   try {
-    const { date, league, season, team, live, status, from, to, round, ids } = req.query;
+    const { date, league, season, team, live, status, from, to, round, ids, last, next } = req.query;
     const params = {};
 
     if (live === 'true' || live === 'all') return res.json(await api.getLiveFixtures());
@@ -18,6 +18,8 @@ router.get('/', async (req, res, next) => {
     if (to) params.to = to;
     if (round) params.round = round;
     if (ids) params.ids = ids;
+    if (last) params.last = parseInt(last);
+    if (next) params.next = parseInt(next);
 
     const data = await api.getFixtures(params);
     res.json(data);
