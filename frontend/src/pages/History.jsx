@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro } from 'lucide-react';
+import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useHistoryStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
 import { format, parseISO } from 'date-fns';
@@ -33,7 +33,7 @@ export default function History() {
   const { entries, getStats, getBankrollStats, getBankrollCurve, setMise } = useHistoryStore();
   const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode } = useBankrollStore();
   const [filter, setFilter] = useState('all');
-  const [tab, setTab] = useState('liste');
+  const [tab, setTab] = useState('matchs');
   const [search, setSearch] = useState('');
   const stats = getStats();
   const bkStats = getBankrollStats();
@@ -95,11 +95,12 @@ export default function History() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {[
-          { id: 'liste', label: 'Liste', icon: BarChart3 },
-          { id: 'bankroll', label: 'Bankroll', icon: Wallet },
-          { id: 'recherche', label: 'Équipe', icon: Search },
+          { id: 'matchs',    label: 'Historique matchs', icon: HistoryIcon },
+          { id: 'pronos',    label: 'Historique pronos', icon: ListChecks },
+          { id: 'bankroll',  label: 'Bankroll',          icon: Wallet },
+          { id: 'recherche', label: 'Équipe',            icon: Search },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -241,17 +242,11 @@ export default function History() {
           ) : (
             <div className="glass-card p-8 text-center">
               <Wallet className="w-10 h-10 text-white/10 mx-auto mb-3" />
-              <p className="text-white/40 font-heading font-semibold">Entrez vos mises dans l'onglet Liste</p>
+              <p className="text-white/40 font-heading font-semibold">Entrez vos mises sur les pronos du jour</p>
               <p className="text-white/20 text-xs font-heading mt-1">La courbe apparaîtra après 2 paris résolus avec mise</p>
             </div>
           )}
 
-          {/* Liste avec mises */}
-          <div className="space-y-2">
-            {entries.filter(e => e.result).map((entry) => (
-              <EntryCard key={entry.fixtureId || entry.savedAt} entry={entry} setMise={setMise} showMise />
-            ))}
-          </div>
         </div>
       )}
 
@@ -289,55 +284,117 @@ export default function History() {
         </>
       )}
 
-      {/* ── LISTE TAB ── */}
-      {tab === 'liste' && (
-        <>
-          <div className="flex gap-2">
-            {[['all', 'Tous'], ['pending', 'En cours'], ['win', 'Gagnés'], ['loss', 'Perdus']].map(([val, label]) => (
-              <button
-                key={val}
-                onClick={() => setFilter(val)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-heading font-semibold border transition-all ${
-                  filter === val ? 'bg-brand-500/15 border-brand-500/35 text-brand-400' : 'border-white/[0.08] text-white/35 hover:text-white/60'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+      {/* ── HISTORIQUE MATCHS TAB ── (matchs terminés, ou pronos d'une date passée) */}
+      {tab === 'matchs' && (() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const finished = entries.filter((e) => e.result || (e.date && e.date < todayStr));
+        const finishedFiltered = finished.filter((e) => {
+          if (filter === 'pending') return !e.result;
+          if (filter === 'win') return e.result === 'win';
+          if (filter === 'loss') return e.result === 'loss';
+          return true;
+        });
+        const groupedF = finishedFiltered.reduce((acc, e) => {
+          const day = e.date || e.savedAt?.split('T')[0] || 'unknown';
+          (acc[day] = acc[day] || []).push(e);
+          return acc;
+        }, {});
+        const daysF = Object.keys(groupedF).sort((a, b) => b.localeCompare(a));
 
-          {entries.length === 0 && (
-            <div className="glass-card p-12 text-center">
-              <BookOpen className="w-12 h-12 text-white/10 mx-auto mb-3" />
-              <p className="text-white/50 font-heading font-semibold">Aucun pronostic enregistré</p>
-              <p className="text-white/25 text-sm mt-1 font-heading max-w-xs mx-auto">
-                Les pronos générés sur la page d'accueil s'enregistreront ici automatiquement
-              </p>
+        return (
+          <>
+            <div className="flex gap-2">
+              {[['all', 'Tous'], ['pending', 'Sans résultat'], ['win', 'Gagnés'], ['loss', 'Perdus']].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setFilter(val)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-heading font-semibold border transition-all ${
+                    filter === val ? 'bg-brand-500/15 border-brand-500/35 text-brand-400' : 'border-white/[0.08] text-white/35 hover:text-white/60'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-          )}
 
-          {filtered.length === 0 && entries.length > 0 && (
-            <div className="glass-card p-8 text-center">
-              <p className="text-white/35 text-sm font-heading">Aucun prono dans cette catégorie</p>
-            </div>
-          )}
-
-          <div className="space-y-6">
-            {sortedDays.map((day) => (
-              <div key={day}>
-                <p className="text-xs font-heading font-semibold text-white/25 uppercase tracking-widest mb-2 px-1">
-                  {day !== 'unknown' ? format(parseISO(day), 'EEEE d MMMM yyyy', { locale: fr }) : 'Date inconnue'}
+            {finished.length === 0 && (
+              <div className="glass-card p-12 text-center">
+                <HistoryIcon className="w-12 h-12 text-white/10 mx-auto mb-3" />
+                <p className="text-white/50 font-heading font-semibold">Aucun match terminé</p>
+                <p className="text-white/25 text-sm mt-1 font-heading max-w-xs mx-auto">
+                  Les pronos d’une journée passée apparaîtront ici une fois les matchs joués
                 </p>
-                <div className="space-y-2">
-                  {grouped[day].map((entry) => (
-                    <EntryCard key={entry.fixtureId || entry.savedAt} entry={entry} setMise={setMise} />
-                  ))}
-                </div>
               </div>
-            ))}
-          </div>
-        </>
-      )}
+            )}
+
+            {finishedFiltered.length === 0 && finished.length > 0 && (
+              <div className="glass-card p-8 text-center">
+                <p className="text-white/35 text-sm font-heading">Aucun match dans cette catégorie</p>
+              </div>
+            )}
+
+            <div className="space-y-6">
+              {daysF.map((day) => (
+                <div key={day}>
+                  <p className="text-xs font-heading font-semibold text-white/25 uppercase tracking-widest mb-2 px-1">
+                    {day !== 'unknown' ? format(parseISO(day), 'EEEE d MMMM yyyy', { locale: fr }) : 'Date inconnue'}
+                  </p>
+                  <div className="space-y-2">
+                    {groupedF[day].map((entry) => (
+                      <EntryCard key={entry.fixtureId || entry.savedAt} entry={entry} setMise={setMise} showMise />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* ── HISTORIQUE PRONOS TAB ── (paris où l’utilisateur a saisi une mise) */}
+      {tab === 'pronos' && (() => {
+        const withMise = entries.filter((e) => e.mise > 0);
+        const groupedP = withMise.reduce((acc, e) => {
+          const day = e.date || e.savedAt?.split('T')[0] || 'unknown';
+          (acc[day] = acc[day] || []).push(e);
+          return acc;
+        }, {});
+        const daysP = Object.keys(groupedP).sort((a, b) => b.localeCompare(a));
+
+        return (
+          <>
+            {withMise.length === 0 ? (
+              <div className="glass-card p-12 text-center">
+                <ListChecks className="w-12 h-12 text-white/10 mx-auto mb-3" />
+                <p className="text-white/50 font-heading font-semibold">Aucun prono misé</p>
+                <p className="text-white/25 text-sm mt-1 font-heading max-w-xs mx-auto">
+                  Saisis une mise sur un prono dans l'onglet Bankroll pour le voir apparaître ici
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {daysP.map((day) => (
+                  <div key={day}>
+                    <p className="text-xs font-heading font-semibold text-white/25 uppercase tracking-widest mb-2 px-1">
+                      {day !== 'unknown' ? format(parseISO(day), 'EEEE d MMMM yyyy', { locale: fr }) : 'Date inconnue'}
+                    </p>
+                    <div className="space-y-2">
+                      {groupedP[day].map((entry) => (
+                        <EntryCard
+                          key={entry.fixtureId || entry.savedAt}
+                          entry={entry}
+                          setMise={setMise}
+                          showMise
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }

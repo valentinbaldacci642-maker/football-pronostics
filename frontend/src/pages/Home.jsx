@@ -46,9 +46,12 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   const { toggle, isFavorite } = useFavoritesStore();
   const isFav = isFavorite(fixtureId);
   const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
+  const { setMise, entries } = useHistoryStore();
   const suggestedStake = pick?.isValue && pick?.odd && pick?.probability
     ? kellyStake(pick.probability, pick.odd, initialBankroll, kFrac)
     : 0;
+  const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
+  const [miseInput, setMiseInput] = useState(existingEntry?.mise != null ? String(existingEntry.mise) : '');
 
   return (
     <motion.div
@@ -170,15 +173,35 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         </div>
       )}
 
-      {/* Kelly stake suggestion (only on value bets) */}
-      {suggestedStake > 0 && (
-        <div className="flex items-center justify-between gap-2 pl-3 pr-1 -mt-2">
-          <span className="text-[11px] text-white/30 font-heading">
-            Mise suggérée · ¼ Kelly
-          </span>
-          <span className="text-xs font-display tracking-wider text-gold-400/90">
-            {suggestedStake.toFixed(0)} €
-          </span>
+      {/* Kelly stake suggestion + actual stake input (when there's a pick with odds) */}
+      {pick?.odd && (
+        <div className="flex items-center justify-between gap-3 pl-3 pr-1 -mt-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {suggestedStake > 0 && (
+              <span className="text-[11px] text-gold-400/70 font-heading whitespace-nowrap">
+                Suggérée: <span className="font-display tracking-wider">{suggestedStake.toFixed(0)} €</span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-white/30 font-heading">Ma mise:</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="—"
+              value={miseInput}
+              onChange={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setMiseInput(e.target.value);
+                setMise(fixtureId, e.target.value);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+            />
+            <span className="text-[11px] text-white/30">€</span>
+          </div>
         </div>
       )}
 
