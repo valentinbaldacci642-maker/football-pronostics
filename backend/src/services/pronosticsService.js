@@ -42,7 +42,7 @@ class PronosticsService {
       upcoming.map((f) => this._fetchAnalysis(f.fixture.id))
     );
 
-    const pronostics = analyses
+    const all = analyses
       .map((result, i) => {
         if (result.status !== 'fulfilled' || !result.value) return null;
         const { oddsAnalysis, predAnalysis } = result.value;
@@ -58,9 +58,11 @@ class PronosticsService {
         return { fixture, analysis: fullAnalysis, confidence, pick };
       })
       .filter(Boolean)
-      .filter((p) => p.confidence >= 45)
-      .sort((a, b) => b.confidence - a.confidence)
-      .slice(0, 8);
+      .sort((a, b) => b.confidence - a.confidence);
+
+    // Prefer high-confidence picks; if none pass threshold, show best available
+    const reliable = all.filter((p) => p.confidence >= 45).slice(0, 8);
+    const pronostics = reliable.length > 0 ? reliable : all.slice(0, 3);
 
     cache.set(cacheKey, pronostics, 10800); // 3h cache
     return pronostics;

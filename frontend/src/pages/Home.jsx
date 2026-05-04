@@ -244,6 +244,7 @@ export default function Home() {
   const avgConf = pronostics.length > 0
     ? Math.round(pronostics.reduce((s, p) => s + p.confidence, 0) / pronostics.length)
     : 0;
+  const isLowConfidenceFallback = pronostics.length > 0 && pronostics.every((p) => p.confidence < 45);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -340,12 +341,21 @@ export default function Home() {
       {/* Pronostics */}
       {!loading && !error && pronostics.length > 0 && (
         <>
-          <div className="px-3.5 py-2.5 rounded-xl bg-dark-800/60 border border-white/[0.04]">
-            <p className="text-xs text-white/20 font-heading leading-relaxed">
-              <span className="text-white/40 font-semibold">Méthode :</span>{' '}
-              Indice calculé sur 6 critères — probabilité dominante, écart entre outcomes, accord modèle Poisson vs bookmakers, qualité overround, forme récente, historique H2H.
-            </p>
-          </div>
+          {isLowConfidenceFallback ? (
+            <div className="px-3.5 py-2.5 rounded-xl bg-gold-500/[0.06] border border-gold-500/20">
+              <p className="text-xs text-gold-400/70 font-heading leading-relaxed">
+                <span className="text-gold-400 font-semibold">Données limitées aujourd'hui —</span>{' '}
+                Aucun pronostic à haute confiance disponible. Voici les meilleures opportunités du jour à titre indicatif.
+              </p>
+            </div>
+          ) : (
+            <div className="px-3.5 py-2.5 rounded-xl bg-dark-800/60 border border-white/[0.04]">
+              <p className="text-xs text-white/20 font-heading leading-relaxed">
+                <span className="text-white/40 font-semibold">Méthode :</span>{' '}
+                Indice calculé sur 6 critères — probabilité dominante, écart entre outcomes, accord modèle Poisson vs bookmakers, qualité overround, forme récente, historique H2H.
+              </p>
+            </div>
+          )}
 
           <PronosticCard pronostic={pronostics[0]} featured index={0} />
 
