@@ -291,23 +291,45 @@ function Skeleton() {
   );
 }
 
+// Build a list of date offsets [0, 1, 2, 3] starting today
+function buildDayOptions() {
+  return [0, 1, 2, 3].map((offset) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    const iso = d.toISOString().split('T')[0];
+    let label;
+    if (offset === 0) label = "Aujourd'hui";
+    else if (offset === 1) label = 'Demain';
+    else label = format(d, 'EEEE d', { locale: fr });
+    return { offset, iso, label };
+  });
+}
+
 export default function Home() {
   const [pronostics, setPronostics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [valueOnly, setValueOnly] = useState(false);
+  const dayOptions = buildDayOptions();
+  const [selectedDay, setSelectedDay] = useState(dayOptions[0].iso);
   const { edgeMode } = useBankrollStore();
   const { getStats, savePronostics } = useHistoryStore();
   const histStats = getStats();
+  const isToday = selectedDay === dayOptions[0].iso;
 
-  const load = async ({ force = false } = {}) => {
+  const load = async ({ force = false, date = selectedDay } = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await pronosticsApi.getBestToday({ force });
+      // For today we omit the param to keep current cache key, otherwise pass explicit date
+      const res = await pronosticsApi.getBestToday({
+        force,
+        date: date && date !== dayOptions[0].iso ? date : null,
+      });
       const data = res?.data || [];
       setPronostics(data);
-      if (data.length > 0) savePronostics(data);
+      // Only persist today's pronostics in history (avoids bloating with future days)
+      if (data.length > 0 && date === dayOptions[0].iso) savePronostics(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -315,7 +337,7 @@ export default function Home() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load({ date: selectedDay }); }, [selectedDay]);
 
   const highConf = pronostics.filter((p) => p.confidence >= 70).length;
   const valueBets = pronostics.filter((p) => p.pick?.isValue).length;
@@ -330,10 +352,11 @@ export default function Home() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-4xl text-white tracking-wide leading-none mb-1">
-            Meilleur <span className="text-gradient-neon">Prono du Jour</span>
+            {isToday ? 'Meilleur ' : 'Pronos '}<span className="text-gradient-neon">{isToday ? 'Prono du Jour' : 'À venir'}</span>
           </h1>
-          <p className="text-sm text-white/35 font-heading font-medium">
-            {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })} · Analyse IA + données en direct
+          <p className="text-sm text-white/35 font-heading font-medium capitalize">
+            {format(new Date(selectedDay + 'T00:00:00'), "EEEE d MMMM yyyy", { locale: fr })}
+            {isToday && ' · Analyse IA + données en direct'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -360,6 +383,24 @@ export default function Home() {
             <span className="text-xs hidden sm:block font-heading font-semibold tracking-wide">Actualiser</span>
           </button>
         </div>
+      </div>
+
+      {/* Day selector — today + next 3 days */}
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+        {dayOptions.map(({ offset, iso, label }) => (
+          <button
+            key={iso}
+            onClick={() => setSelectedDay(iso)}
+            className={clsx(
+              'px-3 py-1.5 rounded-xl text-xs font-heading font-semibold border transition-all whitespace-nowrap capitalize',
+              selectedDay === iso
+                ? 'bg-brand-500/15 border-brand-500/40 text-brand-300'
+                : 'border-white/[0.08] text-white/35 hover:text-white/60'
+            )}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Stats */}

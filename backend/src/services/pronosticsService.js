@@ -7,9 +7,9 @@ const logger = require('../utils/logger');
 const PRIORITY_LEAGUES = [2, 3, 39, 140, 135, 61, 78, 88, 94, 253, 307, 45, 48, 71, 128];
 
 class PronosticsService {
-  async getBestPronostics(forceRefresh = false) {
-    const today = new Date().toISOString().split('T')[0];
-    const cacheKey = cache.buildKey('pronostics', today);
+  async getBestPronostics(forceRefresh = false, date = null) {
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const cacheKey = cache.buildKey('pronostics', targetDate);
 
     if (!forceRefresh) {
       const cached = cache.get(cacheKey);
@@ -18,7 +18,7 @@ class PronosticsService {
 
     let fixtures = [];
     try {
-      const res = await api.getFixturesByDate(today, null, null);
+      const res = await api.getFixturesByDate(targetDate, null, null);
       fixtures = res.response || [];
     } catch (e) {
       logger.error('PronosticsService: failed to get fixtures', e.message);

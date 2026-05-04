@@ -73,8 +73,12 @@ export const scorersApi = {
 };
 
 export const pronosticsApi = {
-  getBestToday: ({ force = false } = {}) =>
-    api.get('/pronostics/today', { params: force ? { force: 1 } : {} }),
+  getBestToday: ({ force = false, date = null } = {}) => {
+    const params = {};
+    if (force) params.force = 1;
+    if (date) params.date = date;
+    return api.get('/pronostics/today', { params });
+  },
 };
 
 export const newsApi = {
