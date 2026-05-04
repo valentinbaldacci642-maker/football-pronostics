@@ -64,15 +64,33 @@ class AnalysisService {
 
   /**
    * Analyze predictions from API
+   * @param {object} predictionData - raw API prediction response
+   * @param {object} [teamStats] - optional season-wide stats { home, away } from /teams/statistics
    */
-  analyzePredictions(predictionData) {
+  analyzePredictions(predictionData, teamStats = null) {
     if (!predictionData) return null;
 
     const { predictions, teams, comparison, league, h2h } = predictionData;
 
-    const homeWinProb = parseFloat(predictions?.percent?.home?.replace('%', '') || 0);
-    const drawProb = parseFloat(predictions?.percent?.draw?.replace('%', '') || 0);
-    const awayWinProb = parseFloat(predictions?.percent?.away?.replace('%', '') || 0);
+    // Sanitize API percent fields — null/missing data must NOT silently become 0,
+    // otherwise an asymmetric response (e.g. home=null, away="100%") yields a wildly
+    // skewed probability distribution that pollutes consensusProbs and the pick.
+    const homeWinProb = this._parsePercent(predictions?.percent?.home);
+    const drawProb = this._parsePercent(predictions?.percent?.draw);
+    const awayWinProb = this._parsePercent(predictions?.percent?.away);
+
+    const allPresent = homeWinProb !== null && drawProb !== null && awayWinProb !== null;
+    const sum = (homeWinProb || 0) + (drawProb || 0) + (awayWinProb || 0);
+    const probabilitiesReliable = allPresent && Math.abs(sum - 100) <= 5;
+
+    const probabilities = probabilitiesReliable
+      ? {
+          home: homeWinProb,
+          draw: drawProb,
+          away: awayWinProb,
+          confidence: getConfidenceLevel(Math.max(homeWinProb, drawProb, awayWinProb)),
+        }
+      : null;
 
     const recommendedWinner = predictions?.winner?.name || null;
     const advice = predictions?.advice || '';
@@ -99,23 +117,30 @@ class AnalysisService {
       },
     };
 
-    const homeExpectedGoals = this._calcExpectedGoals(goalsComparison.home, goalsComparison.away);
-    const awayExpectedGoals = this._calcExpectedGoals(goalsComparison.away, goalsComparison.home);
+    // Use full-season averages when team stats are available; fallback to last_5 only if missing
+    const homeSeason = this._extractSeasonGoals(teamStats?.home);
+    const awaySeason = this._extractSeasonGoals(teamStats?.away);
+    const xGSource = homeSeason && awaySeason ? 'season' : 'last_5';
+
+    const homeExpectedGoals = this._calcExpectedGoals(
+      goalsComparison.home, goalsComparison.away, homeSeason, awaySeason,
+    );
+    const awayExpectedGoals = this._calcExpectedGoals(
+      goalsComparison.away, goalsComparison.home, awaySeason, homeSeason,
+    );
 
     const scoreMatrix = generateScoreMatrix(homeExpectedGoals, awayExpectedGoals);
     const mostLikelyScores = scoreMatrix.slice(0, 5);
 
     return {
-      probabilities: {
-        home: homeWinProb,
-        draw: drawProb,
-        away: awayWinProb,
-        confidence: getConfidenceLevel(Math.max(homeWinProb, drawProb, awayWinProb)),
-      },
+      probabilities,
+      probabilitiesReliable,
       recommendation: {
         winner: recommendedWinner,
         advice,
-        confidence: this._calcRecommendationConfidence(homeWinProb, drawProb, awayWinProb),
+        confidence: probabilitiesReliable
+          ? this._calcRecommendationConfidence(homeWinProb, drawProb, awayWinProb)
+          : null,
       },
       form: { home: homeForm, away: awayForm },
       goalsComparison,
@@ -123,6 +148,10 @@ class AnalysisService {
         home: parseFloat(homeExpectedGoals.toFixed(2)),
         away: parseFloat(awayExpectedGoals.toFixed(2)),
         total: parseFloat((homeExpectedGoals + awayExpectedGoals).toFixed(2)),
+        source: xGSource,
+        sampleSize: xGSource === 'season'
+          ? { home: homeSeason?.played ?? null, away: awaySeason?.played ?? null }
+          : { home: 5, away: 5 },
       },
       mostLikelyScores,
       h2h: h2hAnalysis,
@@ -306,27 +335,6 @@ class AnalysisService {
   }
 
   _findBestBet(analysis) {
-    // 1X2 is always the primary pick when there is a clear favourite
-    if (analysis.matchWinner) {
-      const { fairProbs, odds } = analysis.matchWinner;
-      const maxProb = Math.max(fairProbs.home, fairProbs.draw, fairProbs.away);
-      const outcome = maxProb === fairProbs.home ? 'home' : maxProb === fairProbs.draw ? 'draw' : 'away';
-      const label = outcome === 'home' ? '1' : outcome === 'draw' ? 'X' : '2';
-
-      // If 1X2 has a clear favourite (≥50%), return it directly — never let secondary
-      // markets (O/U, BTTS) override a decisive signal like Chelsea 70%
-      if (maxProb >= 50) {
-        return {
-          market: '1X2',
-          selection: label,
-          prob: maxProb,
-          odd: odds[outcome],
-          confidence: getConfidenceLevel(maxProb),
-        };
-      }
-    }
-
-    // Only compare secondary markets when 1X2 is genuinely uncertain (<50%)
     const candidates = [];
 
     if (analysis.matchWinner) {
@@ -339,9 +347,11 @@ class AnalysisService {
 
     if (analysis.goalsOverUnder?.lines['2.5']) {
       const { over, under } = analysis.goalsOverUnder.lines['2.5'];
-      const best = (over?.fairProb || 0) > (under?.fairProb || 0) ? over : under;
-      const label = best === over ? 'Over 2.5' : 'Under 2.5';
-      candidates.push({ market: 'O/U 2.5', selection: label, prob: best.fairProb, odd: best.odd, confidence: getConfidenceLevel(best.fairProb) });
+      if (over?.fairProb && under?.fairProb) {
+        const best = over.fairProb > under.fairProb ? over : under;
+        const label = best === over ? 'Over 2.5' : 'Under 2.5';
+        candidates.push({ market: 'O/U 2.5', selection: label, prob: best.fairProb, odd: best.odd, confidence: getConfidenceLevel(best.fairProb) });
+      }
     }
 
     if (analysis.btts) {
@@ -350,6 +360,7 @@ class AnalysisService {
       candidates.push({ market: 'BTTS', selection: best === 'yes' ? 'Oui' : 'Non', prob: fairProbs[best], odd: odds[best], confidence: getConfidenceLevel(fairProbs[best]) });
     }
 
+    // Pure highest probability — user chooses what to bet on, we show the facts
     return candidates.sort((a, b) => b.prob - a.prob)[0] || null;
   }
 
@@ -444,13 +455,55 @@ class AnalysisService {
     };
   }
 
-  _calcExpectedGoals(team, opponent) {
-    // parseFloat handles string "0" from API (which is truthy, bypassing || fallback)
-    const attack = parseFloat(team.avgGoals) || 1.2;
-    const conceded = parseFloat(opponent.avgConceded) || 1.2;
-    const attackStrength = attack / 1.4;
-    const defenseWeakness = conceded / 1.2;
-    return Math.max(0.3, attackStrength * defenseWeakness * 1.4);
+  _calcExpectedGoals(team, opponent, teamSeason, opponentSeason) {
+    // League-average baseline (~1.4 goals/team/match in top European leagues)
+    const baseline = 1.4;
+
+    // Prefer full-season averages — much more robust than last_5 (which the user
+    // explicitly flagged as too small a sample for reliable xG).
+    const seasonFor = teamSeason?.avgFor;
+    const seasonAgainst = opponentSeason?.avgAgainst;
+
+    const last5For = parseFloat(team.avgGoals);
+    const last5Against = parseFloat(opponent.avgConceded);
+
+    const attack = Number.isFinite(seasonFor) ? seasonFor
+      : (Number.isFinite(last5For) && last5For > 0 ? last5For : baseline);
+    const conceded = Number.isFinite(seasonAgainst) ? seasonAgainst
+      : (Number.isFinite(last5Against) && last5Against > 0 ? last5Against : baseline);
+
+    const attackStrength = attack / baseline;
+    const defenseWeakness = conceded / baseline;
+    return Math.max(0.3, attackStrength * defenseWeakness * baseline);
+  }
+
+  _parsePercent(value) {
+    if (value === null || value === undefined) return null;
+    const str = String(value).replace('%', '').trim();
+    if (str === '') return null;
+    const n = parseFloat(str);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /**
+   * Extract season goals averages from /teams/statistics response.
+   * Returns { avgFor, avgAgainst, played } or null if unusable.
+   * Skips early-season tiny samples (<5 played) to avoid noise worse than last_5.
+   */
+  _extractSeasonGoals(stats) {
+    if (!stats || typeof stats !== 'object') return null;
+    const avgFor = parseFloat(stats?.goals?.for?.average?.total);
+    const avgAgainst = parseFloat(stats?.goals?.against?.average?.total);
+    const played = parseInt(stats?.fixtures?.played?.total, 10);
+
+    if (!Number.isFinite(avgFor) || !Number.isFinite(avgAgainst)) return null;
+    if (Number.isFinite(played) && played < 5) return null;
+
+    return {
+      avgFor,
+      avgAgainst,
+      played: Number.isFinite(played) ? played : null,
+    };
   }
 
   _calcRecommendationConfidence(home, draw, away) {

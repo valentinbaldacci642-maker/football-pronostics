@@ -37,9 +37,9 @@ class PronosticsService {
 
     if (upcoming.length === 0) return [];
 
-    // Fetch predictions + odds in parallel for all selected fixtures
+    // Fetch predictions + odds + season stats in parallel for all selected fixtures
     const analyses = await Promise.allSettled(
-      upcoming.map((f) => this._fetchAnalysis(f.fixture.id))
+      upcoming.map((f) => this._fetchAnalysis(f))
     );
 
     const all = analyses
@@ -68,18 +68,47 @@ class PronosticsService {
     return pronostics;
   }
 
-  async _fetchAnalysis(fixtureId) {
-    const [oddsData, predData] = await Promise.allSettled([
+  async _fetchAnalysis(fixture) {
+    const fixtureId = fixture.fixture?.id;
+    const homeId = fixture.teams?.home?.id;
+    const awayId = fixture.teams?.away?.id;
+    const leagueId = fixture.league?.id;
+    const season = fixture.league?.season;
+
+    const tasks = [
       api.getOddsByFixture(fixtureId),
       api.getPredictions(fixtureId),
-    ]);
+    ];
+    const hasTeamCtx = homeId && awayId && leagueId && season;
+    if (hasTeamCtx) {
+      tasks.push(
+        api.getTeamStatistics(homeId, season, leagueId),
+        api.getTeamStatistics(awayId, season, leagueId),
+      );
+    }
+
+    const results = await Promise.allSettled(tasks);
+    const [oddsData, predData, homeStatsData, awayStatsData] = results;
 
     const oddsRaw = oddsData.status === 'fulfilled' ? oddsData.value.response?.[0] : null;
     const predRaw = predData.status === 'fulfilled' ? predData.value.response?.[0] : null;
 
+    // Season-wide team statistics — used for full-season xG instead of last_5
+    const extractStats = (settled) => {
+      if (!settled || settled.status !== 'fulfilled') return null;
+      const resp = settled.value.response;
+      // /teams/statistics returns a single object, not an array
+      if (Array.isArray(resp)) return resp.length > 0 ? resp[0] : null;
+      return resp && typeof resp === 'object' ? resp : null;
+    };
+    const homeStats = extractStats(homeStatsData);
+    const awayStats = extractStats(awayStatsData);
+
     return {
       oddsAnalysis: oddsRaw ? analysisService.analyzeFixtureOdds(oddsRaw) : null,
-      predAnalysis: predRaw ? analysisService.analyzePredictions(predRaw) : null,
+      predAnalysis: predRaw
+        ? analysisService.analyzePredictions(predRaw, { home: homeStats, away: awayStats })
+        : null,
     };
   }
 
