@@ -117,19 +117,14 @@ class AnalysisService {
       },
     };
 
-    // Use full-season averages when team stats are available; fallback to last_5 only if missing
+    // Full-season xG only — no last_5 fallback (explicit product requirement)
     const homeSeason = this._extractSeasonGoals(teamStats?.home);
     const awaySeason = this._extractSeasonGoals(teamStats?.away);
-    const xGSource = homeSeason && awaySeason ? 'season' : 'last_5';
+    const homeExpectedGoals = this._calcExpectedGoals(homeSeason, awaySeason);
+    const awayExpectedGoals = this._calcExpectedGoals(awaySeason, homeSeason);
+    const xGAvailable = homeExpectedGoals !== null && awayExpectedGoals !== null;
 
-    const homeExpectedGoals = this._calcExpectedGoals(
-      goalsComparison.home, goalsComparison.away, homeSeason, awaySeason,
-    );
-    const awayExpectedGoals = this._calcExpectedGoals(
-      goalsComparison.away, goalsComparison.home, awaySeason, homeSeason,
-    );
-
-    const scoreMatrix = generateScoreMatrix(homeExpectedGoals, awayExpectedGoals);
+    const scoreMatrix = xGAvailable ? generateScoreMatrix(homeExpectedGoals, awayExpectedGoals) : [];
     const mostLikelyScores = scoreMatrix.slice(0, 5);
 
     return {
@@ -144,15 +139,15 @@ class AnalysisService {
       },
       form: { home: homeForm, away: awayForm },
       goalsComparison,
-      expectedGoals: {
-        home: parseFloat(homeExpectedGoals.toFixed(2)),
-        away: parseFloat(awayExpectedGoals.toFixed(2)),
-        total: parseFloat((homeExpectedGoals + awayExpectedGoals).toFixed(2)),
-        source: xGSource,
-        sampleSize: xGSource === 'season'
-          ? { home: homeSeason?.played ?? null, away: awaySeason?.played ?? null }
-          : { home: 5, away: 5 },
-      },
+      expectedGoals: xGAvailable
+        ? {
+            home: parseFloat(homeExpectedGoals.toFixed(2)),
+            away: parseFloat(awayExpectedGoals.toFixed(2)),
+            total: parseFloat((homeExpectedGoals + awayExpectedGoals).toFixed(2)),
+            source: 'season',
+            sampleSize: { home: homeSeason.played, away: awaySeason.played },
+          }
+        : null,
       mostLikelyScores,
       h2h: h2hAnalysis,
       raw: predictionData,
@@ -455,25 +450,21 @@ class AnalysisService {
     };
   }
 
-  _calcExpectedGoals(team, opponent, teamSeason, opponentSeason) {
+  /**
+   * Compute expected goals from full-season averages only.
+   * Returns null when season data is unavailable — caller must omit Poisson model.
+   * NEVER falls back to last_5 (explicit product requirement).
+   */
+  _calcExpectedGoals(teamSeason, opponentSeason) {
+    if (!teamSeason || !opponentSeason) return null;
+    const seasonFor = teamSeason.avgFor;
+    const seasonAgainst = opponentSeason.avgAgainst;
+    if (!Number.isFinite(seasonFor) || !Number.isFinite(seasonAgainst)) return null;
+
     // League-average baseline (~1.4 goals/team/match in top European leagues)
     const baseline = 1.4;
-
-    // Prefer full-season averages — much more robust than last_5 (which the user
-    // explicitly flagged as too small a sample for reliable xG).
-    const seasonFor = teamSeason?.avgFor;
-    const seasonAgainst = opponentSeason?.avgAgainst;
-
-    const last5For = parseFloat(team.avgGoals);
-    const last5Against = parseFloat(opponent.avgConceded);
-
-    const attack = Number.isFinite(seasonFor) ? seasonFor
-      : (Number.isFinite(last5For) && last5For > 0 ? last5For : baseline);
-    const conceded = Number.isFinite(seasonAgainst) ? seasonAgainst
-      : (Number.isFinite(last5Against) && last5Against > 0 ? last5Against : baseline);
-
-    const attackStrength = attack / baseline;
-    const defenseWeakness = conceded / baseline;
+    const attackStrength = seasonFor / baseline;
+    const defenseWeakness = seasonAgainst / baseline;
     return Math.max(0.3, attackStrength * defenseWeakness * baseline);
   }
 
