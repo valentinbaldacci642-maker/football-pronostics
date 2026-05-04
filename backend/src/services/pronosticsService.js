@@ -7,12 +7,14 @@ const logger = require('../utils/logger');
 const PRIORITY_LEAGUES = [2, 3, 39, 140, 135, 61, 78, 88, 94, 253, 307, 45, 48, 71, 128];
 
 class PronosticsService {
-  async getBestPronostics() {
+  async getBestPronostics(forceRefresh = false) {
     const today = new Date().toISOString().split('T')[0];
     const cacheKey = cache.buildKey('pronostics', today);
 
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
+    if (!forceRefresh) {
+      const cached = cache.get(cacheKey);
+      if (cached && cached.length > 0) return cached;
+    }
 
     let fixtures = [];
     try {
@@ -44,7 +46,7 @@ class PronosticsService {
       .map((result, i) => {
         if (result.status !== 'fulfilled' || !result.value) return null;
         const { oddsAnalysis, predAnalysis } = result.value;
-        if (!predAnalysis) return null;
+        if (!predAnalysis && !oddsAnalysis) return null;
 
         const fixture = upcoming[i];
         const fullAnalysis = analysisService.buildFullAnalysis(oddsAnalysis, predAnalysis, fixture);
@@ -90,7 +92,7 @@ class PronosticsService {
    * F. H2H historical support     (0-8  pts) — historical head-to-head backing
    */
   _calculateConfidence(predAnalysis, oddsAnalysis) {
-    const probs = predAnalysis?.probabilities;
+    const probs = predAnalysis?.probabilities ?? oddsAnalysis?.matchWinner?.fairProbs;
     if (!probs) return 30;
 
     let score = 0;
