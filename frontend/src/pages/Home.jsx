@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen } from 'lucide-react';
+import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star } from 'lucide-react';
 import { pronosticsApi } from '../services/api';
 import { formatTime } from '../utils/format';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
-import { useHistoryStore } from '../store';
+import { useHistoryStore, useFavoritesStore } from '../store';
 
 function getConfidenceConfig(score) {
   if (score >= 70) return {
@@ -42,6 +42,8 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   const awayProb = probs?.away || 0;
   const conf = getConfidenceConfig(confidence);
   const fixtureId = fix.fixture?.id;
+  const { toggle, isFavorite } = useFavoritesStore();
+  const isFav = isFavorite(fixtureId);
 
   return (
     <motion.div
@@ -70,9 +72,17 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
           <span className="text-xs text-white/35 font-heading truncate">{league?.name}</span>
           {league?.round && <span className="text-xs text-white/15 hidden sm:block">· {league.round}</span>}
         </div>
-        <span className="text-xs font-mono text-white/50 bg-dark-700/80 px-2 py-0.5 rounded-lg flex-shrink-0">
-          {matchTime}
-        </span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span className="text-xs font-mono text-white/50 bg-dark-700/80 px-2 py-0.5 rounded-lg">
+            {matchTime}
+          </span>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(fixtureId); }}
+            className={clsx('p-1 rounded-lg transition-all', isFav ? 'text-gold-400' : 'text-white/15 hover:text-white/50')}
+          >
+            <Star className="w-3.5 h-3.5" fill={isFav ? 'currentColor' : 'none'} />
+          </button>
+        </div>
       </div>
 
       {/* Teams matchup */}

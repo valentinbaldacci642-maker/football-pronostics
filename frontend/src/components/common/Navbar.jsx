@@ -58,7 +58,7 @@ export default function Navbar() {
               <button
                 key={r.team.id}
                 className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.06] transition-colors text-left group"
-                onClick={() => { setQuery(''); setResults([]); navigate(`/?team=${r.team.id}`); }}
+                onClick={() => { setQuery(''); setResults([]); navigate(`/team/${r.team.id}`); }}
               >
                 <img src={r.team.logo} alt="" className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" onError={(e) => e.target.style.display = 'none'} />
                 <div>
