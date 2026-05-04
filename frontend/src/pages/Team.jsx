@@ -18,6 +18,7 @@ export default function Team() {
   const [teamData, setTeamData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { toggleTeam, isTeamFavorite } = useFavoriteTeamsStore();
 
   useEffect(() => {
     const load = async () => {
@@ -42,7 +43,6 @@ export default function Team() {
   if (!teamData) return <ErrorState message="Équipe introuvable" />;
 
   const { team, venue } = teamData;
-  const { toggleTeam, isTeamFavorite } = useFavoriteTeamsStore();
   const isFav = isTeamFavorite(team.id);
   const tabs = [
     { key: 'effectif',   label: 'Effectif',   icon: Users },
