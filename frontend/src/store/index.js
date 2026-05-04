@@ -195,6 +195,8 @@ export const useHistoryStore = create(
         ),
       })),
 
+      clearAll: () => set({ entries: [] }),
+
       getStats: () => {
         const settled = get().entries.filter((e) => e.result === 'win' || e.result === 'loss');
         const wins = settled.filter((e) => e.result === 'win').length;

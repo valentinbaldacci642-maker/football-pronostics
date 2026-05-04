@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks } from 'lucide-react';
+import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks, RotateCcw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useHistoryStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
 import { format, parseISO } from 'date-fns';
@@ -30,8 +30,31 @@ const CustomTooltip = ({ active, payload }) => {
 };
 
 export default function History() {
-  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise } = useHistoryStore();
-  const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode } = useBankrollStore();
+  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll } = useHistoryStore();
+  const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode, reset: resetBankroll } = useBankrollStore();
+
+  const handleResetAll = () => {
+    const ok = window.confirm(
+      'Reset complet ?\n\n' +
+      '- Tout l\'historique des pronos sera supprimé\n' +
+      '- Bankroll de départ remise à 1000 €\n' +
+      '- Mode Standard, 1/4 Kelly\n\n' +
+      'Cette action est irréversible.'
+    );
+    if (!ok) return;
+    clearAll();
+    resetBankroll();
+  };
+
+  const handleResetBankrollOnly = () => {
+    const ok = window.confirm(
+      'Réinitialiser uniquement la bankroll ?\n\n' +
+      'Les paramètres reviennent aux valeurs par défaut (1000 €, ¼ Kelly, Standard) ' +
+      'mais l\'historique des pronos est conservé.'
+    );
+    if (!ok) return;
+    resetBankroll();
+  };
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('matchs');
   const [search, setSearch] = useState('');
@@ -199,6 +222,24 @@ export default function History() {
                   ({bkStats.pnl >= 0 ? '+' : ''}{bkStats.pnl.toFixed(0)}€)
                 </span>
               </span>
+            </div>
+
+            {/* Reset actions */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-white/[0.05]">
+              <button
+                onClick={handleResetBankrollOnly}
+                className="flex items-center justify-center gap-1.5 flex-1 px-3 py-2 rounded-lg border border-white/[0.08] text-xs font-heading font-semibold text-white/50 hover:text-white/80 hover:border-white/15 transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset bankroll uniquement
+              </button>
+              <button
+                onClick={handleResetAll}
+                className="flex items-center justify-center gap-1.5 flex-1 px-3 py-2 rounded-lg border border-danger/30 text-xs font-heading font-semibold text-danger/80 hover:text-danger hover:bg-danger/10 transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset complet (bankroll + historique)
+              </button>
             </div>
           </div>
 
