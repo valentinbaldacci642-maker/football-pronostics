@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { useHistoryStore } from '../store';
+import { useHistoryStore, useBankrollStore } from '../store';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -31,12 +31,14 @@ const CustomTooltip = ({ active, payload }) => {
 
 export default function History() {
   const { entries, getStats, getBankrollStats, getBankrollCurve, setMise } = useHistoryStore();
+  const { initialBankroll, kellyFraction, setInitialBankroll, setKellyFraction } = useBankrollStore();
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('liste');
   const [search, setSearch] = useState('');
   const stats = getStats();
   const bkStats = getBankrollStats();
   const curve = getBankrollCurve();
+  const currentBankroll = initialBankroll + (bkStats.pnl || 0);
 
   const byResult = entries.filter((e) => {
     if (filter === 'pending') return !e.result;
@@ -114,6 +116,49 @@ export default function History() {
       {/* ── BANKROLL TAB ── */}
       {tab === 'bankroll' && (
         <div className="space-y-4">
+          {/* Settings: initial bankroll + Kelly fraction */}
+          <div className="glass-card p-4 space-y-3">
+            <p className="text-xs font-heading font-semibold text-white/35 uppercase tracking-wider">Paramètres bankroll</p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-white/40 font-heading">Bankroll de départ (€)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="50"
+                  value={initialBankroll}
+                  onChange={(e) => setInitialBankroll(e.target.value)}
+                  className="bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-white/40 font-heading">Fraction Kelly</span>
+                <select
+                  value={kellyFraction}
+                  onChange={(e) => setKellyFraction(e.target.value)}
+                  className="bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
+                >
+                  <option value="0.1">1/10 Kelly · ultra-prudent</option>
+                  <option value="0.25">1/4 Kelly · recommandé</option>
+                  <option value="0.5">1/2 Kelly · agressif</option>
+                  <option value="1">Full Kelly · variance max</option>
+                </select>
+              </label>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-white/[0.05]">
+              <span className="text-xs text-white/40 font-heading">Bankroll actuelle</span>
+              <span className={clsx(
+                'text-2xl font-display tracking-wider',
+                currentBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
+              )}>
+                {currentBankroll.toFixed(0)} €
+                <span className="text-xs text-white/30 ml-2 font-mono">
+                  ({bkStats.pnl >= 0 ? '+' : ''}{bkStats.pnl.toFixed(0)}€)
+                </span>
+              </span>
+            </div>
+          </div>
+
           {/* Bankroll stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {[

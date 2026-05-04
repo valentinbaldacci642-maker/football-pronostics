@@ -118,10 +118,11 @@ class AnalysisService {
     };
 
     // Full-season xG only — no last_5 fallback (explicit product requirement)
+    // Venue-adjusted: home team uses its home scoring rate vs away team's away conceding rate
     const homeSeason = this._extractSeasonGoals(teamStats?.home);
     const awaySeason = this._extractSeasonGoals(teamStats?.away);
-    const homeExpectedGoals = this._calcExpectedGoals(homeSeason, awaySeason);
-    const awayExpectedGoals = this._calcExpectedGoals(awaySeason, homeSeason);
+    const homeExpectedGoals = this._calcExpectedGoals(homeSeason, awaySeason, 'home');
+    const awayExpectedGoals = this._calcExpectedGoals(awaySeason, homeSeason, 'away');
     const xGAvailable = homeExpectedGoals !== null && awayExpectedGoals !== null;
 
     const scoreMatrix = xGAvailable ? generateScoreMatrix(homeExpectedGoals, awayExpectedGoals) : [];
@@ -145,6 +146,11 @@ class AnalysisService {
             away: parseFloat(awayExpectedGoals.toFixed(2)),
             total: parseFloat((homeExpectedGoals + awayExpectedGoals).toFixed(2)),
             source: 'season',
+            venueAdjusted:
+              homeSeason.avgForHome != null
+              && awaySeason.avgForAway != null
+              && homeSeason.avgAgainstHome != null
+              && awaySeason.avgAgainstAway != null,
             sampleSize: { home: homeSeason.played, away: awaySeason.played },
           }
         : null,
@@ -451,20 +457,28 @@ class AnalysisService {
   }
 
   /**
-   * Compute expected goals from full-season averages only.
+   * Compute expected goals from full-season averages, venue-adjusted.
+   * - venue='home': team plays at home, use team.avgFor.home and opponent.avgAgainst.away
+   * - venue='away': team plays away, use team.avgFor.away and opponent.avgAgainst.home
+   * Falls back to total averages when home/away splits are unavailable.
    * Returns null when season data is unavailable — caller must omit Poisson model.
-   * NEVER falls back to last_5 (explicit product requirement).
    */
-  _calcExpectedGoals(teamSeason, opponentSeason) {
+  _calcExpectedGoals(teamSeason, opponentSeason, venue) {
     if (!teamSeason || !opponentSeason) return null;
-    const seasonFor = teamSeason.avgFor;
-    const seasonAgainst = opponentSeason.avgAgainst;
-    if (!Number.isFinite(seasonFor) || !Number.isFinite(seasonAgainst)) return null;
+
+    const teamFor = venue === 'home'
+      ? (teamSeason.avgForHome ?? teamSeason.avgFor)
+      : (teamSeason.avgForAway ?? teamSeason.avgFor);
+    const oppAgainst = venue === 'home'
+      ? (opponentSeason.avgAgainstAway ?? opponentSeason.avgAgainst)
+      : (opponentSeason.avgAgainstHome ?? opponentSeason.avgAgainst);
+
+    if (!Number.isFinite(teamFor) || !Number.isFinite(oppAgainst)) return null;
 
     // League-average baseline (~1.4 goals/team/match in top European leagues)
     const baseline = 1.4;
-    const attackStrength = seasonFor / baseline;
-    const defenseWeakness = seasonAgainst / baseline;
+    const attackStrength = teamFor / baseline;
+    const defenseWeakness = oppAgainst / baseline;
     return Math.max(0.3, attackStrength * defenseWeakness * baseline);
   }
 
@@ -478,11 +492,13 @@ class AnalysisService {
 
   /**
    * Extract season goals averages from /teams/statistics response.
-   * Returns { avgFor, avgAgainst, played } or null if unusable.
+   * Returns full {avgFor*, avgAgainst*, played} venue-split breakdown.
+   * Returns null if total averages are unusable.
    * Skips early-season tiny samples (<5 played) to avoid noise worse than last_5.
    */
   _extractSeasonGoals(stats) {
     if (!stats || typeof stats !== 'object') return null;
+
     const avgFor = parseFloat(stats?.goals?.for?.average?.total);
     const avgAgainst = parseFloat(stats?.goals?.against?.average?.total);
     const played = parseInt(stats?.fixtures?.played?.total, 10);
@@ -490,9 +506,19 @@ class AnalysisService {
     if (!Number.isFinite(avgFor) || !Number.isFinite(avgAgainst)) return null;
     if (Number.isFinite(played) && played < 5) return null;
 
+    // Venue-split averages (used for venue-adjusted xG, with total as fallback)
+    const avgForHome = parseFloat(stats?.goals?.for?.average?.home);
+    const avgForAway = parseFloat(stats?.goals?.for?.average?.away);
+    const avgAgainstHome = parseFloat(stats?.goals?.against?.average?.home);
+    const avgAgainstAway = parseFloat(stats?.goals?.against?.average?.away);
+
     return {
       avgFor,
       avgAgainst,
+      avgForHome: Number.isFinite(avgForHome) ? avgForHome : null,
+      avgForAway: Number.isFinite(avgForAway) ? avgForAway : null,
+      avgAgainstHome: Number.isFinite(avgAgainstHome) ? avgAgainstHome : null,
+      avgAgainstAway: Number.isFinite(avgAgainstAway) ? avgAgainstAway : null,
       played: Number.isFinite(played) ? played : null,
     };
   }

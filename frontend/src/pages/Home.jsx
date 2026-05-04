@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star } from 'lucide-react';
+import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Flame } from 'lucide-react';
 import { pronosticsApi } from '../services/api';
 import { formatTime } from '../utils/format';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
-import { useHistoryStore, useFavoritesStore } from '../store';
+import { useHistoryStore, useFavoritesStore, useBankrollStore } from '../store';
+import { kellyStake } from '../utils/kelly';
 
 function getConfidenceConfig(score) {
   if (score >= 70) return {
@@ -44,6 +45,10 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   const fixtureId = fix.fixture?.id;
   const { toggle, isFavorite } = useFavoritesStore();
   const isFav = isFavorite(fixtureId);
+  const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
+  const suggestedStake = pick?.isValue && pick?.odd && pick?.probability
+    ? kellyStake(pick.probability, pick.odd, initialBankroll, kFrac)
+    : 0;
 
   return (
     <motion.div
@@ -165,6 +170,18 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         </div>
       )}
 
+      {/* Kelly stake suggestion (only on value bets) */}
+      {suggestedStake > 0 && (
+        <div className="flex items-center justify-between gap-2 pl-3 pr-1 -mt-2">
+          <span className="text-[11px] text-white/30 font-heading">
+            Mise suggérée · ¼ Kelly
+          </span>
+          <span className="text-xs font-display tracking-wider text-gold-400/90">
+            {suggestedStake.toFixed(0)} €
+          </span>
+        </div>
+      )}
+
       {/* Confidence */}
       <div className="space-y-1.5 pl-3">
         <div className="flex items-center justify-between">
@@ -229,6 +246,7 @@ export default function Home() {
   const [pronostics, setPronostics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [valueOnly, setValueOnly] = useState(false);
   const { getStats, savePronostics } = useHistoryStore();
   const histStats = getStats();
 
@@ -369,11 +387,54 @@ export default function Home() {
 
           <PronosticCard pronostic={pronostics[0]} featured index={0} />
 
-          <div className="text-center pt-2">
-            <Link to="/matchs" className="inline-flex items-center gap-2 text-sm text-white/25 hover:text-white/50 font-heading font-medium transition-colors">
-              Tous les pronostics <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
+          {pronostics.length > 1 && (
+            <>
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">Autres pronostics du jour</h2>
+                <div className="flex gap-1 p-0.5 bg-dark-800 rounded-lg border border-white/5">
+                  <button
+                    onClick={() => setValueOnly(false)}
+                    className={clsx(
+                      'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-heading font-semibold transition-all',
+                      !valueOnly ? 'bg-dark-700 text-white' : 'text-white/30 hover:text-white/60'
+                    )}
+                  >
+                    Tous
+                  </button>
+                  <button
+                    onClick={() => setValueOnly(true)}
+                    className={clsx(
+                      'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-heading font-semibold transition-all',
+                      valueOnly ? 'bg-gold-500/20 text-gold-400' : 'text-white/30 hover:text-white/60'
+                    )}
+                  >
+                    <Flame className="w-3 h-3" /> Value bets
+                  </button>
+                </div>
+              </div>
+
+              {(() => {
+                const others = pronostics.slice(1);
+                const filtered = valueOnly ? others.filter((p) => p.pick?.isValue) : others;
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center text-xs text-white/30 py-4 font-heading">
+                      Aucun value bet supplémentaire détecté aujourd'hui
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-3">
+                    {filtered.map((p, i) => (
+                      <Link key={p.fixture?.fixture?.id || i} to={`/match/${p.fixture?.fixture?.id}`} className="block">
+                        <PronosticCard pronostic={p} index={i + 1} />
+                      </Link>
+                    ))}
+                  </div>
+                );
+              })()}
+            </>
+          )}
         </>
       )}
     </div>

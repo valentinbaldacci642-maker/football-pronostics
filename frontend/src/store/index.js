@@ -71,6 +71,24 @@ export const useUIStore = create((set) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
 }));
 
+/**
+ * Bankroll & Kelly criterion settings.
+ * Kelly fraction defaults to 0.25 (quarter Kelly) — standard recommendation
+ * to dampen variance vs full Kelly which is mathematically optimal but very volatile.
+ */
+export const useBankrollStore = create(
+  persist(
+    (set, get) => ({
+      initialBankroll: 1000,
+      kellyFraction: 0.25,
+      setInitialBankroll: (amount) => set({ initialBankroll: Math.max(0, parseFloat(amount) || 0) }),
+      setKellyFraction: (frac) => set({ kellyFraction: Math.max(0, Math.min(1, parseFloat(frac) || 0)) }),
+      reset: () => set({ initialBankroll: 1000, kellyFraction: 0.25 }),
+    }),
+    { name: 'pronostats-bankroll-v1' }
+  )
+);
+
 export const useBetsStore = create(
   persist(
     (set, get) => ({
