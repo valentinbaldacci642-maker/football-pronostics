@@ -185,9 +185,14 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         <div className="flex flex-col gap-1.5 pl-3 pr-1 -mt-2">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              {suggestedStake > 0 && (
+              {suggestedStake > 0 ? (
                 <span className="text-[11px] text-gold-400/70 font-heading whitespace-nowrap">
                   Suggérée: <span className="font-display tracking-wider">{suggestedStake.toFixed(0)} €</span>
+                  <span className="text-white/25 ml-1">· Kelly actif (edge ≥ 5%)</span>
+                </span>
+              ) : (
+                <span className="text-[11px] text-white/25 font-heading whitespace-nowrap">
+                  Kelly inactif <span className="text-white/15">· edge {pick?.edge != null ? `${pick.edge >= 0 ? '+' : ''}${pick.edge.toFixed(1)}% < 5%` : '< 5%'}</span>
                 </span>
               )}
             </div>
