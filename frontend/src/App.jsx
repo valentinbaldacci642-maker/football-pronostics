@@ -18,6 +18,7 @@ import WorldCup from './pages/WorldCup';
 import Team from './pages/Team';
 import History from './pages/History';
 import News from './pages/News';
+import Help from './pages/Help';
 
 export default function App() {
   const location = useLocation();
@@ -67,6 +68,7 @@ export default function App() {
               <Route path="/team/:id" element={<PageTransition><Team /></PageTransition>} />
               <Route path="/history" element={<PageTransition><History /></PageTransition>} />
               <Route path="/news" element={<PageTransition><News /></PageTransition>} />
+              <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
             </Routes>
           </AnimatePresence>
         </main>
