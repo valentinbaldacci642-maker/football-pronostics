@@ -222,36 +222,60 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         </div>
       )}
 
-      {/* Other value bets detected on this match (different market than the main pick).
-          Each one gets its own Kelly stake suggestion — Kelly is mathematically
-          valid on any value bet, not just 1X2. */}
-      {otherValueBets.length > 0 && (
+      {/* Banner when main pick has no edge but secondary value bets exist —
+          redirects user attention to the value bet block below */}
+      {!pick?.isValue && otherValueBets.length > 0 && (
         <div className="pl-3 pr-1 -mt-2">
-          <p className="text-[10px] text-gold-400/60 font-heading uppercase tracking-wider mb-1">
-            <Flame className="w-2.5 h-2.5 inline mb-0.5" /> Autres value bets détectés
-          </p>
-          <div className="space-y-1">
-            {otherValueBets.slice(0, 3).map((vb, i) => {
-              const prob = vb.trueProb ?? vb.prob;
-              const stake = (vb.odd && prob)
-                ? kellyStake(prob, vb.odd, liveBankroll, kFrac)
-                : 0;
-              return (
-                <div key={i} className="flex items-center gap-2 text-[11px] text-white/60 font-heading flex-wrap">
-                  <span className="text-gold-400/80 font-display tracking-wider">
-                    +{vb.edge?.toFixed(1)}%
-                  </span>
-                  <span>{vb.market} · <span className="text-white/80 font-semibold">{vb.selection}</span></span>
-                  <span className="text-white/30 font-mono">@{vb.odd?.toFixed(2)}</span>
-                  {stake > 0 && (
-                    <span className="text-gold-400/90 font-display tracking-wider ml-auto">
-                      {stake.toFixed(0)} €
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+          <div className="px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/25">
+            <p className="text-[11px] text-orange-300 font-heading leading-snug">
+              ⚠️ <strong>Pari principal sans edge</strong> — ne mise pas dessus.
+              {' '}Regarde les value bets ci-dessous : ce sont eux qu'il faut parier.
+            </p>
           </div>
+        </div>
+      )}
+
+      {/* Other value bets — prominent block, each with its own Kelly stake.
+          Kelly is mathematically valid on any positive-edge bet. */}
+      {otherValueBets.length > 0 && (
+        <div className="pl-3 pr-1 space-y-1.5">
+          <p className="text-[11px] text-gold-400 font-heading uppercase tracking-widest font-bold flex items-center gap-1">
+            <Flame className="w-3 h-3" /> Value bets à parier
+          </p>
+          {otherValueBets.slice(0, 3).map((vb, i) => {
+            const prob = vb.trueProb ?? vb.prob;
+            const stake = (vb.odd && prob)
+              ? kellyStake(prob, vb.odd, liveBankroll, kFrac)
+              : 0;
+            return (
+              <div
+                key={i}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gold-500/[0.08] border border-gold-500/30"
+              >
+                <span className="text-xs font-display tracking-wider text-gold-400 bg-gold-400/10 px-1.5 py-0.5 rounded leading-none">
+                  +{vb.edge?.toFixed(1)}%
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-white/40 font-heading">{vb.market}</p>
+                  <p className="text-sm font-heading font-bold text-white truncate">{vb.selection}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-base font-display tracking-wider text-gold-400">
+                    @{vb.odd?.toFixed(2)}
+                  </p>
+                  {stake > 0 ? (
+                    <p className="text-xs text-gold-400/90 font-display tracking-wider mt-0.5">
+                      Mise: {stake.toFixed(0)} €
+                    </p>
+                  ) : liveBankroll <= 0 ? (
+                    <p className="text-[10px] text-white/30 font-heading mt-0.5">
+                      Définir bankroll
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
