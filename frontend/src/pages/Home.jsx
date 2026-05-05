@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Flame, Save } from 'lucide-react';
+import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Save } from 'lucide-react';
 import { pronosticsApi } from '../services/api';
 import { formatTime } from '../utils/format';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
-import { useHistoryStore, useFavoritesStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
+import { useHistoryStore, useFavoritesStore, useBankrollStore } from '../store';
 import { kellyStake } from '../utils/kelly';
 
 function getConfidenceConfig(score) {
@@ -59,7 +59,9 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   const savedOdd = existingEntry?.actualOdd != null ? String(existingEntry.actualOdd) : '';
   const [miseInput, setMiseInput] = useState(savedMise);
   const [oddInput, setOddInput] = useState(savedOdd);
-  const hasMise = parseFloat(savedMise) > 0;
+  // Show the bookmaker odd input as soon as the user types a positive mise
+  // (saved or just typed) — don't gate it behind clicking Save first
+  const hasMise = parseFloat(miseInput) > 0 || parseFloat(savedMise) > 0;
   const miseDirty = miseInput !== savedMise;
   const oddDirty = oddInput !== savedOdd;
 
@@ -355,10 +357,8 @@ export default function Home() {
   const [pronostics, setPronostics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [valueOnly, setValueOnly] = useState(false);
   const dayOptions = buildDayOptions();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0].iso);
-  const { edgeMode } = useBankrollStore();
   const { getStats, savePronostics } = useHistoryStore();
   const histStats = getStats();
   const isToday = selectedDay === dayOptions[0].iso;
@@ -525,73 +525,6 @@ export default function Home() {
           )}
 
           <PronosticCard pronostic={pronostics[0]} featured index={0} />
-
-          {pronostics.length > 1 && (
-            <>
-              <div className="flex items-center justify-between gap-3 pt-2">
-                <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">Autres pronostics du jour</h2>
-                <div className="flex gap-1 p-0.5 bg-dark-800 rounded-lg border border-white/5">
-                  <button
-                    onClick={() => setValueOnly(false)}
-                    className={clsx(
-                      'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-heading font-semibold transition-all',
-                      !valueOnly ? 'bg-dark-700 text-white' : 'text-white/30 hover:text-white/60'
-                    )}
-                  >
-                    Tous
-                  </button>
-                  <button
-                    onClick={() => setValueOnly(true)}
-                    className={clsx(
-                      'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-heading font-semibold transition-all',
-                      valueOnly ? 'bg-gold-500/20 text-gold-400' : 'text-white/30 hover:text-white/60'
-                    )}
-                  >
-                    <Flame className="w-3 h-3" /> Value bets
-                  </button>
-                </div>
-              </div>
-
-              {(() => {
-                const others = pronostics.slice(1);
-                const minEdge = EDGE_MODE_THRESHOLD[edgeMode] ?? 5;
-                // Edge mode filter applied first (only relevant when valueOnly or
-                // when conservative mode wants to hide weak value bets):
-                //   - aggressive (minEdge=0): keep all
-                //   - standard (minEdge=5): require isValue
-                //   - conservative (minEdge=8): require isValue && edge >= 8
-                const passEdgeMode = (p) => {
-                  if (minEdge === 0) return true;
-                  if (!p.pick?.isValue) return false;
-                  return (p.pick?.edge ?? 0) >= minEdge;
-                };
-                const base = edgeMode === 'aggressive' ? others : others.filter(passEdgeMode);
-                const filtered = valueOnly ? base.filter((p) => p.pick?.isValue) : base;
-
-                if (filtered.length === 0) {
-                  const msg = valueOnly
-                    ? 'Aucun value bet supplémentaire détecté aujourd’hui'
-                    : edgeMode === 'conservative'
-                    ? `Aucun pronostic ne dépasse l’edge ≥ ${minEdge}% aujourd’hui`
-                    : 'Aucun pronostic supplémentaire';
-                  return (
-                    <div className="text-center text-xs text-white/30 py-4 font-heading">
-                      {msg}
-                    </div>
-                  );
-                }
-                return (
-                  <div className="space-y-3">
-                    {filtered.map((p, i) => (
-                      <Link key={p.fixture?.fixture?.id || i} to={`/match/${p.fixture?.fixture?.id}`} className="block">
-                        <PronosticCard pronostic={p} index={i + 1} />
-                      </Link>
-                    ))}
-                  </div>
-                );
-              })()}
-            </>
-          )}
         </>
       )}
     </div>
