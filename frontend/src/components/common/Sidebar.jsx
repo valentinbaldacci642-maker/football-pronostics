@@ -8,7 +8,7 @@ import { useUIStore } from '../../store';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
-  { to: '/', icon: Target, label: 'Pronostics', exact: true },
+  { to: '/', icon: Target, label: 'Top 10 pronos', exact: true },
   { to: '/value-bets', icon: Flame, label: 'Value bets' },
   { to: '/matchs', icon: Calendar, label: 'Tous les matchs' },
   { to: '/leagues', icon: Trophy, label: 'Ligues' },
