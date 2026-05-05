@@ -25,24 +25,27 @@ class PronosticsService {
       return [];
     }
 
-    // Only upcoming, sorted by league priority, capped at 10 to limit API quota usage
+    // All upcoming matches sorted by league priority — no cap. The user wants
+    // every prono of the day in the home list, regardless of total count.
+    // Heavy days may take longer to fetch but the 3h cache absorbs subsequent
+    // requests. Per-match calls are still batched (see below) to respect API
+    // rate limits.
     const upcoming = fixtures
       .filter((f) => ['NS', 'TBD'].includes(f.fixture?.status?.short))
       .sort((a, b) => {
         const pa = PRIORITY_LEAGUES.indexOf(a.league?.id);
         const pb = PRIORITY_LEAGUES.indexOf(b.league?.id);
         return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
-      })
-      .slice(0, 10);
+      });
 
     if (upcoming.length === 0) return [];
 
     // Fetch predictions + odds for all selected fixtures, BATCHED to avoid
-    // hammering API-Football's rate limit. Earlier we sent 20+ parallel
-    // requests which caused random fixtures (including high-priority ones
-    // like Champions League) to silently drop out of the response with
-    // empty cached results.
-    const BATCH_SIZE = 3;
+    // hammering API-Football's rate limit. Each fixture costs 2 API calls in
+    // 'lite' mode (odds + predictions). Batch size 5 + 250ms delay = ~20
+    // req/sec sustained, safely below typical paid-plan limits while still
+    // keeping the overall request fast for very large days (50+ matches).
+    const BATCH_SIZE = 5;
     const analyses = [];
     for (let i = 0; i < upcoming.length; i += BATCH_SIZE) {
       const batch = upcoming.slice(i, i + BATCH_SIZE);
@@ -50,9 +53,8 @@ class PronosticsService {
         batch.map((f) => this._fetchAnalysis(f))
       );
       analyses.push(...batchResults);
-      // Small breather between batches when there are still more to fetch
       if (i + BATCH_SIZE < upcoming.length) {
-        await new Promise((r) => setTimeout(r, 300));
+        await new Promise((r) => setTimeout(r, 250));
       }
     }
 
@@ -74,8 +76,9 @@ class PronosticsService {
       .filter(Boolean)
       .sort((a, b) => b.confidence - a.confidence);
 
-    // Prefer high-confidence picks; if none pass threshold, show best available
-    const reliable = all.filter((p) => p.confidence >= 45).slice(0, 10);
+    // Prefer high-confidence picks; if none pass threshold, show best available.
+    // No slice cap — return everything that has a confidence ≥ 45 + valid pick.
+    const reliable = all.filter((p) => p.confidence >= 45);
     const pronostics = reliable.length > 0 ? reliable : all.slice(0, 3);
 
     cache.set(cacheKey, pronostics, 10800); // 3h cache

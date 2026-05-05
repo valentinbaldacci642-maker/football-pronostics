@@ -8,7 +8,9 @@ const BASE = import.meta.env.VITE_API_URL
 
 const api = axios.create({
   baseURL: BASE,
-  timeout: 20000,
+  // Long timeout to accommodate /pronostics/today on heavy days (50+ matches
+  // means 100+ batched API calls server-side, ~20-30s in worst case).
+  timeout: 60000,
   headers: { 'Content-Type': 'application/json' },
 });
 
