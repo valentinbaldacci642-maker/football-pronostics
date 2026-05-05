@@ -1,13 +1,13 @@
 import { NavLink } from 'react-router-dom';
-import { Flame, Calendar, Newspaper, Star, LayoutGrid } from 'lucide-react';
+import { Flame, Calendar, Newspaper, Star, LayoutGrid, Target } from 'lucide-react';
 import { useUIStore } from '../../store';
 import clsx from 'clsx';
 
 const TABS = [
-  { to: '/',        icon: Flame,     label: 'Accueil',  exact: true },
-  { to: '/matchs',  icon: Calendar,  label: 'Matchs'            },
-  { to: '/news',    icon: Newspaper, label: 'Actu'              },
-  { to: '/favorites', icon: Star,    label: 'Favoris'           },
+  { to: '/',           icon: Target,   label: 'Pronos',     exact: true },
+  { to: '/value-bets', icon: Flame,    label: 'Value bets'              },
+  { to: '/matchs',     icon: Calendar, label: 'Matchs'                  },
+  { to: '/favorites',  icon: Star,     label: 'Favoris'                 },
 ];
 
 export default function BottomNav() {

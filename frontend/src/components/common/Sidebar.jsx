@@ -2,14 +2,15 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Star, Trophy, BarChart3,
-  Calendar, Settings, ChevronRight, Globe2, BookOpen, Newspaper, HelpCircle,
+  Calendar, Settings, ChevronRight, Globe2, BookOpen, Newspaper, HelpCircle, Target,
 } from 'lucide-react';
 import { useUIStore } from '../../store';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
-  { to: '/', icon: Flame, label: 'Accueil', exact: true },
-  { to: '/matchs', icon: Calendar, label: 'Matchs/Pronostics' },
+  { to: '/', icon: Target, label: 'Pronostics', exact: true },
+  { to: '/value-bets', icon: Flame, label: 'Value bets' },
+  { to: '/matchs', icon: Calendar, label: 'Tous les matchs' },
   { to: '/leagues', icon: Trophy, label: 'Ligues' },
   { to: '/worldcup', icon: Globe2, label: 'Coupe du Monde' },
   { to: '/news', icon: Newspaper, label: 'Actu Football' },
