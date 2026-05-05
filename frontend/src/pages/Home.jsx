@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Save } from 'lucide-react';
+import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Save, Flame } from 'lucide-react';
 import { pronosticsApi } from '../services/api';
 import { formatTime } from '../utils/format';
 import { format } from 'date-fns';
@@ -56,6 +56,13 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
     ? kellyStake(pick.probability, pick.odd, liveBankroll, kFrac)
     : 0;
   const streaks = detectStreaksForFixture(analysis?.predictions);
+  // Value bets present in the analysis that aren't the main pick — shown as
+  // a secondary indicator so the user sees secondary-market value bets that
+  // _selectBestPick chose to hide behind a clear-favourite featured pick.
+  const allValueBets = analysis?.odds?.valueBets || [];
+  const otherValueBets = allValueBets.filter(
+    (v) => !(v.market === pick?.market && v.selection === pick?.selection)
+  );
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
   const savedMise = existingEntry?.mise != null ? String(existingEntry.mise) : '';
   const savedOdd = existingEntry?.actualOdd != null ? String(existingEntry.actualOdd) : '';
@@ -183,7 +190,6 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         </div>
       )}
 
-      {/* Pick */}
       {pick && (
         <div className={clsx(
           'flex items-center gap-3 p-3 rounded-xl border pl-3',
@@ -212,6 +218,26 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
             {pick.probability != null && (
               <p className="text-xs text-white/25 font-mono mt-0.5">{pick.probability.toFixed(0)}%</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Other value bets detected on this match (different market than the main pick) */}
+      {otherValueBets.length > 0 && (
+        <div className="pl-3 pr-1 -mt-2">
+          <p className="text-[10px] text-gold-400/60 font-heading uppercase tracking-wider mb-1">
+            <Flame className="w-2.5 h-2.5 inline mb-0.5" /> Autres value bets détectés
+          </p>
+          <div className="space-y-1">
+            {otherValueBets.slice(0, 3).map((vb, i) => (
+              <div key={i} className="flex items-center gap-2 text-[11px] text-white/60 font-heading">
+                <span className="text-gold-400/80 font-display tracking-wider">
+                  +{vb.edge?.toFixed(1)}%
+                </span>
+                <span>{vb.market} · <span className="text-white/80 font-semibold">{vb.selection}</span></span>
+                <span className="text-white/30 font-mono ml-auto">@{vb.odd?.toFixed(2)}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
