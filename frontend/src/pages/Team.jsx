@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, AlertTriangle, ArrowLeftRight, ArrowLeft, MapPin, Calendar, Trophy, Star, BarChart2, Clock } from 'lucide-react';
+import { Users, AlertTriangle, ArrowLeftRight, ArrowLeft, MapPin, Calendar, Trophy, Star, BarChart2, Clock, RefreshCw } from 'lucide-react';
 import { teamsApi, fixturesApi } from '../services/api';
 import { Spinner, ErrorState } from '../components/ui/Loading';
 import { useFavoriteTeamsStore } from '../store';
@@ -209,6 +209,17 @@ function SquadTab({ teamId }) {
   );
 }
 
+// European football season convention: a 'season' starts mid-year. API-Football
+// uses the calendar year of the season's START. So 2025/2026 → season=2025.
+// July+ → season = current year, Jan-June → season = previous year.
+function getCurrentSeason() {
+  const now = new Date();
+  return now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+}
+
+const FINISHED_STATUSES = ['FT', 'AET', 'PEN'];
+const UPCOMING_STATUSES = ['NS', 'TBD'];
+
 function ResultsTab({ teamId }) {
   const [fixtures, setFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -218,8 +229,11 @@ function ResultsTab({ teamId }) {
     const load = async () => {
       setLoading(true);
       try {
-        const data = await fixturesApi.getByTeam(teamId, { last: 10 });
-        const list = (data?.response || []).sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
+        // All season fixtures (across competitions). Filter to played matches client-side.
+        const data = await fixturesApi.getByTeam(teamId, { season: getCurrentSeason() });
+        const list = (data?.response || [])
+          .filter((f) => FINISHED_STATUSES.includes(f.fixture?.status?.short))
+          .sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
         setFixtures(list);
       } catch (err) {
         setError(err.message);
@@ -297,8 +311,12 @@ function CalendrierTab({ teamId }) {
     const load = async () => {
       setLoading(true);
       try {
-        const data = await fixturesApi.getByTeam(teamId, { next: 5 });
-        setFixtures(data?.response || []);
+        // All season fixtures (across competitions). Filter to upcoming client-side.
+        const data = await fixturesApi.getByTeam(teamId, { season: getCurrentSeason() });
+        const list = (data?.response || [])
+          .filter((f) => UPCOMING_STATUSES.includes(f.fixture?.status?.short))
+          .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+        setFixtures(list);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -408,25 +426,59 @@ function TransfersTab({ teamId }) {
   const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastFetch, setLastFetch] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
+  // Auto-poll every 3 minutes while the tab is mounted, plus an initial load.
+  // Manual refresh button forces a backend cache bust via ?force=1.
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+    let cancelled = false;
+    const load = async ({ force = false } = {}) => {
+      if (force) setRefreshing(true); else setLoading(true);
       try {
-        const data = await teamsApi.getTransfers(teamId);
+        const data = await teamsApi.getTransfers(teamId, { force });
+        if (cancelled) return;
         setTransfers(data?.response || []);
+        setLastFetch(new Date());
+        setError(null);
       } catch (err) {
-        setError(err.message);
+        if (!cancelled) setError(err.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     };
     load();
+    const interval = setInterval(() => load({ force: false }), 180000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [teamId]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const data = await teamsApi.getTransfers(teamId, { force: true });
+      setTransfers(data?.response || []);
+      setLastFetch(new Date());
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const formatLastFetch = () => {
+    if (!lastFetch) return '';
+    const diff = Math.round((Date.now() - lastFetch.getTime()) / 1000);
+    if (diff < 60) return `il y a ${diff}s`;
+    if (diff < 3600) return `il y a ${Math.round(diff / 60)} min`;
+    return `il y a ${Math.round(diff / 3600)} h`;
+  };
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
   if (error) return <ErrorState message={error} />;
-  if (!transfers.length) return <Empty emoji="↔️" text="Aucun transfert disponible" />;
 
   // API-Football occasionally returns malformed dates like '290715' or '010711'
   // (truncated/legacy format) for very old transfers. Parsing these via new Date()
@@ -439,8 +491,35 @@ function TransfersTab({ teamId }) {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 30);
 
+  const refreshHeader = (
+    <div className="flex items-center justify-between mb-3">
+      <div className="text-xs text-white/30 font-heading">
+        {recent.length > 0 && lastFetch && (
+          <>Dernière mise à jour : <span className="text-white/50">{formatLastFetch()}</span></>
+        )}
+      </div>
+      <button
+        onClick={handleRefresh}
+        disabled={refreshing}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-500/30 text-xs font-heading font-semibold text-brand-400 hover:bg-brand-500/10 transition-all disabled:opacity-50"
+      >
+        <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
+        {refreshing ? 'Actualisation...' : 'Actualiser'}
+      </button>
+    </div>
+  );
+
+  if (!recent.length) return (
+    <div>
+      {refreshHeader}
+      <Empty emoji="↔️" text="Aucun transfert disponible" />
+    </div>
+  );
+
   return (
-    <div className="glass-card divide-y divide-white/5">
+    <div>
+      {refreshHeader}
+      <div className="glass-card divide-y divide-white/5">
       {recent.map((tr, i) => {
         const isIn = tr.teams?.in?.id === Number(teamId);
         const otherTeam = isIn ? tr.teams?.out : tr.teams?.in;
@@ -478,6 +557,7 @@ function TransfersTab({ teamId }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

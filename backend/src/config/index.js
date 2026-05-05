@@ -11,7 +11,7 @@ module.exports = {
     ttlOdds: 300,
     ttlFixtures: 600,
     ttlTeams: 7200,
-    ttlTransfers: 1800,
+    ttlTransfers: 180,
     ttlLeagues: 86400,
   },
   valueBet: {

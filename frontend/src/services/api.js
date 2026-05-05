@@ -49,7 +49,8 @@ export const teamsApi = {
   getStatistics: (id, season, league) => api.get(`/teams/${id}/statistics`, { params: { season, league } }),
   getSquad: (id) => api.get(`/teams/${id}/squad`),
   getInjuries: (id, season) => api.get(`/teams/${id}/injuries`, { params: { season } }),
-  getTransfers: (id) => api.get(`/teams/${id}/transfers`),
+  getTransfers: (id, { force = false } = {}) =>
+    api.get(`/teams/${id}/transfers`, { params: force ? { force: 1 } : {} }),
 };
 
 export const leaguesApi = {

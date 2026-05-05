@@ -23,6 +23,12 @@ router.get('/:id/injuries', async (req, res, next) => {
 
 router.get('/:id/transfers', async (req, res, next) => {
   try {
+    // ?force=1 bypasses the cache so the user can pull the freshest list when
+    // a transfer breaks. Otherwise served from a 3-min TTL cache.
+    if (req.query.force === '1') {
+      const cache = require('../utils/cache');
+      cache.del(cache.buildKey('api', '/transfers', JSON.stringify({ team: req.params.id })));
+    }
     res.json(await api.getTransfers(req.params.id));
   } catch (err) { next(err); }
 });
