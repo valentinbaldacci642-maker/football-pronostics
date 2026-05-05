@@ -632,49 +632,22 @@ export default function Home() {
 
           <PronosticCard pronostic={nonValuePronos[0]} featured index={0} />
 
-          {nonValuePronos.length > 1 && (() => {
-            const minEdge = EDGE_MODE_THRESHOLD[edgeMode] ?? 0;
-            const passEdgeMode = (p) => {
-              if (minEdge === 0) return true;
-              const pickEdge = p.pick?.isValue ? (p.pick?.edge ?? 0) : 0;
-              if (pickEdge >= minEdge) return true;
-              const secondary = p.analysis?.odds?.valueBets || [];
-              return secondary.some((vb) => (vb.edge ?? 0) >= minEdge);
-            };
-            const filtered = nonValuePronos.slice(1, 10).filter(passEdgeMode);
-            const modeLabel =
-              edgeMode === 'conservative' ? 'Conservateur · edge ≥ 8%' :
-              edgeMode === 'standard'     ? 'Standard · edge ≥ 5%' :
-              'Aggressif · tous';
-            return (
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">
-                    Top {filtered.length} pronos du jour
-                  </h2>
-                  <span className="text-[10px] text-white/30 font-mono">{modeLabel}</span>
-                </div>
-                {filtered.length === 0 ? (
-                  <div className="text-center text-xs text-white/30 py-6 font-heading">
-                    Aucun autre prono ne dépasse le seuil edge {minEdge}% ·
-                    <Link to="/history" className="text-brand-400/70 hover:text-brand-400 ml-1">
-                      changer de mode
-                    </Link>
-                  </div>
-                ) : (
-                  filtered.map((p, i) => (
-                    <Link
-                      key={p.fixture?.fixture?.id || i}
-                      to={`/match/${p.fixture?.fixture?.id}`}
-                      className="block"
-                    >
-                      <PronosticCard pronostic={p} index={i + 1} />
-                    </Link>
-                  ))
-                )}
-              </div>
-            );
-          })()}
+          {nonValuePronos.length > 1 && (
+            <div className="space-y-3 pt-2">
+              <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">
+                Top {nonValuePronos.slice(1, 10).length} pronos du jour
+              </h2>
+              {nonValuePronos.slice(1, 10).map((p, i) => (
+                <Link
+                  key={p.fixture?.fixture?.id || i}
+                  to={`/match/${p.fixture?.fixture?.id}`}
+                  className="block"
+                >
+                  <PronosticCard pronostic={p} index={i + 1} />
+                </Link>
+              ))}
+            </div>
+          )}
         </>
         );
       })()}
