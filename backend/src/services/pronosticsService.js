@@ -279,7 +279,9 @@ class PronosticsService {
           market: top.market,
           selection: top.selection,
           selectionLabel: this._selectionLabel(top.selection, home?.name, away?.name),
-          probability: top.prob,
+          // detectValueBet exposes trueProb (not prob) — fall back to prob
+          // for safety if the upstream contract ever changes.
+          probability: top.trueProb ?? top.prob,
           odd: top.odd,
           isValue: true,
           edge: top.edge,
