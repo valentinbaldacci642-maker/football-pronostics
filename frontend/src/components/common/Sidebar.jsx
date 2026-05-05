@@ -31,7 +31,7 @@ const TOP_LEAGUES = [
 
 function SidebarContent({ onClose }) {
   return (
-    <div className="flex flex-col h-full py-5 px-3">
+    <div className="flex flex-col h-full py-5 px-3 overflow-y-auto overscroll-contain">
       {/* Logo */}
       <NavLink to="/" onClick={onClose} className="flex items-center gap-3 mb-6 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors">
         <div className="relative">
