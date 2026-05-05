@@ -192,48 +192,48 @@ export default function History() {
           {/* Settings: initial bankroll + Kelly fraction + edge mode */}
           <div className="glass-card p-4 space-y-3">
             <p className="text-xs font-heading font-semibold text-white/35 uppercase tracking-wider">Paramètres bankroll</p>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-white/40 font-heading">Bankroll de départ (€)</span>
-                <div className="flex gap-1.5">
-                  <input
-                    type="number"
-                    min="0"
-                    step="50"
-                    value={bankrollInput}
-                    onChange={(e) => setBankrollInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveBankroll(); }}
-                    className="flex-1 bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
-                  />
-                  <button
-                    onClick={handleSaveBankroll}
-                    disabled={!bankrollChanged}
-                    className={clsx(
-                      'flex items-center gap-1 px-3 rounded-lg border text-xs font-heading font-semibold transition-all',
-                      bankrollChanged
-                        ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
-                        : 'border-white/[0.05] text-white/20 cursor-not-allowed'
-                    )}
-                    title="Enregistrer la nouvelle bankroll"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-white/40 font-heading">Fraction Kelly</span>
-                <select
-                  value={kellyFraction}
-                  onChange={(e) => setKellyFraction(e.target.value)}
-                  className="bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-white/40 font-heading">Bankroll de départ (€)</span>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="50"
+                  value={bankrollInput}
+                  onChange={(e) => setBankrollInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveBankroll(); }}
+                  className="flex-1 bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
+                />
+                <button
+                  onClick={handleSaveBankroll}
+                  disabled={!bankrollChanged}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-4 py-2 rounded-lg border text-xs font-heading font-semibold transition-all whitespace-nowrap',
+                    bankrollChanged
+                      ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
+                      : 'border-white/[0.05] text-white/20 cursor-not-allowed'
+                  )}
+                  title="Enregistrer la bankroll"
                 >
-                  <option value="0.1">1/10 Kelly · ultra-prudent</option>
-                  <option value="0.25">1/4 Kelly · recommandé</option>
-                  <option value="0.5">1/2 Kelly · agressif</option>
-                  <option value="1">Full Kelly · variance max</option>
-                </select>
-              </label>
-            </div>
+                  <Save className="w-3.5 h-3.5" />
+                  Enregistrer
+                </button>
+              </div>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-white/40 font-heading">Fraction Kelly</span>
+              <select
+                value={kellyFraction}
+                onChange={(e) => setKellyFraction(e.target.value)}
+                className="bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
+              >
+                <option value="0.1">1/10 Kelly · ultra-prudent</option>
+                <option value="0.25">1/4 Kelly · recommandé</option>
+                <option value="0.5">1/2 Kelly · agressif</option>
+                <option value="1">Full Kelly · variance max</option>
+              </select>
+            </label>
 
             <p className="text-[11px] text-white/25 font-heading leading-relaxed pt-1">
               {kellyFraction == 0.1 && '1/10 Kelly · Mises très petites (~1-2% de la bankroll). Très peu de variance, croissance lente. Idéal si tu débutes ou si ton modèle n’est pas encore validé sur 50+ paris settlés.'}
