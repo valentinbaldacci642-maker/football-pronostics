@@ -39,12 +39,14 @@ class PronosticsService {
 
     if (upcoming.length === 0) return [];
 
-    // Fetch predictions + odds for all selected fixtures, BATCHED to avoid
-    // hammering API-Football's per-minute rate limit. Each fixture costs 2
-    // API calls in 'lite' mode. Batch size 2 + 600ms delay → ~3-4 req/sec
-    // sustained, well below typical 300/min paid-plan limit even with
-    // concurrent users.
+    // Fetch predictions + odds for all selected fixtures. BATCHED to stay
+    // under API-Football Pro plan's 300 req/min = 5 req/sec average limit.
+    // Each fixture = 2 API calls (odds + predictions).
+    // Config: 2 fixtures × 2 calls per 800ms → ~5 req/sec sustained, leaves
+    // room for concurrent user-triggered calls (team page, match detail) on
+    // top of pronos fetching without tripping the rate limit.
     const BATCH_SIZE = 2;
+    const BATCH_DELAY_MS = 800;
     const analyses = [];
     for (let i = 0; i < upcoming.length; i += BATCH_SIZE) {
       const batch = upcoming.slice(i, i + BATCH_SIZE);
@@ -53,7 +55,7 @@ class PronosticsService {
       );
       analyses.push(...batchResults);
       if (i + BATCH_SIZE < upcoming.length) {
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
       }
     }
 
