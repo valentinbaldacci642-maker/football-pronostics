@@ -475,7 +475,7 @@ export default function Home() {
   const showLowBankrollHint = bankroll > 0 && bankroll < 50;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl xl:max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>

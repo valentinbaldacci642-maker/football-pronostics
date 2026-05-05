@@ -4,12 +4,27 @@
 
 @layer base {
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+    /* Slightly larger base font on big screens so the mobile-first layout
+       doesn't feel cramped when displayed on a 1440px+ desktop. */
+    font-size: 16px;
+  }
+  @media (min-width: 1280px) {
+    html { font-size: 17px; }
+  }
+  @media (min-width: 1920px) {
+    html { font-size: 18px; }
+  }
   body {
     @apply bg-dark-900 text-white font-sans antialiased;
     background-image:
       radial-gradient(ellipse at 15% 0%, rgba(34, 197, 94, 0.05) 0%, transparent 50%);
     min-height: 100vh;
+    /* Crisper text rendering on retina / high-dpi displays */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   #root { position: relative; z-index: 1; }

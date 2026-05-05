@@ -190,7 +190,7 @@ export default function Matchs() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="space-y-5 max-w-5xl mx-auto"
+      className="space-y-5 max-w-5xl xl:max-w-7xl mx-auto"
     >
       {/* Header */}
       <div className="flex items-start justify-between">

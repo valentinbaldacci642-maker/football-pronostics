@@ -52,7 +52,7 @@ export default function MatchDetail() {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-4xl mx-auto space-y-6"
+      className="max-w-4xl xl:max-w-6xl mx-auto space-y-6"
     >
       {/* Back */}
       <div className="flex items-center justify-between">

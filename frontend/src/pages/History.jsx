@@ -127,7 +127,7 @@ export default function History() {
   const sortedDays = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl xl:max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <h1 className="font-display text-4xl text-white tracking-wide leading-none">Historique <span className="text-brand-400">Pronos</span></h1>
