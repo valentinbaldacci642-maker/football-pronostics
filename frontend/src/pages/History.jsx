@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks, RotateCcw, RefreshCw, Save } from 'lucide-react';
+import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks, RotateCcw, RefreshCw, Save, Download, MessageSquare } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useHistoryStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
 import { resolveFinishedMatches } from '../utils/resolveResults';
+import { exportBankrollCsv } from '../utils/exportCsv';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -174,7 +175,7 @@ export default function History() {
       {/* ── BANKROLL TAB ── */}
       {tab === 'bankroll' && (
         <div className="space-y-4">
-          {/* Manual resolve action */}
+          {/* Manual actions: resolve + export */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleResolveNow}
@@ -183,6 +184,15 @@ export default function History() {
             >
               <RefreshCw className={clsx('w-3.5 h-3.5', resolving && 'animate-spin')} />
               {resolving ? 'Vérification...' : 'Vérifier les résultats'}
+            </button>
+            <button
+              onClick={() => exportBankrollCsv(entries, `bankroll-${new Date().toISOString().split('T')[0]}.csv`)}
+              disabled={!entries.some((e) => e.mise > 0)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.08] text-xs font-heading font-semibold text-white/50 hover:text-white/80 hover:border-white/15 transition-all disabled:opacity-30"
+              title="Exporter l'historique des paris en CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export CSV
             </button>
             {resolveMsg && (
               <span className="text-xs text-white/50 font-heading">{resolveMsg}</span>
@@ -519,10 +529,14 @@ export default function History() {
 
 function EntryCard({ entry, setMise, showMise = false }) {
   const setActualOdd = useHistoryStore((s) => s.setActualOdd);
+  const setNote = useHistoryStore((s) => s.setNote);
   const res = RESULT_CONFIG[entry.result] || RESULT_CONFIG[null];
   const ResIcon = res.icon;
   const [miseInput, setMiseInput] = useState(entry.mise != null ? String(entry.mise) : '');
   const [oddInput, setOddInput] = useState(entry.actualOdd != null ? String(entry.actualOdd) : '');
+  const [noteInput, setNoteInput] = useState(entry.note || '');
+  const [noteOpen, setNoteOpen] = useState(false);
+  const noteDirty = noteInput !== (entry.note || '');
 
   // Use the user-entered actual bookmaker odd when present, otherwise the
   // system-suggested odd from when the prono was generated.
@@ -615,8 +629,45 @@ function EntryCard({ entry, setMise, showMise = false }) {
             </span>
           )}
           <span className={`text-xs font-heading font-semibold ${res.color}`}>{res.label}</span>
+          {/* Note toggle */}
+          <button
+            onClick={() => setNoteOpen((v) => !v)}
+            className={clsx(
+              'flex items-center justify-center w-6 h-6 rounded-md border transition-all',
+              entry.note
+                ? 'bg-gold-500/15 border-gold-500/40 text-gold-400'
+                : 'border-white/[0.08] text-white/35 hover:text-white/70'
+            )}
+            title={entry.note ? 'Modifier la note' : 'Ajouter une note'}
+          >
+            <MessageSquare className="w-3 h-3" />
+          </button>
         </div>
       </div>
+
+      {noteOpen && (
+        <div className="mt-2 ml-11 flex gap-2">
+          <textarea
+            value={noteInput}
+            onChange={(e) => setNoteInput(e.target.value)}
+            placeholder="Pourquoi ce pari ? (ex: edge fort, équipe en forme, blessure de X...)"
+            rows={2}
+            className="flex-1 bg-dark-800 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/80 placeholder:text-white/20 focus:outline-none focus:border-brand-500/50 resize-none font-heading"
+          />
+          <button
+            onClick={() => { setNote(entry.fixtureId, noteInput); setNoteOpen(false); }}
+            disabled={!noteDirty}
+            className={clsx(
+              'flex items-center justify-center px-3 rounded-lg border text-xs font-heading font-semibold transition-all',
+              noteDirty
+                ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
+                : 'border-white/[0.05] text-white/20 cursor-not-allowed'
+            )}
+          >
+            <Save className="w-3 h-3" />
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

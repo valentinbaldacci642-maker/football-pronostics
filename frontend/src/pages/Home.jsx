@@ -9,6 +9,7 @@ import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
 import { useHistoryStore, useFavoritesStore, useBankrollStore } from '../store';
 import { kellyStake } from '../utils/kelly';
+import { detectStreaksForFixture } from '../utils/streak';
 
 function getConfidenceConfig(score) {
   if (score >= 70) return {
@@ -54,6 +55,7 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   const suggestedStake = pick?.isValue && pick?.odd && pick?.probability
     ? kellyStake(pick.probability, pick.odd, liveBankroll, kFrac)
     : 0;
+  const streaks = detectStreaksForFixture(analysis?.predictions);
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
   const savedMise = existingEntry?.mise != null ? String(existingEntry.mise) : '';
   const savedOdd = existingEntry?.actualOdd != null ? String(existingEntry.actualOdd) : '';
@@ -120,7 +122,17 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
           <div className={clsx('bg-dark-700/80 rounded-xl flex items-center justify-center p-1.5 flex-shrink-0', featured ? 'w-11 h-11' : 'w-9 h-9')}>
             <img src={home?.logo} alt={home?.name} className="w-full h-full object-contain" onError={(e) => { e.target.style.opacity = '0'; }} />
           </div>
-          <span className={clsx('font-heading font-bold text-white truncate', featured ? 'text-base' : 'text-sm')}>{home?.name}</span>
+          <div className="min-w-0">
+            <span className={clsx('block font-heading font-bold text-white truncate', featured ? 'text-base' : 'text-sm')}>{home?.name}</span>
+            {streaks.home && (
+              <span className={clsx(
+                'block text-[10px] font-mono leading-none mt-0.5 truncate',
+                streaks.home.intensity === 'hot' ? 'text-orange-400' :
+                streaks.home.intensity === 'cold' ? 'text-blue-400' :
+                'text-white/40'
+              )}>{streaks.home.label}</span>
+            )}
+          </div>
         </div>
 
         <span className="matchup-vs flex-shrink-0 text-sm">VS</span>
@@ -129,7 +141,17 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
           <div className={clsx('bg-dark-700/80 rounded-xl flex items-center justify-center p-1.5 flex-shrink-0', featured ? 'w-11 h-11' : 'w-9 h-9')}>
             <img src={away?.logo} alt={away?.name} className="w-full h-full object-contain" onError={(e) => { e.target.style.opacity = '0'; }} />
           </div>
-          <span className={clsx('font-heading font-bold text-white truncate text-right', featured ? 'text-base' : 'text-sm')}>{away?.name}</span>
+          <div className="min-w-0 text-right">
+            <span className={clsx('block font-heading font-bold text-white truncate', featured ? 'text-base' : 'text-sm')}>{away?.name}</span>
+            {streaks.away && (
+              <span className={clsx(
+                'block text-[10px] font-mono leading-none mt-0.5 truncate',
+                streaks.away.intensity === 'hot' ? 'text-orange-400' :
+                streaks.away.intensity === 'cold' ? 'text-blue-400' :
+                'text-white/40'
+              )}>{streaks.away.label}</span>
+            )}
+          </div>
         </div>
       </div>
 

@@ -158,6 +158,38 @@ export function ExactScoreOdds({ data }) {
   );
 }
 
+export function HandicapOdds({ data }) {
+  if (!data || !Array.isArray(data) || data.length === 0) return null;
+  // data = [{ outcome, odd, prob }] from _analyzeHandicap
+  const sorted = [...data].sort((a, b) => (b.prob || 0) - (a.prob || 0)).slice(0, 8);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs text-white/40 font-semibold uppercase tracking-wider">Handicap asiatique</h4>
+        <span className="text-xs text-white/20 italic">prob. implicite</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {sorted.map((item, i) => (
+          <div key={i} className={clsx(
+            'flex flex-col gap-0.5 px-3 py-2 rounded-lg border text-xs',
+            i === 0 ? 'bg-brand-500/10 border-brand-500/25' : 'bg-dark-700 border-white/5'
+          )}>
+            <div className="flex items-center justify-between gap-1">
+              <span className={clsx('font-bold font-mono text-xs truncate', i === 0 ? 'text-brand-300' : 'text-white/80')}>
+                {item.outcome}
+              </span>
+              <span className={clsx('font-bold flex-shrink-0', i === 0 ? 'text-brand-400' : 'text-white/60')}>
+                {formatOdd(item.odd)}
+              </span>
+            </div>
+            <span className="text-white/30 font-mono text-[10px]">{item.prob?.toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ValueBetsList({ valueBets }) {
   if (!valueBets?.length) return null;
 

@@ -195,6 +195,12 @@ export const useHistoryStore = create(
         ),
       })),
 
+      setNote: (fixtureId, note) => set((s) => ({
+        entries: s.entries.map((e) =>
+          e.fixtureId === fixtureId ? { ...e, note: note || null } : e
+        ),
+      })),
+
       clearAll: () => set({ entries: [] }),
 
       getStats: () => {
