@@ -434,6 +434,7 @@ export default function Home() {
   const [pronostics, setPronostics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sortBy, setSortBy] = useState('confidence-desc');
   const dayOptions = buildDayOptions();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0].iso);
   const { edgeMode } = useBankrollStore();
@@ -632,28 +633,67 @@ export default function Home() {
 
           <PronosticCard pronostic={nonValuePronos[0]} featured index={0} />
 
-          {/* Always show 'Top 10 pronos du jour' section header, even when the
-              list under the featured is empty (eg only 1 prono today) */}
-          <div className="space-y-3 pt-2">
-            <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">
-              Top 10 pronos du jour
-            </h2>
-            {nonValuePronos.slice(1, 10).length === 0 ? (
-              <div className="text-center text-xs text-white/30 py-6 font-heading">
-                Aucun autre prono pour ce jour. Reviens plus tard ou clique Actualiser.
+          {/* Full list of remaining pronos with sort controls */}
+          {(() => {
+            const rest = nonValuePronos.slice(1);
+            const sorted = [...rest].sort((a, b) => {
+              const teamA = (a.fixture?.teams?.home?.name || '').toLowerCase();
+              const teamB = (b.fixture?.teams?.home?.name || '').toLowerCase();
+              const leagueA = (a.fixture?.league?.name || '').toLowerCase();
+              const leagueB = (b.fixture?.league?.name || '').toLowerCase();
+              const oddA = a.pick?.odd ?? 0;
+              const oddB = b.pick?.odd ?? 0;
+              const marketA = (a.pick?.market || '').toLowerCase();
+              const marketB = (b.pick?.market || '').toLowerCase();
+              switch (sortBy) {
+                case 'confidence-desc': return (b.confidence || 0) - (a.confidence || 0);
+                case 'confidence-asc':  return (a.confidence || 0) - (b.confidence || 0);
+                case 'team-asc':        return teamA.localeCompare(teamB);
+                case 'league-asc':      return leagueA.localeCompare(leagueB);
+                case 'odd-asc':         return oddA - oddB;
+                case 'odd-desc':        return oddB - oddA;
+                case 'market-asc':      return marketA.localeCompare(marketB);
+                default: return 0;
+              }
+            });
+            return (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">
+                    {rest.length} prono{rest.length > 1 ? 's' : ''}
+                  </h2>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-dark-800 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/70 font-heading focus:outline-none focus:border-brand-500/50"
+                  >
+                    <option value="confidence-desc">Confiance ↓ (défaut)</option>
+                    <option value="confidence-asc">Confiance ↑</option>
+                    <option value="team-asc">Équipe A → Z</option>
+                    <option value="league-asc">Ligue A → Z</option>
+                    <option value="odd-asc">Cote ↑ (faible → grosse)</option>
+                    <option value="odd-desc">Cote ↓ (grosse → faible)</option>
+                    <option value="market-asc">Type de pari</option>
+                  </select>
+                </div>
+                {sorted.length === 0 ? (
+                  <div className="text-center text-xs text-white/30 py-6 font-heading">
+                    Aucun autre prono pour ce jour. Reviens plus tard ou clique Actualiser.
+                  </div>
+                ) : (
+                  sorted.map((p, i) => (
+                    <Link
+                      key={p.fixture?.fixture?.id || i}
+                      to={`/match/${p.fixture?.fixture?.id}`}
+                      className="block"
+                    >
+                      <PronosticCard pronostic={p} index={i + 1} />
+                    </Link>
+                  ))
+                )}
               </div>
-            ) : (
-              nonValuePronos.slice(1, 10).map((p, i) => (
-                <Link
-                  key={p.fixture?.fixture?.id || i}
-                  to={`/match/${p.fixture?.fixture?.id}`}
-                  className="block"
-                >
-                  <PronosticCard pronostic={p} index={i + 1} />
-                </Link>
-              ))
-            )}
-          </div>
+            );
+          })()}
         </>
         );
       })()}
