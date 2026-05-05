@@ -68,19 +68,25 @@ class PronosticsService {
     return pronostics;
   }
 
-  async _fetchAnalysis(fixture) {
+  async _fetchAnalysis(fixture, opts = {}) {
+    const { full = false } = opts;
     const fixtureId = fixture.fixture?.id;
     const homeId = fixture.teams?.home?.id;
     const awayId = fixture.teams?.away?.id;
     const leagueId = fixture.league?.id;
     const season = fixture.league?.season;
 
+    // 'lite' mode (default for the home Top 10): only odds + predictions to
+    // keep total parallel API calls per request manageable. With 10 fixtures,
+    // that's 20 calls instead of 60 — well within API-Football rate limits.
+    // 'full' mode adds team stats + lineups + top scorers (used by /api/
+    // analysis/fixture/:id which is per-match, not in a batch of 10).
     const tasks = [
       api.getOddsByFixture(fixtureId),
       api.getPredictions(fixtureId),
     ];
     const hasTeamCtx = homeId && awayId && leagueId && season;
-    if (hasTeamCtx) {
+    if (full && hasTeamCtx) {
       tasks.push(
         api.getTeamStatistics(homeId, season, leagueId),
         api.getTeamStatistics(awayId, season, leagueId),
@@ -95,26 +101,28 @@ class PronosticsService {
     const oddsRaw = oddsData.status === 'fulfilled' ? oddsData.value.response?.[0] : null;
     const predRaw = predData.status === 'fulfilled' ? predData.value.response?.[0] : null;
 
-    // Season-wide team statistics — used for full-season xG instead of last_5
-    const extractStats = (settled) => {
-      if (!settled || settled.status !== 'fulfilled') return null;
-      const resp = settled.value.response;
-      // /teams/statistics returns a single object, not an array
-      if (Array.isArray(resp)) return resp.length > 0 ? resp[0] : null;
-      return resp && typeof resp === 'object' ? resp : null;
-    };
-    const homeStats = extractStats(homeStatsData);
-    const awayStats = extractStats(awayStatsData);
-
-    // Lineup + top scorers context for xG composition adjustment
-    const lineups = lineupsData?.status === 'fulfilled' ? (lineupsData.value.response || []) : [];
-    const topScorers = scorersData?.status === 'fulfilled' ? (scorersData.value.response || []) : [];
-    const lineupContext = this._computeLineupContext(lineups, topScorers, homeId, awayId);
+    let teamStats = null;
+    let lineupContext = null;
+    if (full && hasTeamCtx) {
+      const extractStats = (settled) => {
+        if (!settled || settled.status !== 'fulfilled') return null;
+        const resp = settled.value.response;
+        if (Array.isArray(resp)) return resp.length > 0 ? resp[0] : null;
+        return resp && typeof resp === 'object' ? resp : null;
+      };
+      teamStats = {
+        home: extractStats(homeStatsData),
+        away: extractStats(awayStatsData),
+      };
+      const lineups = lineupsData?.status === 'fulfilled' ? (lineupsData.value.response || []) : [];
+      const topScorers = scorersData?.status === 'fulfilled' ? (scorersData.value.response || []) : [];
+      lineupContext = this._computeLineupContext(lineups, topScorers, homeId, awayId);
+    }
 
     return {
       oddsAnalysis: oddsRaw ? analysisService.analyzeFixtureOdds(oddsRaw) : null,
       predAnalysis: predRaw
-        ? analysisService.analyzePredictions(predRaw, { home: homeStats, away: awayStats }, lineupContext)
+        ? analysisService.analyzePredictions(predRaw, teamStats, lineupContext)
         : null,
     };
   }
