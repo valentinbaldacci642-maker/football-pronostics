@@ -53,7 +53,7 @@ export default function Team() {
   ];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-6">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-6 overflow-x-hidden">
       {/* Back */}
       <Link to="/leagues" className="flex items-center gap-2 text-white/40 hover:text-white/70 text-sm transition-colors w-fit">
         <ArrowLeft className="w-4 h-4" />
@@ -63,10 +63,10 @@ export default function Team() {
       {/* Header */}
       <div className="glass-card p-6">
         <div className="flex items-center gap-5">
-          <img src={team.logo} alt={team.name} className="w-20 h-20 object-contain" onError={e => e.target.style.display='none'} />
+          <img src={team.logo} alt={team.name} className="w-20 h-20 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-3">
-              <h1 className="font-display text-4xl text-white tracking-wide leading-none">{team.name}</h1>
+              <h1 className="font-display text-2xl sm:text-3xl md:text-4xl text-white tracking-wide leading-tight truncate flex-1 min-w-0">{team.name}</h1>
               <button
                 onClick={() => toggleTeam({ id: team.id, name: team.name, logo: team.logo, country: team.country })}
                 className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isFav ? 'bg-gold-500/20 text-gold-400' : 'bg-dark-700/60 text-white/25 hover:text-gold-400 hover:bg-gold-500/10'}`}
