@@ -30,10 +30,13 @@ class ApiFootballService {
       (res) => {
         const remaining = res.headers['x-ratelimit-requests-remaining'];
         const limit = res.headers['x-ratelimit-requests-limit'];
+        // Per-minute (or per-second) burst limit headers, when API exposes them
+        this.minuteLimit = res.headers['x-ratelimit-limit'];
+        this.minuteRemaining = res.headers['x-ratelimit-remaining'];
         if (remaining !== undefined) {
           this.quotaRemaining = parseInt(remaining);
           if (limit) this.quotaLimit = parseInt(limit);
-          logger.info(`API Quota: ${remaining}/${limit || '?'} restants`);
+          logger.info(`API Quota: ${remaining}/${limit || '?'} jour · ${this.minuteRemaining ?? '?'}/${this.minuteLimit ?? '?'} min`);
           if (this.quotaRemaining < 10) {
             logger.warn(`⚠️  Quota critique: ${remaining} requêtes restantes aujourd'hui!`);
           }
@@ -45,6 +48,21 @@ class ApiFootballService {
         throw err;
       }
     );
+  }
+
+  getQuotaInfo() {
+    return {
+      day: {
+        remaining: this.quotaRemaining,
+        limit: this.quotaLimit,
+        used: this.quotaRemaining !== null ? this.quotaLimit - this.quotaRemaining : null,
+      },
+      minute: {
+        remaining: this.minuteRemaining ? parseInt(this.minuteRemaining) : null,
+        limit: this.minuteLimit ? parseInt(this.minuteLimit) : null,
+      },
+      rateLimitedUntil: this.rateLimitedUntil > Date.now() ? this.rateLimitedUntil : null,
+    };
   }
 
   async request(endpoint, params = {}, ttl) {

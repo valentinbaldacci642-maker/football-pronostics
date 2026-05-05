@@ -61,6 +61,11 @@ app.get('/version', (req, res) => {
   res.json({ version: '1.1.0', deployed: new Date().toISOString() });
 });
 
+app.get('/api/quota', (req, res) => {
+  const apiFootball = require('./services/apiFootball');
+  res.json(apiFootball.getQuotaInfo());
+});
+
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
