@@ -7,7 +7,7 @@ import { formatTime } from '../utils/format';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
-import { useHistoryStore, useFavoritesStore, useBankrollStore } from '../store';
+import { useHistoryStore, useFavoritesStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
 import { kellyStake } from '../utils/kelly';
 import { detectStreaksForFixture } from '../utils/streak';
 
@@ -407,6 +407,7 @@ export default function Home() {
   const [error, setError] = useState(null);
   const dayOptions = buildDayOptions();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0].iso);
+  const { edgeMode } = useBankrollStore();
   const { getStats, savePronostics } = useHistoryStore();
   const histStats = getStats();
   const isToday = selectedDay === dayOptions[0].iso;
@@ -574,22 +575,52 @@ export default function Home() {
 
           <PronosticCard pronostic={pronostics[0]} featured index={0} />
 
-          {pronostics.length > 1 && (
-            <div className="space-y-3 pt-2">
-              <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide pl-1">
-                Top {Math.min(pronostics.length, 10)} pronos du jour
-              </h2>
-              {pronostics.slice(1, 10).map((p, i) => (
-                <Link
-                  key={p.fixture?.fixture?.id || i}
-                  to={`/match/${p.fixture?.fixture?.id}`}
-                  className="block"
-                >
-                  <PronosticCard pronostic={p} index={i + 1} />
-                </Link>
-              ))}
-            </div>
-          )}
+          {pronostics.length > 1 && (() => {
+            const minEdge = EDGE_MODE_THRESHOLD[edgeMode] ?? 0;
+            // Edge mode filter: a card passes if either the main pick has edge ≥ threshold,
+            // or any secondary-market value bet on the same match does. This way a match
+            // with no 1X2 edge but +6% Under 2.5 still surfaces in Standard mode (≥5%).
+            const passEdgeMode = (p) => {
+              if (minEdge === 0) return true;
+              const pickEdge = p.pick?.isValue ? (p.pick?.edge ?? 0) : 0;
+              if (pickEdge >= minEdge) return true;
+              const secondary = p.analysis?.odds?.valueBets || [];
+              return secondary.some((vb) => (vb.edge ?? 0) >= minEdge);
+            };
+            const filtered = pronostics.slice(1, 10).filter(passEdgeMode);
+            const modeLabel =
+              edgeMode === 'conservative' ? 'Conservateur · edge ≥ 8%' :
+              edgeMode === 'standard'     ? 'Standard · edge ≥ 5%' :
+              'Aggressif · tous';
+            return (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">
+                    Top {filtered.length} pronos du jour
+                  </h2>
+                  <span className="text-[10px] text-white/30 font-mono">{modeLabel}</span>
+                </div>
+                {filtered.length === 0 ? (
+                  <div className="text-center text-xs text-white/30 py-6 font-heading">
+                    Aucun autre prono ne dépasse le seuil edge {minEdge}% ·
+                    <Link to="/history" className="text-brand-400/70 hover:text-brand-400 ml-1">
+                      changer de mode
+                    </Link>
+                  </div>
+                ) : (
+                  filtered.map((p, i) => (
+                    <Link
+                      key={p.fixture?.fixture?.id || i}
+                      to={`/match/${p.fixture?.fixture?.id}`}
+                      className="block"
+                    >
+                      <PronosticCard pronostic={p} index={i + 1} />
+                    </Link>
+                  ))
+                )}
+              </div>
+            );
+          })()}
         </>
       )}
     </div>
