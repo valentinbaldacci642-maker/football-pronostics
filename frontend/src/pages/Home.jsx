@@ -537,12 +537,11 @@ export default function Home() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 sm:grid-cols-4 gap-2.5"
+          className="grid grid-cols-3 gap-2.5"
         >
           {[
             { label: 'Pronostics', value: pronostics.length, color: 'text-white', icon: Target },
             { label: 'Haute conf.', value: highConf, color: 'text-brand-400', icon: Shield },
-            { label: 'Value bets', value: valueBets, color: 'text-gold-400', icon: TrendingUp },
             { label: 'Conf. moy.', value: avgConf, color: 'text-info', icon: Trophy },
           ].map(({ label, value, color, icon: Icon }, i) => (
             <motion.div
