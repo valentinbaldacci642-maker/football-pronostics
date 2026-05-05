@@ -25,18 +25,17 @@ class PronosticsService {
       return [];
     }
 
-    // All upcoming matches sorted by league priority — no cap. User wants
-    // every prono of the day. The empty-response cache guard (apiFootball)
-    // means rate-limit hits don't poison the cache, so partial fetches
-    // recover on the next request. Some fixtures may be momentarily missing
-    // on first fetch of very heavy days; they fill in on subsequent loads.
+    // Top-10 mode: take the 10 highest-priority upcoming fixtures of the day
+    // and analyze them. Keeps the API call volume predictable (20 calls
+    // batched) and the page focused on the day's best pronos.
     const upcoming = fixtures
       .filter((f) => ['NS', 'TBD'].includes(f.fixture?.status?.short))
       .sort((a, b) => {
         const pa = PRIORITY_LEAGUES.indexOf(a.league?.id);
         const pb = PRIORITY_LEAGUES.indexOf(b.league?.id);
         return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
-      });
+      })
+      .slice(0, 10);
 
     if (upcoming.length === 0) return [];
 
@@ -76,11 +75,10 @@ class PronosticsService {
       .filter(Boolean)
       .sort((a, b) => b.confidence - a.confidence);
 
-    // No confidence threshold — return every match with a valid pick. Even
-    // low-confidence matches are useful for the user to see (informational).
-    // The user explicitly asked for 'all matches of the day' to surface, not
-    // a top-N filtered list.
-    const pronostics = all;
+    // Return up to 10 pronos sorted by confidence desc. Soft fallback to top
+    // 3 if no match passes confidence ≥ 45 (rare days with very poor data).
+    const reliable = all.filter((p) => p.confidence >= 45).slice(0, 10);
+    const pronostics = reliable.length > 0 ? reliable : all.slice(0, 3);
 
     cache.set(cacheKey, pronostics, 10800); // 3h cache
     return pronostics;
