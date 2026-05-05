@@ -3,7 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useHistoryStore } from './store';
-import { fixturesApi } from './services/api';
+import { resolveFinishedMatches } from './utils/resolveResults';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
 import BottomNav from './components/common/BottomNav';
@@ -43,49 +43,9 @@ export default function App() {
     return () => removeListener();
   }, []);
 
-  // Auto-resolve finished matches: at app launch, look at unresolved entries
-  // from the past 14 days and check the API for their final scores. If the
-  // match is finished (FT/AET/PEN) we call resolveResult to mark W/L, which
-  // feeds the bankroll ROI calculations. Limited to 30 lookups per launch
-  // and runs once per session to avoid hammering the API.
+  // Auto-resolve finished matches at app launch — run once per mount
   useEffect(() => {
-    const FINISHED_STATUSES = ['FT', 'AET', 'PEN'];
-    const MAX_LOOKUPS = 30;
-    const MAX_AGE_DAYS = 14;
-
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - MAX_AGE_DAYS);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
-
-    const todoStr = new Date().toISOString().split('T')[0];
-    const candidates = entries
-      .filter((e) => !e.result && e.fixtureId && e.date && e.date >= cutoffStr && e.date < todoStr)
-      .slice(0, MAX_LOOKUPS);
-
-    if (candidates.length === 0) return;
-
-    let cancelled = false;
-    Promise.allSettled(
-      candidates.map((e) =>
-        fixturesApi.getById(e.fixtureId).then((res) => ({ entry: e, raw: res }))
-      )
-    ).then((results) => {
-      if (cancelled) return;
-      results.forEach((r) => {
-        if (r.status !== 'fulfilled') return;
-        const { entry, raw } = r.value;
-        const fixture = raw?.response?.[0] || raw?.data?.response?.[0];
-        const status = fixture?.fixture?.status?.short;
-        const hg = fixture?.goals?.home;
-        const ag = fixture?.goals?.away;
-        if (FINISHED_STATUSES.includes(status) && Number.isFinite(hg) && Number.isFinite(ag)) {
-          resolveResult(entry.fixtureId, hg, ag);
-        }
-      });
-    }).catch(() => {});
-
-    return () => { cancelled = true; };
-    // run only once per app mount
+    resolveFinishedMatches(entries, resolveResult).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

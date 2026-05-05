@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks, RotateCcw } from 'lucide-react';
+import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks, RotateCcw, RefreshCw, Save } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useHistoryStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
+import { resolveFinishedMatches } from '../utils/resolveResults';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -30,8 +31,38 @@ const CustomTooltip = ({ active, payload }) => {
 };
 
 export default function History() {
-  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll } = useHistoryStore();
+  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll, resolveResult } = useHistoryStore();
   const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode, reset: resetBankroll } = useBankrollStore();
+
+  // Local input state so the bankroll input has a Save button (no save-on-keystroke)
+  const [bankrollInput, setBankrollInput] = useState(String(initialBankroll));
+  useEffect(() => { setBankrollInput(String(initialBankroll)); }, [initialBankroll]);
+  const bankrollChanged = parseFloat(bankrollInput) !== initialBankroll;
+
+  const handleSaveBankroll = () => {
+    const v = parseFloat(bankrollInput);
+    if (!Number.isFinite(v) || v < 0) return;
+    setInitialBankroll(v);
+  };
+
+  // Manual resolve trigger for the "Vérifier les résultats" button
+  const [resolving, setResolving] = useState(false);
+  const [resolveMsg, setResolveMsg] = useState(null);
+  const handleResolveNow = async () => {
+    setResolving(true);
+    setResolveMsg(null);
+    try {
+      const { checked, resolved } = await resolveFinishedMatches(entries, resolveResult);
+      if (checked === 0) setResolveMsg('Aucun pari en attente à vérifier');
+      else if (resolved === 0) setResolveMsg(`${checked} pari(s) vérifié(s), aucun résultat encore disponible`);
+      else setResolveMsg(`${resolved} pari(s) résolu(s) sur ${checked} vérifié(s)`);
+    } catch {
+      setResolveMsg('Erreur lors de la vérification');
+    } finally {
+      setResolving(false);
+      setTimeout(() => setResolveMsg(null), 4000);
+    }
+  };
 
   const handleResetAll = () => {
     const ok = window.confirm(
@@ -143,20 +174,51 @@ export default function History() {
       {/* ── BANKROLL TAB ── */}
       {tab === 'bankroll' && (
         <div className="space-y-4">
+          {/* Manual resolve action */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleResolveNow}
+              disabled={resolving}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-brand-500/30 text-xs font-heading font-semibold text-brand-400 hover:bg-brand-500/10 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={clsx('w-3.5 h-3.5', resolving && 'animate-spin')} />
+              {resolving ? 'Vérification...' : 'Vérifier les résultats'}
+            </button>
+            {resolveMsg && (
+              <span className="text-xs text-white/50 font-heading">{resolveMsg}</span>
+            )}
+          </div>
+
           {/* Settings: initial bankroll + Kelly fraction + edge mode */}
           <div className="glass-card p-4 space-y-3">
             <p className="text-xs font-heading font-semibold text-white/35 uppercase tracking-wider">Paramètres bankroll</p>
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-white/40 font-heading">Bankroll de départ (€)</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="50"
-                  value={initialBankroll}
-                  onChange={(e) => setInitialBankroll(e.target.value)}
-                  className="bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
-                />
+                <div className="flex gap-1.5">
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={bankrollInput}
+                    onChange={(e) => setBankrollInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveBankroll(); }}
+                    className="flex-1 bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
+                  />
+                  <button
+                    onClick={handleSaveBankroll}
+                    disabled={!bankrollChanged}
+                    className={clsx(
+                      'flex items-center gap-1 px-3 rounded-lg border text-xs font-heading font-semibold transition-all',
+                      bankrollChanged
+                        ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
+                        : 'border-white/[0.05] text-white/20 cursor-not-allowed'
+                    )}
+                    title="Enregistrer la nouvelle bankroll"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-white/40 font-heading">Fraction Kelly</span>

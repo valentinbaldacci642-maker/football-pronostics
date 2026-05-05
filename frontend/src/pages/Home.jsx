@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Flame } from 'lucide-react';
+import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Flame, Save } from 'lucide-react';
 import { pronosticsApi } from '../services/api';
 import { formatTime } from '../utils/format';
 import { format } from 'date-fns';
@@ -55,11 +55,22 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
     ? kellyStake(pick.probability, pick.odd, liveBankroll, kFrac)
     : 0;
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
-  const [miseInput, setMiseInput] = useState(existingEntry?.mise != null ? String(existingEntry.mise) : '');
-  const [oddInput, setOddInput] = useState(
-    existingEntry?.actualOdd != null ? String(existingEntry.actualOdd) : ''
-  );
-  const hasMise = parseFloat(miseInput) > 0;
+  const savedMise = existingEntry?.mise != null ? String(existingEntry.mise) : '';
+  const savedOdd = existingEntry?.actualOdd != null ? String(existingEntry.actualOdd) : '';
+  const [miseInput, setMiseInput] = useState(savedMise);
+  const [oddInput, setOddInput] = useState(savedOdd);
+  const hasMise = parseFloat(savedMise) > 0;
+  const miseDirty = miseInput !== savedMise;
+  const oddDirty = oddInput !== savedOdd;
+
+  const saveMise = () => {
+    if (!miseDirty) return;
+    setMise(fixtureId, miseInput);
+  };
+  const saveOdd = () => {
+    if (!oddDirty) return;
+    setActualOdd(fixtureId, oddInput);
+  };
 
   return (
     <motion.div
@@ -205,11 +216,25 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
                 step="1"
                 placeholder="—"
                 value={miseInput}
-                onChange={(e) => { e.stopPropagation(); setMiseInput(e.target.value); setMise(fixtureId, e.target.value); }}
+                onChange={(e) => { e.stopPropagation(); setMiseInput(e.target.value); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveMise(); } }}
                 onClick={(e) => e.stopPropagation()}
                 className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
               />
               <span className="text-[11px] text-white/30">€</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); saveMise(); }}
+                disabled={!miseDirty}
+                className={clsx(
+                  'flex items-center justify-center w-6 h-6 rounded-md border transition-all',
+                  miseDirty
+                    ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
+                    : 'border-white/[0.05] text-white/15 cursor-not-allowed'
+                )}
+                title="Enregistrer la mise"
+              >
+                <Save className="w-3 h-3" />
+              </button>
             </div>
           </div>
 
@@ -228,10 +253,24 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
                   step="0.01"
                   placeholder={pick.odd.toFixed(2)}
                   value={oddInput}
-                  onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); setActualOdd(fixtureId, e.target.value); }}
+                  onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveOdd(); } }}
                   onClick={(e) => e.stopPropagation()}
                   className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
                 />
+                <button
+                  onClick={(e) => { e.stopPropagation(); saveOdd(); }}
+                  disabled={!oddDirty}
+                  className={clsx(
+                    'flex items-center justify-center w-6 h-6 rounded-md border transition-all',
+                    oddDirty
+                      ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
+                      : 'border-white/[0.05] text-white/15 cursor-not-allowed'
+                  )}
+                  title="Enregistrer la cote"
+                >
+                  <Save className="w-3 h-3" />
+                </button>
               </div>
             </div>
           )}
