@@ -365,11 +365,14 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         </div>
       )}
 
-      {/* Confidence */}
+      {/* Confidence — calculated on the 1X2 market only, doesn't reflect
+          BTTS / O-U / other markets. Adds a hint when the 1X2 has no edge
+          (but secondary value bets do) so the user understands why a high
+          confidence is shown but the recommendation says 'don't bet 1X2'. */}
       <div className="space-y-1.5 pl-3">
         <div className="flex items-center justify-between">
           <span className="text-xs text-white/25 flex items-center gap-1.5 font-heading">
-            <Shield className="w-3 h-3" /> Confiance
+            <Shield className="w-3 h-3" /> Confiance <span className="text-white/15">(1X2)</span>
           </span>
           <span className={clsx('text-xs font-display tracking-wider px-2 py-0.5 rounded-full border', conf.badgeClass)}>
             {confidence}/100 · {conf.label}
@@ -383,6 +386,14 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
             className={clsx('h-full rounded-full', conf.barClass)}
           />
         </div>
+        {!pick?.isValue && (
+          <p className="text-[10px] text-white/30 font-heading leading-snug">
+            ℹ️ La confiance porte sur le 1X2 uniquement.
+            {otherValueBets.length > 0
+              ? ' Le 1X2 n\'a pas d\'edge (cote bookie alignée) → ne pas parier dessus, mise sur les value bets ci-dessus.'
+              : ' Le 1X2 n\'a pas d\'edge — pas de pari conseillé sur ce match.'}
+          </p>
+        )}
       </div>
 
       {/* CTA */}
