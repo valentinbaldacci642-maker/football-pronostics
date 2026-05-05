@@ -50,18 +50,26 @@ class ApiFootballService {
 
     const { data } = await this.client.get(endpoint, { params });
 
-    if (data.errors && Object.keys(data.errors).length > 0) {
-      logger.warn(`API returned errors for ${endpoint}:`, data.errors);
+    const errors = data.errors || {};
+    const hasErrors = errors && Object.keys(errors).length > 0;
+    if (hasErrors) {
+      logger.warn(`API returned errors for ${endpoint}:`, errors);
     }
 
     const result = {
       response: data.response || [],
       results: data.results || 0,
       paging: data.paging || {},
-      errors: data.errors || {},
+      errors,
     };
 
-    cache.set(cacheKey, result, ttl || config.cache.ttl);
+    // Don't cache empty / errored responses (especially rate-limit ones).
+    // Otherwise a single rate-limit hit poisons the cache for hours and a
+    // legitimate team / fixture appears 'introuvable' until cache expiry.
+    const isEmpty = !data.response || (Array.isArray(data.response) && data.response.length === 0);
+    if (!hasErrors && !isEmpty) {
+      cache.set(cacheKey, result, ttl || config.cache.ttl);
+    }
     return result;
   }
 
