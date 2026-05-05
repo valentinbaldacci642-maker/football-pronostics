@@ -428,9 +428,14 @@ function TransfersTab({ teamId }) {
   if (error) return <ErrorState message={error} />;
   if (!transfers.length) return <Empty emoji="↔️" text="Aucun transfert disponible" />;
 
+  // API-Football occasionally returns malformed dates like '290715' or '010711'
+  // (truncated/legacy format) for very old transfers. Parsing these via new Date()
+  // yields year 290715 / 10711 which then ranks first in a desc sort, masking the
+  // actual recent transfers. Require strict YYYY-MM-DD before including.
+  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
   const recent = transfers
     .flatMap(t => (t.transfers || []).map(tr => ({ player: t.player, ...tr })))
-    .filter(t => t.date)
+    .filter(t => t.date && ISO_DATE.test(t.date))
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 30);
 
