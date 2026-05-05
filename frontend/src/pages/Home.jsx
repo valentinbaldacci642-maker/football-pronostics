@@ -222,22 +222,35 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         </div>
       )}
 
-      {/* Other value bets detected on this match (different market than the main pick) */}
+      {/* Other value bets detected on this match (different market than the main pick).
+          Each one gets its own Kelly stake suggestion — Kelly is mathematically
+          valid on any value bet, not just 1X2. */}
       {otherValueBets.length > 0 && (
         <div className="pl-3 pr-1 -mt-2">
           <p className="text-[10px] text-gold-400/60 font-heading uppercase tracking-wider mb-1">
             <Flame className="w-2.5 h-2.5 inline mb-0.5" /> Autres value bets détectés
           </p>
           <div className="space-y-1">
-            {otherValueBets.slice(0, 3).map((vb, i) => (
-              <div key={i} className="flex items-center gap-2 text-[11px] text-white/60 font-heading">
-                <span className="text-gold-400/80 font-display tracking-wider">
-                  +{vb.edge?.toFixed(1)}%
-                </span>
-                <span>{vb.market} · <span className="text-white/80 font-semibold">{vb.selection}</span></span>
-                <span className="text-white/30 font-mono ml-auto">@{vb.odd?.toFixed(2)}</span>
-              </div>
-            ))}
+            {otherValueBets.slice(0, 3).map((vb, i) => {
+              const prob = vb.trueProb ?? vb.prob;
+              const stake = (vb.odd && prob)
+                ? kellyStake(prob, vb.odd, liveBankroll, kFrac)
+                : 0;
+              return (
+                <div key={i} className="flex items-center gap-2 text-[11px] text-white/60 font-heading flex-wrap">
+                  <span className="text-gold-400/80 font-display tracking-wider">
+                    +{vb.edge?.toFixed(1)}%
+                  </span>
+                  <span>{vb.market} · <span className="text-white/80 font-semibold">{vb.selection}</span></span>
+                  <span className="text-white/30 font-mono">@{vb.odd?.toFixed(2)}</span>
+                  {stake > 0 && (
+                    <span className="text-gold-400/90 font-display tracking-wider ml-auto">
+                      {stake.toFixed(0)} €
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
