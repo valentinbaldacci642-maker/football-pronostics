@@ -9,6 +9,7 @@ import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
 import { useHistoryStore, useFavoritesStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
 import { kellyStake } from '../utils/kelly';
+import { formatStake } from '../utils/formatStake';
 import { detectStreaksForFixture } from '../utils/streak';
 
 function getConfidenceConfig(score) {
@@ -265,7 +266,7 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
                   </p>
                   {stake > 0 ? (
                     <p className="text-xs text-gold-400/90 font-display tracking-wider mt-0.5">
-                      Mise: {stake.toFixed(0)} €
+                      Mise: {formatStake(stake)}
                     </p>
                   ) : liveBankroll <= 0 ? (
                     <p className="text-[10px] text-white/30 font-heading mt-0.5">
@@ -286,7 +287,7 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
             <div className="flex items-center gap-2 min-w-0">
               {suggestedStake > 0 ? (
                 <span className="text-[11px] text-gold-400/70 font-heading whitespace-nowrap">
-                  Suggérée: <span className="font-display tracking-wider">{suggestedStake.toFixed(0)} €</span>
+                  Suggérée: <span className="font-display tracking-wider">{formatStake(suggestedStake)}</span>
                   <span className="text-white/25 ml-1">· Kelly actif (edge ≥ 5%)</span>
                 </span>
               ) : (
@@ -479,6 +480,8 @@ export default function Home() {
     ? Math.round(pronostics.reduce((s, p) => s + p.confidence, 0) / pronostics.length)
     : 0;
   const isLowConfidenceFallback = pronostics.length > 0 && pronostics.every((p) => p.confidence < 45);
+  const bankroll = useBankrollStore((s) => s.initialBankroll);
+  const showLowBankrollHint = bankroll > 0 && bankroll < 50;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">

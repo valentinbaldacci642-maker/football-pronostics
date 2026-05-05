@@ -34,5 +34,5 @@ export function kellyFraction(probPercent, decimalOdd) {
 export function kellyStake(probPercent, decimalOdd, bankroll, fractionMult = 0.25, maxFraction = 0.1) {
   const k = kellyFraction(probPercent, decimalOdd) * fractionMult;
   const capped = Math.min(k, maxFraction);
-  return Math.max(0, parseFloat((bankroll * capped).toFixed(1)));
+  return Math.max(0, parseFloat((bankroll * capped).toFixed(2)));
 }
