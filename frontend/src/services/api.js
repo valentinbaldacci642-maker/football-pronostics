@@ -17,7 +17,18 @@ const api = axios.create({
 api.interceptors.response.use(
   (res) => res.data,
   (err) => {
-    const message = err.response?.data?.error || err.message || 'API error';
+    const status = err.response?.status;
+    const data = err.response?.data;
+    // Surface API rate-limit errors with a friendly French message
+    if (status === 429 || data?.code === 'RATE_LIMITED') {
+      const retrySec = Math.ceil((data?.retryAfterMs || 30000) / 1000);
+      const friendly = `Trop de requêtes en peu de temps · réessaie dans ${retrySec} s`;
+      const e = new Error(friendly);
+      e.code = 'RATE_LIMITED';
+      console.warn('[API Rate Limit]', err.config?.url);
+      return Promise.reject(e);
+    }
+    const message = data?.error || err.message || 'API error';
     console.error('[API Error]', message, err.config?.url);
     return Promise.reject(new Error(message));
   }

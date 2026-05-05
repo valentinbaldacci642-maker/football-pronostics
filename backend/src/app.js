@@ -66,6 +66,15 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
+  // Rate limit from API-Football → return a clear 429 so the frontend can
+  // show a 'try again in X seconds' message instead of looking broken.
+  if (err.code === 'RATE_LIMITED') {
+    return res.status(429).json({
+      error: 'API momentanément saturée. Réessaie dans quelques secondes.',
+      code: 'RATE_LIMITED',
+      retryAfterMs: err.retryAfterMs || 30_000,
+    });
+  }
   logger.error('Unhandled error:', err);
   res.status(err.status || 500).json({
     error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,

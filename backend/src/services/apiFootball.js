@@ -7,6 +7,10 @@ class ApiFootballService {
   constructor() {
     this.quotaRemaining = null;
     this.quotaLimit = 100;
+    // When the API rejects us with a rate-limit error, remember the timestamp
+    // so we can short-circuit subsequent calls instead of hammering and burning
+    // through the per-minute window. Window is API-Football's 60s rolling.
+    this.rateLimitedUntil = 0;
 
     this.client = axios.create({
       baseURL: config.api.baseUrl,
@@ -48,12 +52,32 @@ class ApiFootballService {
     const cached = cache.get(cacheKey);
     if (cached) return cached;
 
+    // Short-circuit during a known rate-limit window to avoid burning more
+    // requests against an API that's already saying no. The 60s window is
+    // a conservative match for API-Football's per-minute limit.
+    if (this.rateLimitedUntil > Date.now()) {
+      const err = new Error('API rate limit hit, retry in a few seconds');
+      err.code = 'RATE_LIMITED';
+      err.retryAfterMs = this.rateLimitedUntil - Date.now();
+      throw err;
+    }
+
     const { data } = await this.client.get(endpoint, { params });
 
     const errors = data.errors || {};
     const hasErrors = errors && Object.keys(errors).length > 0;
+    const isRateLimit = !!errors.rateLimit;
     if (hasErrors) {
       logger.warn(`API returned errors for ${endpoint}:`, errors);
+    }
+    if (isRateLimit) {
+      // Block further requests for 30s — half the API window — to give the
+      // upstream limit a chance to recover before we try again.
+      this.rateLimitedUntil = Date.now() + 30_000;
+      const err = new Error('API rate limit hit, retry in a few seconds');
+      err.code = 'RATE_LIMITED';
+      err.retryAfterMs = 30_000;
+      throw err;
     }
 
     const result = {
