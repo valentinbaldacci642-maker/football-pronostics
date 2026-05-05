@@ -121,6 +121,17 @@ export default function ValueBets() {
         </button>
       </div>
 
+      {/* Note: les value bets sont dynamiques */}
+      <div className="px-3.5 py-2.5 rounded-xl bg-orange-500/[0.08] border border-orange-500/25">
+        <p className="text-xs text-orange-300/90 font-heading leading-relaxed">
+          ⚠️ <strong>Les value bets peuvent disparaître au cours de la journée.</strong>{' '}
+          Si les bookmakers resserrent la cote (ex: 3.13 → 2.95), la proba implicite
+          monte et l'edge baisse — si l'edge passe sous 5%, le pari n'est plus détecté
+          comme value bet par Kelly et sort de cette liste. Saisis ta mise et ta cote
+          dès qu'un value bet t'intéresse, le marché bouge vite.
+        </p>
+      </div>
+
       {/* Day selector */}
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
         {dayOptions.map(({ iso, label }) => (
