@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, AlertTriangle, ArrowLeftRight, ArrowLeft, MapPin, Calendar, Trophy, Star, BarChart2, Clock, RefreshCw } from 'lucide-react';
@@ -220,6 +220,25 @@ function getCurrentSeason() {
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN'];
 const UPCOMING_STATUSES = ['NS', 'TBD'];
 
+// Section header shown between groups of consecutive matches in the same
+// competition. Inserted whenever the league changes vs the previous match
+// in the date-sorted list.
+function CompetitionDivider({ league }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 bg-dark-700/40 border-y border-white/[0.06]">
+      {league?.logo && (
+        <img src={league.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={(e) => { e.target.style.display = 'none'; }} />
+      )}
+      <span className="text-[11px] font-heading font-bold tracking-wide text-white/55 uppercase">
+        {league?.name || 'Compétition'}
+      </span>
+      {league?.country && (
+        <span className="text-[10px] text-white/25 font-mono">· {league.country}</span>
+      )}
+    </div>
+  );
+}
+
 function ResultsTab({ teamId }) {
   const [fixtures, setFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -249,8 +268,8 @@ function ResultsTab({ teamId }) {
   if (!fixtures.length) return <Empty emoji="📊" text="Aucun résultat disponible" />;
 
   return (
-    <div className="glass-card divide-y divide-white/[0.05]">
-      {fixtures.map((item) => {
+    <div className="glass-card overflow-hidden">
+      {fixtures.map((item, idx) => {
         const { fixture, teams, goals, league } = item;
         const isHome = teams.home.id === Number(teamId);
         const myGoals = isHome ? goals?.home : goals?.away;
@@ -267,35 +286,41 @@ function ResultsTab({ teamId }) {
           ? 'bg-red-500/20 text-red-400'
           : 'bg-white/5 text-white/30';
 
+        // Insert a competition divider when the league changes vs. the previous match
+        const prevLeagueId = idx > 0 ? fixtures[idx - 1].league?.id : null;
+        const showDivider = idx === 0 || prevLeagueId !== league?.id;
+
         return (
-          <div key={fixture.id} className="flex items-center gap-3 px-4 py-3">
-            <span className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-display font-bold flex-shrink-0 ${resultColor}`}>
-              {resultLabel}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <img src={teams.home.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
-                  <span className={`text-sm font-semibold truncate max-w-[80px] sm:max-w-[120px] ${teams.home.id === Number(teamId) ? 'text-white/90' : 'text-white/50'}`}>
-                    {teams.home.name}
+          <Fragment key={fixture.id}>
+            {showDivider && <CompetitionDivider league={league} />}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.05] last:border-b-0">
+              <span className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-display font-bold flex-shrink-0 ${resultColor}`}>
+                {resultLabel}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <img src={teams.home.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
+                    <span className={`text-sm font-semibold truncate max-w-[80px] sm:max-w-[120px] ${teams.home.id === Number(teamId) ? 'text-white/90' : 'text-white/50'}`}>
+                      {teams.home.name}
+                    </span>
+                  </div>
+                  <span className="text-sm font-display font-bold text-white flex-shrink-0">
+                    {goals?.home ?? '-'} – {goals?.away ?? '-'}
                   </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-sm font-semibold truncate max-w-[80px] sm:max-w-[120px] ${teams.away.id === Number(teamId) ? 'text-white/90' : 'text-white/50'}`}>
+                      {teams.away.name}
+                    </span>
+                    <img src={teams.away.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
+                  </div>
                 </div>
-                <span className="text-sm font-display font-bold text-white flex-shrink-0">
-                  {goals?.home ?? '-'} – {goals?.away ?? '-'}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-sm font-semibold truncate max-w-[80px] sm:max-w-[120px] ${teams.away.id === Number(teamId) ? 'text-white/90' : 'text-white/50'}`}>
-                    {teams.away.name}
-                  </span>
-                  <img src={teams.away.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
-                </div>
+                <p className="text-xs text-white/25 mt-0.5">
+                  {format(parseISO(fixture.date), 'd MMM yyyy', { locale: fr })}
+                </p>
               </div>
-              <p className="text-xs text-white/25 mt-0.5">
-                {format(parseISO(fixture.date), 'd MMM yyyy', { locale: fr })}
-                {league?.name ? ` · ${league.name}` : ''}
-              </p>
             </div>
-          </div>
+          </Fragment>
         );
       })}
     </div>
@@ -331,31 +356,34 @@ function CalendrierTab({ teamId }) {
   if (!fixtures.length) return <Empty emoji="📅" text="Aucun match à venir" />;
 
   return (
-    <div className="glass-card divide-y divide-white/[0.05]">
-      {fixtures.map((item) => {
+    <div className="glass-card overflow-hidden">
+      {fixtures.map((item, idx) => {
         const { fixture, teams, league } = item;
         const isHome = teams.home.id === Number(teamId);
         const opponent = isHome ? teams.away : teams.home;
 
+        // Insert a competition divider when the league changes vs. the previous match
+        const prevLeagueId = idx > 0 ? fixtures[idx - 1].league?.id : null;
+        const showDivider = idx === 0 || prevLeagueId !== league?.id;
+
         return (
-          <div key={fixture.id} className="flex items-center gap-4 px-4 py-3">
-            <div className="w-10 h-10 rounded-xl bg-dark-700 p-1.5 flex-shrink-0 flex items-center justify-center">
-              <img src={opponent.logo} alt={opponent.name} className="w-full h-full object-contain" onError={e => e.target.style.display='none'} />
+          <Fragment key={fixture.id}>
+            {showDivider && <CompetitionDivider league={league} />}
+            <div className="flex items-center gap-4 px-4 py-3 border-b border-white/[0.05] last:border-b-0">
+              <div className="w-10 h-10 rounded-xl bg-dark-700 p-1.5 flex-shrink-0 flex items-center justify-center">
+                <img src={opponent.logo} alt={opponent.name} className="w-full h-full object-contain" onError={e => e.target.style.display='none'} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white/90 truncate">
+                  <span className="text-white/35 text-xs font-normal mr-1.5">{isHome ? 'vs' : '@'}</span>
+                  {opponent.name}
+                </p>
+                <p className="text-xs text-white/30 mt-0.5">
+                  {format(parseISO(fixture.date), "EEE d MMM · HH'h'mm", { locale: fr })}
+                </p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white/90 truncate">
-                <span className="text-white/35 text-xs font-normal mr-1.5">{isHome ? 'vs' : '@'}</span>
-                {opponent.name}
-              </p>
-              <p className="text-xs text-white/30 mt-0.5">
-                {format(parseISO(fixture.date), "EEE d MMM · HH'h'mm", { locale: fr })}
-              </p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <img src={league?.logo} alt={league?.name} className="w-5 h-5 object-contain ml-auto mb-0.5" onError={e => e.target.style.display='none'} />
-              <p className="text-[10px] text-white/25 truncate max-w-[80px]">{league?.name}</p>
-            </div>
-          </div>
+          </Fragment>
         );
       })}
     </div>
