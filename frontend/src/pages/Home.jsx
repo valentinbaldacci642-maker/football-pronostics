@@ -525,6 +525,23 @@ export default function Home() {
           )}
 
           <PronosticCard pronostic={pronostics[0]} featured index={0} />
+
+          {pronostics.length > 1 && (
+            <div className="space-y-3 pt-2">
+              <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide pl-1">
+                Top {Math.min(pronostics.length, 10)} pronos du jour
+              </h2>
+              {pronostics.slice(1, 10).map((p, i) => (
+                <Link
+                  key={p.fixture?.fixture?.id || i}
+                  to={`/match/${p.fixture?.fixture?.id}`}
+                  className="block"
+                >
+                  <PronosticCard pronostic={p} index={i + 1} />
+                </Link>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>

@@ -25,7 +25,7 @@ class PronosticsService {
       return [];
     }
 
-    // Only upcoming, sorted by league priority, capped at 8 to limit API quota usage
+    // Only upcoming, sorted by league priority, capped at 10 to limit API quota usage
     const upcoming = fixtures
       .filter((f) => ['NS', 'TBD'].includes(f.fixture?.status?.short))
       .sort((a, b) => {
@@ -33,7 +33,7 @@ class PronosticsService {
         const pb = PRIORITY_LEAGUES.indexOf(b.league?.id);
         return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
       })
-      .slice(0, 8);
+      .slice(0, 10);
 
     if (upcoming.length === 0) return [];
 
@@ -61,7 +61,7 @@ class PronosticsService {
       .sort((a, b) => b.confidence - a.confidence);
 
     // Prefer high-confidence picks; if none pass threshold, show best available
-    const reliable = all.filter((p) => p.confidence >= 45).slice(0, 8);
+    const reliable = all.filter((p) => p.confidence >= 45).slice(0, 10);
     const pronostics = reliable.length > 0 ? reliable : all.slice(0, 3);
 
     cache.set(cacheKey, pronostics, 10800); // 3h cache
