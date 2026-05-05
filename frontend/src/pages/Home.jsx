@@ -53,17 +53,43 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
   // Live = initial + settled P&L − pending stakes (cash currently with bookie).
   const _bk = getBankrollStats();
   const liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
-  const suggestedStake = pick?.isValue && pick?.odd && pick?.probability
-    ? kellyStake(pick.probability, pick.odd, liveBankroll, kFrac)
-    : 0;
+
   const streaks = detectStreaksForFixture(analysis?.predictions);
-  // Value bets present in the analysis that aren't the main pick — shown as
-  // a secondary indicator so the user sees secondary-market value bets that
-  // _selectBestPick chose to hide behind a clear-favourite featured pick.
   const allValueBets = analysis?.odds?.valueBets || [];
   const otherValueBets = allValueBets.filter(
     (v) => !(v.market === pick?.market && v.selection === pick?.selection)
   );
+
+  // The "best bet to actually play" — highest-edge value bet across main pick
+  // and secondary markets. Used to show the Kelly stake suggestion near the
+  // mise input regardless of whether the main pick has edge or not.
+  const bestPlayableBet = (() => {
+    const candidates = [];
+    if (pick?.isValue && pick?.odd && pick?.probability) {
+      candidates.push({
+        market: pick.market,
+        selection: pick.selectionLabel || pick.selection,
+        edge: pick.edge,
+        odd: pick.odd,
+        prob: pick.probability,
+        isMainPick: true,
+      });
+    }
+    otherValueBets.forEach((vb) => {
+      candidates.push({
+        market: vb.market,
+        selection: vb.selection,
+        edge: vb.edge,
+        odd: vb.odd,
+        prob: vb.trueProb ?? vb.prob,
+        isMainPick: false,
+      });
+    });
+    return candidates.sort((a, b) => (b.edge || 0) - (a.edge || 0))[0] || null;
+  })();
+  const suggestedStake = bestPlayableBet
+    ? kellyStake(bestPlayableBet.prob, bestPlayableBet.odd, liveBankroll, kFrac)
+    : 0;
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
   const savedMise = existingEntry?.mise != null ? String(existingEntry.mise) : '';
   const savedOdd = existingEntry?.actualOdd != null ? String(existingEntry.actualOdd) : '';
@@ -286,13 +312,19 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               {suggestedStake > 0 ? (
-                <span className="text-[11px] text-gold-400/70 font-heading whitespace-nowrap">
-                  Suggérée: <span className="font-display tracking-wider">{formatStake(suggestedStake)}</span>
-                  <span className="text-white/25 ml-1">· Kelly actif (edge ≥ 5%)</span>
+                <span className="text-[11px] text-gold-400/70 font-heading">
+                  <span className="font-display tracking-wider text-gold-400">
+                    Mise: {formatStake(suggestedStake)}
+                  </span>
+                  <span className="text-white/40 ml-1.5">
+                    sur {bestPlayableBet?.isMainPick
+                      ? 'le pari principal'
+                      : `${bestPlayableBet?.market} · ${bestPlayableBet?.selection}`} (+{bestPlayableBet?.edge?.toFixed(1)}%)
+                  </span>
                 </span>
               ) : (
                 <span className="text-[11px] text-white/25 font-heading whitespace-nowrap">
-                  Kelly inactif <span className="text-white/15">· edge {pick?.edge != null ? `${pick.edge >= 0 ? '+' : ''}${pick.edge.toFixed(1)}% < 5%` : '< 5%'}</span>
+                  Kelly inactif <span className="text-white/15">· aucun value bet</span>
                 </span>
               )}
             </div>

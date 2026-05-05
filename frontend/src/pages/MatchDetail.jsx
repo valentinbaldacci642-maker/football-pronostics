@@ -6,7 +6,7 @@ import { useFixtureDetail } from '../hooks/useFixtures';
 import { usePredictions, useOdds, useScorers } from '../hooks/usePredictions';
 import { useFavoritesStore } from '../store';
 import PredictionWidget from '../components/match/PredictionWidget';
-import { MatchWinnerOdds, OverUnderOdds, BTTSOdds, ExactScoreOdds, HandicapOdds, PlayerPropsOdds, ValueBetsList } from '../components/match/OddsTable';
+import { MatchWinnerOdds, OverUnderOdds, BTTSOdds, ExactScoreOdds, HandicapOdds, PlayerPropsOdds } from '../components/match/OddsTable';
 import BookmakersComparison from '../components/match/BookmakersComparison';
 import { GoalsHistogram } from '../components/match/ProbabilityChart';
 import ScorerPredictions from '../components/match/ScorerPredictions';
@@ -204,10 +204,6 @@ export default function MatchDetail() {
 
         {tab === 'Cotes' && (
           <div className="space-y-5">
-            <ValueBetsKelly valueBets={oddsAnalysis?.valueBets} />
-            {oddsAnalysis?.valueBets?.length > 0 && (
-              <ValueBetsList valueBets={oddsAnalysis.valueBets} />
-            )}
             <div className="glass-card p-4 space-y-6">
               <MatchWinnerOdds data={oddsAnalysis?.matchWinner} />
               <div className="border-t border-white/5" />
