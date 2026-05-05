@@ -76,10 +76,11 @@ class PronosticsService {
       .filter(Boolean)
       .sort((a, b) => b.confidence - a.confidence);
 
-    // Prefer high-confidence picks; if none pass threshold, show best available.
-    // No slice cap — return everything that has a confidence ≥ 45 + valid pick.
-    const reliable = all.filter((p) => p.confidence >= 45);
-    const pronostics = reliable.length > 0 ? reliable : all.slice(0, 3);
+    // No confidence threshold — return every match with a valid pick. Even
+    // low-confidence matches are useful for the user to see (informational).
+    // The user explicitly asked for 'all matches of the day' to surface, not
+    // a top-N filtered list.
+    const pronostics = all;
 
     cache.set(cacheKey, pronostics, 10800); // 3h cache
     return pronostics;
