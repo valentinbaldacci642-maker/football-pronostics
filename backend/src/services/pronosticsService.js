@@ -37,10 +37,24 @@ class PronosticsService {
 
     if (upcoming.length === 0) return [];
 
-    // Fetch predictions + odds + season stats in parallel for all selected fixtures
-    const analyses = await Promise.allSettled(
-      upcoming.map((f) => this._fetchAnalysis(f))
-    );
+    // Fetch predictions + odds for all selected fixtures, BATCHED to avoid
+    // hammering API-Football's rate limit. Earlier we sent 20+ parallel
+    // requests which caused random fixtures (including high-priority ones
+    // like Champions League) to silently drop out of the response with
+    // empty cached results.
+    const BATCH_SIZE = 3;
+    const analyses = [];
+    for (let i = 0; i < upcoming.length; i += BATCH_SIZE) {
+      const batch = upcoming.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map((f) => this._fetchAnalysis(f))
+      );
+      analyses.push(...batchResults);
+      // Small breather between batches when there are still more to fetch
+      if (i + BATCH_SIZE < upcoming.length) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
 
     const all = analyses
       .map((result, i) => {
