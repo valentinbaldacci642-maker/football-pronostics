@@ -120,10 +120,11 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         featured ? 'p-5 border-brand-500/20' : 'p-4',
       )}
     >
-      {/* Featured badge */}
+      {/* Featured badge — its own line above league/time so it doesn't
+          collide with the kick-off time + favourite star on the right */}
       {featured && (
-        <div className="absolute top-0 right-0">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-display tracking-widest text-dark-900 rounded-bl-xl"
+        <div className="flex justify-end -mt-1 -mr-1">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-display tracking-widest text-dark-900 rounded-lg"
             style={{ background: 'linear-gradient(135deg, #22c55e, #15803d)' }}>
             ★ TOP PRONO
           </div>
