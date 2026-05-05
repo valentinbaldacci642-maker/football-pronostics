@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Zap, Clock, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, Zap, Clock, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import MatchCard from '../components/match/MatchCard';
 import { SkeletonCard, EmptyState, ErrorState } from '../components/ui/Loading';
@@ -9,13 +9,25 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
 
-const TABS = [
-  { id: 'today', label: "Aujourd'hui", icon: Clock },
-  { id: 'live', label: 'En direct', icon: Zap },
-  { id: 'tomorrow', label: 'Demain', icon: Calendar },
-];
-
 const PRIORITY_LEAGUE_IDS = [39, 140, 78, 135, 61, 2, 3, 88, 94, 253, 71, 128];
+
+function formatDayLabel(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const sameDay = (a, b) => a.toISOString().slice(0, 10) === b.toISOString().slice(0, 10);
+  if (sameDay(d, today)) return "Aujourd'hui";
+  if (sameDay(d, tomorrow)) return 'Demain';
+  if (sameDay(d, yesterday)) return 'Hier';
+  return format(d, 'EEEE d MMM', { locale: fr });
+}
+
+function shiftDate(iso, deltaDays) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
 
 const LEAGUE_FILTERS = [
   { id: null, name: 'Toutes', flag: null },
@@ -100,12 +112,12 @@ function LeagueGroup({ league, matches, defaultExpanded = false }) {
 
 export default function Matchs() {
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('today');
+  const [mode, setMode] = useState('date'); // 'date' or 'live'
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [selectedLeague, setSelectedLeague] = useState(null);
   const [allFixtures, setAllFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [customDate, setCustomDate] = useState(null);
   const [liveCount, setLiveCount] = useState(0);
 
   const leagueParam = searchParams.get('league');
@@ -121,36 +133,29 @@ export default function Matchs() {
     setLoading(true);
     setError(null);
     try {
-      let result;
-      if (activeTab === 'live') {
-        result = await fixturesApi.getLive();
-      } else if (activeTab === 'tomorrow') {
-        result = await fixturesApi.getTomorrow();
-      } else if (activeTab === 'custom' && customDate) {
-        result = await fixturesApi.getByDate(customDate);
-      } else {
-        result = await fixturesApi.getToday();
-      }
+      const result = mode === 'live'
+        ? await fixturesApi.getLive()
+        : await fixturesApi.getByDate(selectedDate);
 
       const all = result?.response || [];
       setAllFixtures(all);
-      if (activeTab === 'live') setLiveCount(all.length);
+      if (mode === 'live') setLiveCount(all.length);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [activeTab, customDate]);
+  }, [mode, selectedDate]);
 
   useEffect(() => {
     fetchFixtures();
   }, [fetchFixtures]);
 
   useEffect(() => {
-    if (activeTab !== 'live') return;
+    if (mode !== 'live') return;
     const interval = setInterval(fetchFixtures, 90000);
     return () => clearInterval(interval);
-  }, [activeTab, fetchFixtures]);
+  }, [mode, fetchFixtures]);
 
   const grouped = groupByLeague(fixtures);
 
@@ -171,9 +176,11 @@ export default function Matchs() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-display text-4xl text-white tracking-wide leading-none">Matchs <span className="text-brand-400">du Jour</span></h1>
-          <p className="text-sm text-white/35 font-heading font-medium mt-1">
-            {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
+          <h1 className="font-display text-4xl text-white tracking-wide leading-none">Tous les <span className="text-brand-400">matchs</span></h1>
+          <p className="text-sm text-white/35 font-heading font-medium mt-1 capitalize">
+            {mode === 'live'
+              ? 'Tous les matchs en direct'
+              : format(new Date(selectedDate + 'T00:00:00'), "EEEE d MMMM yyyy", { locale: fr })}
           </p>
         </div>
         <button onClick={fetchFixtures} className="btn-ghost !px-2.5 !py-2 flex items-center gap-2">
@@ -199,39 +206,69 @@ export default function Matchs() {
         </div>
       )}
 
-      {/* Tabs + date picker */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex gap-1 p-1 bg-dark-800 rounded-xl">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={clsx(
-                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-heading font-semibold transition-all whitespace-nowrap tracking-wide',
-                activeTab === id ? 'bg-dark-700 text-white shadow-inset-glow' : 'text-white/35 hover:text-white/60'
-              )}
-            >
-              {id === 'live' && (
-                <span className={clsx(
-                  'w-1.5 h-1.5 rounded-full',
-                  liveCount > 0 ? 'bg-red-500 animate-live-dot' : 'bg-white/20'
-                )} />
-              )}
-              <Icon className="w-3.5 h-3.5" />
-              <span>{label}</span>
-              {id === 'live' && liveCount > 0 && (
-                <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-mono">{liveCount}</span>
-              )}
-            </button>
-          ))}
+      {/* Date navigator: ◀ [date · clickable picker] ▶ */}
+      <div className="flex flex-col gap-2">
+        <div className={clsx(
+          'flex items-stretch gap-1 p-1 bg-dark-800 rounded-xl border transition-colors',
+          mode === 'date' ? 'border-brand-500/30' : 'border-white/[0.08]'
+        )}>
+          <button
+            onClick={() => { setMode('date'); setSelectedDate(shiftDate(selectedDate, -1)); }}
+            className="flex items-center justify-center w-10 rounded-lg text-white/50 hover:text-white hover:bg-dark-700 transition-all"
+            title="Jour précédent"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+
+          <label className={clsx(
+            'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all relative',
+            mode === 'date' ? 'bg-dark-700 text-white shadow-inset-glow' : 'text-white/50 hover:text-white/80'
+          )}>
+            <Calendar className="w-4 h-4" />
+            <span className="font-heading font-semibold tracking-wide capitalize">
+              {formatDayLabel(selectedDate)}
+            </span>
+            <span className="text-xs text-white/30 font-mono hidden sm:inline">
+              {format(new Date(selectedDate + 'T00:00:00'), 'd MMM', { locale: fr })}
+            </span>
+            {/* Native date picker overlaid for tap, fully transparent */}
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => { setMode('date'); setSelectedDate(e.target.value); }}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            />
+          </label>
+
+          <button
+            onClick={() => { setMode('date'); setSelectedDate(shiftDate(selectedDate, 1)); }}
+            className="flex items-center justify-center w-10 rounded-lg text-white/50 hover:text-white hover:bg-dark-700 transition-all"
+            title="Jour suivant"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
         </div>
 
-        <input
-          type="date"
-          value={customDate || ''}
-          onChange={(e) => { setCustomDate(e.target.value); setActiveTab('custom'); }}
-          className="bg-dark-800 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500/50 transition-colors"
-        />
+        {/* En direct toggle, on its own line below the date row */}
+        <button
+          onClick={() => setMode('live')}
+          className={clsx(
+            'flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-heading font-semibold border transition-all',
+            mode === 'live'
+              ? 'bg-red-500/15 border-red-500/40 text-red-300 shadow-inset-glow'
+              : 'bg-dark-800 border-white/[0.08] text-white/50 hover:text-white hover:border-white/15'
+          )}
+        >
+          <span className={clsx(
+            'w-2 h-2 rounded-full',
+            liveCount > 0 ? 'bg-red-500 animate-live-dot' : 'bg-white/20'
+          )} />
+          <Zap className="w-3.5 h-3.5" />
+          <span>En direct</span>
+          {liveCount > 0 && (
+            <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-mono">{liveCount}</span>
+          )}
+        </button>
       </div>
 
       {/* League filter */}
