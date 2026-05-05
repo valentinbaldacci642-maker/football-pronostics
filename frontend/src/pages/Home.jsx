@@ -635,7 +635,7 @@ export default function Home() {
           {nonValuePronos.length > 1 && (
             <div className="space-y-3 pt-2">
               <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">
-                Top {nonValuePronos.slice(1, 10).length} pronos du jour
+                Top 10 pronos du jour
               </h2>
               {nonValuePronos.slice(1, 10).map((p, i) => (
                 <Link
