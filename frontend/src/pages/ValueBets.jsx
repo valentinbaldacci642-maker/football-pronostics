@@ -240,24 +240,34 @@ export default function ValueBets() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gold-500/[0.08] border border-gold-500/30">
-                  <span className="text-sm font-display tracking-wider text-gold-400 bg-gold-400/10 px-2 py-0.5 rounded leading-none">
-                    +{vb.edge?.toFixed(1)}%
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-white/40 font-heading uppercase tracking-wider">{vb.market}</p>
-                    <p className="text-sm font-heading font-bold text-white truncate">{vb.selection}</p>
+                <div className="px-3 py-2.5 rounded-lg bg-gold-500/[0.08] border border-gold-500/30 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-display tracking-wider text-gold-400 bg-gold-400/10 px-2 py-0.5 rounded leading-none">
+                      +{vb.edge?.toFixed(1)}%
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-white/40 font-heading uppercase tracking-wider">{vb.market}</p>
+                      <p className="text-sm font-heading font-bold text-white truncate">{vb.selection}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-base font-display tracking-wider text-gold-400">@{vb.odd?.toFixed(2)}</p>
+                      {vb.stake > 0 ? (
+                        <p className="text-xs text-gold-400/90 font-display tracking-wider mt-0.5">
+                          Mise: {formatStake(vb.stake)}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-white/30 font-heading mt-0.5">{liveBankroll <= 0 ? 'Définir bankroll' : '—'}</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-base font-display tracking-wider text-gold-400">@{vb.odd?.toFixed(2)}</p>
-                    {vb.stake > 0 ? (
-                      <p className="text-xs text-gold-400/90 font-display tracking-wider mt-0.5">
-                        Mise: {formatStake(vb.stake)}
-                      </p>
-                    ) : (
-                      <p className="text-[10px] text-white/30 font-heading mt-0.5">{liveBankroll <= 0 ? 'Définir bankroll' : '—'}</p>
-                    )}
-                  </div>
+                  {/* Edge explanation — what does +X% actually mean */}
+                  <p className="text-[10px] text-white/40 font-heading leading-snug pt-1.5 border-t border-gold-500/15">
+                    <span className="text-gold-400/70">Edge +{vb.edge?.toFixed(1)}%</span> :
+                    notre modèle estime ce pari à {vb.prob?.toFixed(1)}% (vraie chance)
+                    contre {(100 / vb.odd).toFixed(1)}% implicite par la cote {vb.odd?.toFixed(2)}.
+                    {' '}Le bookie sous-évalue de {vb.edge?.toFixed(1)} points → tu gagnes
+                    statistiquement {vb.edge?.toFixed(1)}% de plus que ce que la cote te paye.
+                  </p>
                 </div>
               </motion.div>
             </Link>

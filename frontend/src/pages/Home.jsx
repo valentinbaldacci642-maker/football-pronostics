@@ -249,62 +249,9 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         </div>
       )}
 
-      {/* Banner when main pick has no edge but secondary value bets exist —
-          redirects user attention to the value bet block below */}
-      {!pick?.isValue && otherValueBets.length > 0 && (
-        <div className="pl-3 pr-1 -mt-2">
-          <div className="px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/25">
-            <p className="text-[11px] text-orange-300 font-heading leading-snug">
-              ⚠️ <strong>Pari principal sans edge</strong> — ne mise pas dessus.
-              {' '}Regarde les value bets ci-dessous : ce sont eux qu'il faut parier.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Other value bets — prominent block, each with its own Kelly stake.
-          Kelly is mathematically valid on any positive-edge bet. */}
-      {otherValueBets.length > 0 && (
-        <div className="pl-3 pr-1 space-y-1.5">
-          <p className="text-[11px] text-gold-400 font-heading uppercase tracking-widest font-bold flex items-center gap-1">
-            <Flame className="w-3 h-3" /> Value bets à parier
-          </p>
-          {otherValueBets.slice(0, 3).map((vb, i) => {
-            const prob = vb.trueProb ?? vb.prob;
-            const stake = (vb.odd && prob)
-              ? kellyStake(prob, vb.odd, liveBankroll, kFrac)
-              : 0;
-            return (
-              <div
-                key={i}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gold-500/[0.08] border border-gold-500/30"
-              >
-                <span className="text-xs font-display tracking-wider text-gold-400 bg-gold-400/10 px-1.5 py-0.5 rounded leading-none">
-                  +{vb.edge?.toFixed(1)}%
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-white/40 font-heading">{vb.market}</p>
-                  <p className="text-sm font-heading font-bold text-white truncate">{vb.selection}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-base font-display tracking-wider text-gold-400">
-                    @{vb.odd?.toFixed(2)}
-                  </p>
-                  {stake > 0 ? (
-                    <p className="text-xs text-gold-400/90 font-display tracking-wider mt-0.5">
-                      Mise: {formatStake(stake)}
-                    </p>
-                  ) : liveBankroll <= 0 ? (
-                    <p className="text-[10px] text-white/30 font-heading mt-0.5">
-                      Définir bankroll
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Value bets widget removed: matches with detected value bets are filtered
+          out of /pronostics and live exclusively on /value-bets so the two pages
+          don't overlap. */}
 
       {/* Kelly stake suggestion + actual stake/odd input (when there's a pick with odds) */}
       {pick?.odd && (
