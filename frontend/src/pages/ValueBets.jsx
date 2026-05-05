@@ -57,41 +57,45 @@ export default function ValueBets() {
 
   useEffect(() => { load({ date: selectedDay }); }, [selectedDay]);
 
-  // Flatten ALL value bets across all matches into a single list, sorted by edge desc.
-  // Each entry knows which match it belongs to, so we can show team names + open detail.
-  const flatValueBets = useMemo(() => {
-    const items = [];
+  // Group value bets BY MATCH so a single fixture with multiple value bets
+  // (e.g. PSG-Bayern with Under 2.5 + BTTS No) shows up as one card containing
+  // all its value bets, instead of one row per value bet (which duplicated
+  // the team names confusingly).
+  const matchesWithValueBets = useMemo(() => {
+    const groups = [];
     pronostics.forEach((p) => {
-      const fixture = p.fixture;
-      const fixtureId = fixture?.fixture?.id;
-      const home = fixture?.teams?.home;
-      const away = fixture?.teams?.away;
-      const league = fixture?.league;
-      const date = fixture?.fixture?.date;
       const all = p.analysis?.odds?.valueBets || [];
-      all.forEach((vb) => {
+      if (!all.length) return;
+      const fixture = p.fixture;
+      const valueBets = all.map((vb) => {
         const prob = vb.trueProb ?? vb.prob;
-        const stake = (vb.odd && prob) ? kellyStake(prob, vb.odd, liveBankroll, kFrac) : 0;
-        items.push({
-          fixtureId,
-          home,
-          away,
-          league,
-          date,
-          confidence: p.confidence,
+        return {
           market: vb.market,
           selection: vb.selection,
           edge: vb.edge,
           odd: vb.odd,
           prob,
-          stake,
-        });
+          stake: (vb.odd && prob) ? kellyStake(prob, vb.odd, liveBankroll, kFrac) : 0,
+        };
+      }).sort((a, b) => (b.edge || 0) - (a.edge || 0));
+
+      groups.push({
+        fixtureId: fixture?.fixture?.id,
+        home: fixture?.teams?.home,
+        away: fixture?.teams?.away,
+        league: fixture?.league,
+        date: fixture?.fixture?.date,
+        confidence: p.confidence,
+        valueBets,
+        bestEdge: valueBets[0]?.edge || 0,
+        totalStake: valueBets.reduce((s, vb) => s + (vb.stake || 0), 0),
       });
     });
-    return items.sort((a, b) => (b.edge || 0) - (a.edge || 0));
+    return groups.sort((a, b) => b.bestEdge - a.bestEdge);
   }, [pronostics, liveBankroll, kFrac]);
 
-  const totalSuggestedStake = flatValueBets.reduce((s, vb) => s + (vb.stake || 0), 0);
+  const totalValueBetsCount = matchesWithValueBets.reduce((s, m) => s + m.valueBets.length, 0);
+  const totalSuggestedStake = matchesWithValueBets.reduce((s, m) => s + m.totalStake, 0);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -136,15 +140,15 @@ export default function ValueBets() {
       </div>
 
       {/* Summary */}
-      {!loading && flatValueBets.length > 0 && (
+      {!loading && matchesWithValueBets.length > 0 && (
         <div className="grid grid-cols-3 gap-2.5">
           <div className="glass-card px-3.5 py-3">
-            <p className="stat-number text-xl leading-none text-gold-400">{flatValueBets.length}</p>
-            <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">Value bets</p>
+            <p className="stat-number text-xl leading-none text-gold-400">{totalValueBetsCount}</p>
+            <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">Value bets · {matchesWithValueBets.length} matchs</p>
           </div>
           <div className="glass-card px-3.5 py-3">
             <p className="stat-number text-xl leading-none text-white">
-              {flatValueBets[0]?.edge?.toFixed(1)}%
+              {matchesWithValueBets[0]?.bestEdge?.toFixed(1)}%
             </p>
             <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">Meilleur edge</p>
           </div>
@@ -173,7 +177,7 @@ export default function ValueBets() {
         </div>
       )}
 
-      {!loading && !error && flatValueBets.length === 0 && (
+      {!loading && !error && matchesWithValueBets.length === 0 && (
         <div className="glass-card p-12 text-center space-y-4">
           <Flame className="w-12 h-12 text-white/10 mx-auto" />
           <div>
@@ -189,8 +193,8 @@ export default function ValueBets() {
         </div>
       )}
 
-      {/* Value bets list */}
-      {!loading && !error && flatValueBets.length > 0 && (
+      {/* Match cards — one per match, with all its value bets stacked inside */}
+      {!loading && !error && matchesWithValueBets.length > 0 && (
         <div className="space-y-3">
           {liveBankroll <= 0 && (
             <div className="px-3.5 py-2.5 rounded-xl bg-brand-500/[0.08] border border-brand-500/25">
@@ -204,70 +208,83 @@ export default function ValueBets() {
             </div>
           )}
 
-          {flatValueBets.map((vb, i) => (
+          {matchesWithValueBets.map((m, mi) => (
             <Link
-              key={`${vb.fixtureId}-${vb.market}-${vb.selection}`}
-              to={`/match/${vb.fixtureId}`}
+              key={m.fixtureId}
+              to={`/match/${m.fixtureId}`}
               className="block"
             >
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.28 }}
-                className="football-card p-4 border-l-4 border-gold-500 cursor-pointer hover:border-gold-400 transition-colors"
+                transition={{ delay: Math.min(mi * 0.04, 0.3), duration: 0.28 }}
+                className="football-card p-4 border-l-4 border-gold-500 cursor-pointer hover:border-gold-400 transition-colors space-y-3"
               >
-                <div className="flex items-center gap-3 mb-3">
-                  {vb.league?.logo && (
-                    <img src={vb.league.logo} alt="" className="w-4 h-4 object-contain opacity-60 flex-shrink-0" />
+                {/* League + time header */}
+                <div className="flex items-center gap-3">
+                  {m.league?.logo && (
+                    <img src={m.league.logo} alt="" className="w-4 h-4 object-contain opacity-60 flex-shrink-0" />
                   )}
-                  <span className="text-xs text-white/35 font-heading truncate">{vb.league?.name}</span>
-                  {vb.date && (
-                    <span className="text-xs font-mono text-white/30 ml-auto">
-                      {formatTime(vb.date)}
+                  <span className="text-xs text-white/35 font-heading truncate">{m.league?.name}</span>
+                  <span className="text-[10px] text-gold-400/80 font-mono ml-auto">
+                    {m.valueBets.length} value bet{m.valueBets.length > 1 ? 's' : ''}
+                  </span>
+                  {m.date && (
+                    <span className="text-xs font-mono text-white/30">
+                      {formatTime(m.date)}
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 mb-3">
-                  {vb.home?.logo && (
-                    <img src={vb.home.logo} alt={vb.home?.name} className="w-5 h-5 object-contain flex-shrink-0" />
+                {/* Teams */}
+                <div className="flex items-center gap-2">
+                  {m.home?.logo && (
+                    <img src={m.home.logo} alt={m.home?.name} className="w-5 h-5 object-contain flex-shrink-0" />
                   )}
-                  <span className="text-sm font-heading font-bold text-white truncate flex-1">{vb.home?.name}</span>
+                  <span className="text-sm font-heading font-bold text-white truncate flex-1">{m.home?.name}</span>
                   <span className="matchup-vs text-xs flex-shrink-0">VS</span>
-                  <span className="text-sm font-heading font-bold text-white truncate flex-1 text-right">{vb.away?.name}</span>
-                  {vb.away?.logo && (
-                    <img src={vb.away.logo} alt={vb.away?.name} className="w-5 h-5 object-contain flex-shrink-0" />
+                  <span className="text-sm font-heading font-bold text-white truncate flex-1 text-right">{m.away?.name}</span>
+                  {m.away?.logo && (
+                    <img src={m.away.logo} alt={m.away?.name} className="w-5 h-5 object-contain flex-shrink-0" />
                   )}
                 </div>
 
-                <div className="px-3 py-2.5 rounded-lg bg-gold-500/[0.08] border border-gold-500/30 space-y-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-display tracking-wider text-gold-400 bg-gold-400/10 px-2 py-0.5 rounded leading-none">
-                      +{vb.edge?.toFixed(1)}%
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-white/40 font-heading uppercase tracking-wider">{vb.market}</p>
-                      <p className="text-sm font-heading font-bold text-white truncate">{vb.selection}</p>
+                {/* Stack of value bets on this match */}
+                <div className="space-y-2">
+                  {m.valueBets.map((vb, i) => (
+                    <div
+                      key={i}
+                      className="px-3 py-2.5 rounded-lg bg-gold-500/[0.08] border border-gold-500/30 space-y-2"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-display tracking-wider text-gold-400 bg-gold-400/10 px-2 py-0.5 rounded leading-none">
+                          +{vb.edge?.toFixed(1)}%
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] text-white/40 font-heading uppercase tracking-wider">{vb.market}</p>
+                          <p className="text-sm font-heading font-bold text-white truncate">{vb.selection}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-base font-display tracking-wider text-gold-400">@{vb.odd?.toFixed(2)}</p>
+                          {vb.stake > 0 ? (
+                            <p className="text-xs text-gold-400/90 font-display tracking-wider mt-0.5">
+                              Mise: {formatStake(vb.stake)}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-white/30 font-heading mt-0.5">{liveBankroll <= 0 ? 'Définir bankroll' : '—'}</p>
+                          )}
+                        </div>
+                      </div>
+                      {/* Edge explanation */}
+                      <p className="text-[10px] text-white/40 font-heading leading-snug pt-1.5 border-t border-gold-500/15">
+                        <span className="text-gold-400/70">Edge +{vb.edge?.toFixed(1)}%</span> :
+                        notre modèle estime ce pari à {vb.prob?.toFixed(1)}% contre
+                        {' '}{(100 / vb.odd).toFixed(1)}% implicite par la cote {vb.odd?.toFixed(2)}.
+                        {' '}Le bookie sous-évalue de {vb.edge?.toFixed(1)} points → tu gagnes
+                        statistiquement {vb.edge?.toFixed(1)}% de plus que ce que la cote paye.
+                      </p>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-base font-display tracking-wider text-gold-400">@{vb.odd?.toFixed(2)}</p>
-                      {vb.stake > 0 ? (
-                        <p className="text-xs text-gold-400/90 font-display tracking-wider mt-0.5">
-                          Mise: {formatStake(vb.stake)}
-                        </p>
-                      ) : (
-                        <p className="text-[10px] text-white/30 font-heading mt-0.5">{liveBankroll <= 0 ? 'Définir bankroll' : '—'}</p>
-                      )}
-                    </div>
-                  </div>
-                  {/* Edge explanation — what does +X% actually mean */}
-                  <p className="text-[10px] text-white/40 font-heading leading-snug pt-1.5 border-t border-gold-500/15">
-                    <span className="text-gold-400/70">Edge +{vb.edge?.toFixed(1)}%</span> :
-                    notre modèle estime ce pari à {vb.prob?.toFixed(1)}% (vraie chance)
-                    contre {(100 / vb.odd).toFixed(1)}% implicite par la cote {vb.odd?.toFixed(2)}.
-                    {' '}Le bookie sous-évalue de {vb.edge?.toFixed(1)} points → tu gagnes
-                    statistiquement {vb.edge?.toFixed(1)}% de plus que ce que la cote te paye.
-                  </p>
+                  ))}
                 </div>
               </motion.div>
             </Link>
