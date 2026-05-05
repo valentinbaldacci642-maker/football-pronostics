@@ -235,6 +235,62 @@ export default function Help() {
         </Definition>
       </Section>
 
+      {/* Idée reçue importante */}
+      <Section icon={Flame} title="⚠️ Un value bet n'est PAS un pari sûr" color="orange">
+        <p className="text-base text-white/85">
+          C'est le contre-sens le plus courant chez les débutants.
+        </p>
+        <p>
+          Un <strong className="text-gold-400">value bet</strong> n'est <strong>pas</strong> un pari
+          "facile" ni "le plus probable". C'est un pari où la <strong className="text-white">cote
+          du bookmaker est trop généreuse</strong> par rapport à la vraie probabilité — donc un
+          moyen mathématique de <strong>battre le bookmaker</strong> sur le long terme.
+        </p>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-dark-800 border border-white/10">
+            <p className="font-heading font-bold text-white mb-1">Pari le plus probable</p>
+            <p className="text-xs text-white/60">
+              Ex: PSG @1.20 (83% chances). Tu vas presque toujours gagner mais le bookie le
+              sait → gain net minuscule (0.20€ pour 1€ misé). Si en plus le bookie a sa marge,
+              tu paies 6% de plus. <strong>Pari le plus probable mais perdant long terme.</strong>
+            </p>
+          </div>
+          <div className="p-3 rounded-lg bg-gold-500/10 border border-gold-500/30">
+            <p className="font-heading font-bold text-gold-400 mb-1">Value bet</p>
+            <p className="text-xs text-white/60">
+              Ex: Match nul @4.88 (26% chances réelles vs 20% implicite). Tu vas perdre 3 fois sur
+              4. Mais quand tu gagnes, tu touches 4.88× ta mise. La 4ème victoire compense
+              largement les 3 pertes. <strong>Pari moins probable mais gagnant long terme.</strong>
+            </p>
+          </div>
+        </div>
+
+        <p className="text-sm">
+          <strong className="text-white">L'idée fondamentale :</strong> tu ne paries pas sur ce
+          qui va se passer (le résultat le plus probable), tu paries sur ce qui est{' '}
+          <strong className="text-gold-400">mieux payé que ce que ça vaut</strong>. Le bookie a
+          fait une erreur de pricing → tu l'exploites.
+        </p>
+
+        <Formula>
+          Long terme : nb_victoires × (cote − 1) × mise &gt; nb_défaites × mise
+        </Formula>
+
+        <p className="text-xs text-white/50 italic">
+          C'est la logique des pros (Bill Benter, Tony Bloom). Ils parient peu (1-3% des matchs),
+          souvent sur des cotes 3-10, gagnent rarement, mais quand ils gagnent ça paye gros. Le
+          ROI vient du <strong>volume de paris × edge moyen</strong>, pas du taux de victoire.
+        </p>
+
+        <p className="text-sm text-white/85">
+          <strong>Conclusion :</strong> méfie-toi de ton intuition "ce pari paraît sûr". Les paris
+          qui paraissent sûrs sont rarement rentables — le bookie les a déjà bien évalués pour
+          attraper l'argent des parieurs intuitifs. Les vrais gains se cachent dans des paris
+          qui paraissent contre-intuitifs.
+        </p>
+      </Section>
+
       {/* Pari principal vs Value bet */}
       <Section icon={Trophy} title="Pari principal vs Value bet (à ne pas confondre)" color="gold">
         <p>

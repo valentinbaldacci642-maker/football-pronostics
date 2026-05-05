@@ -637,8 +637,34 @@ export default function Home() {
         </div>
       )}
 
-      {/* Pronostics */}
-      {!loading && !error && pronostics.length > 0 && (
+      {/* Pronostics — strictly NON-value-bet matches.
+          Matches with detected value bets live on the /value-bets page so the
+          two views don't overlap. This page shows the safer 'informational'
+          predictions where the bookmaker priced everything fairly. */}
+      {!loading && !error && pronostics.length > 0 && (() => {
+        const hasAnyValueBet = (p) =>
+          p.pick?.isValue || (p.analysis?.odds?.valueBets || []).length > 0;
+        const nonValuePronos = pronostics.filter((p) => !hasAnyValueBet(p));
+
+        if (nonValuePronos.length === 0) {
+          return (
+            <div className="glass-card p-12 text-center space-y-4">
+              <Flame className="w-10 h-10 text-gold-400 mx-auto" />
+              <div>
+                <p className="text-white/80 font-heading font-bold">Tous les pronos du jour sont des value bets</p>
+                <p className="text-white/40 text-xs mt-1 font-heading max-w-md mx-auto">
+                  Excellente journée pour parier ! Tous les top pronos détectés ont un edge mathématique.
+                  Va dans Value bets pour voir la liste avec les mises Kelly.
+                </p>
+              </div>
+              <Link to="/value-bets" className="inline-flex items-center gap-2 btn-primary mt-2">
+                Voir les value bets <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+          );
+        }
+
+        return (
         <>
           {isLowConfidenceFallback ? (
             <div className="px-3.5 py-2.5 rounded-xl bg-gold-500/[0.06] border border-gold-500/20">
@@ -650,19 +676,17 @@ export default function Home() {
           ) : (
             <div className="px-3.5 py-2.5 rounded-xl bg-dark-800/60 border border-white/[0.04]">
               <p className="text-xs text-white/20 font-heading leading-relaxed">
-                <span className="text-white/40 font-semibold">Méthode :</span>{' '}
-                Indice calculé sur 6 critères — probabilité dominante, écart entre outcomes, accord modèle Poisson vs bookmakers, qualité overround, forme récente, historique H2H.
+                <span className="text-white/40 font-semibold">Pronos informatifs —</span>{' '}
+                Prédictions sans edge mathématique (cotes bookies alignées). Pas conseillés
+                à parier. Pour les paris rentables, va dans <Link to="/value-bets" className="text-gold-400 hover:underline">Value bets</Link>.
               </p>
             </div>
           )}
 
-          <PronosticCard pronostic={pronostics[0]} featured index={0} />
+          <PronosticCard pronostic={nonValuePronos[0]} featured index={0} />
 
-          {pronostics.length > 1 && (() => {
+          {nonValuePronos.length > 1 && (() => {
             const minEdge = EDGE_MODE_THRESHOLD[edgeMode] ?? 0;
-            // Edge mode filter: a card passes if either the main pick has edge ≥ threshold,
-            // or any secondary-market value bet on the same match does. This way a match
-            // with no 1X2 edge but +6% Under 2.5 still surfaces in Standard mode (≥5%).
             const passEdgeMode = (p) => {
               if (minEdge === 0) return true;
               const pickEdge = p.pick?.isValue ? (p.pick?.edge ?? 0) : 0;
@@ -670,7 +694,7 @@ export default function Home() {
               const secondary = p.analysis?.odds?.valueBets || [];
               return secondary.some((vb) => (vb.edge ?? 0) >= minEdge);
             };
-            const filtered = pronostics.slice(1, 10).filter(passEdgeMode);
+            const filtered = nonValuePronos.slice(1, 10).filter(passEdgeMode);
             const modeLabel =
               edgeMode === 'conservative' ? 'Conservateur · edge ≥ 8%' :
               edgeMode === 'standard'     ? 'Standard · edge ≥ 5%' :
@@ -705,7 +729,8 @@ export default function Home() {
             );
           })()}
         </>
-      )}
+        );
+      })()}
     </div>
   );
 }
