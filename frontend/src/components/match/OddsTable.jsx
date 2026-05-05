@@ -158,6 +158,36 @@ export function ExactScoreOdds({ data }) {
   );
 }
 
+export function PlayerPropsOdds({ data, title }) {
+  if (!data || !Array.isArray(data) || data.length === 0) return null;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs text-white/40 font-semibold uppercase tracking-wider">{title}</h4>
+        <span className="text-xs text-white/20 italic">prob. implicite</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {data.map((p, i) => (
+          <div key={i} className={clsx(
+            'flex items-center justify-between gap-1 px-3 py-2 rounded-lg border text-xs',
+            i === 0 ? 'bg-brand-500/10 border-brand-500/25' : 'bg-dark-700 border-white/5'
+          )}>
+            <span className={clsx('font-heading font-semibold truncate', i === 0 ? 'text-brand-300' : 'text-white/80')}>
+              {p.player}
+            </span>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className={clsx('font-bold', i === 0 ? 'text-brand-400' : 'text-white/70')}>
+                {formatOdd(p.odd)}
+              </span>
+              <span className="text-white/30 font-mono text-[10px] w-9 text-right">{p.prob?.toFixed(0)}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function HandicapOdds({ data }) {
   if (!data || !Array.isArray(data) || data.length === 0) return null;
   // data = [{ outcome, odd, prob }] from _analyzeHandicap

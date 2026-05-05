@@ -6,10 +6,11 @@ import { useFixtureDetail } from '../hooks/useFixtures';
 import { usePredictions, useOdds, useScorers } from '../hooks/usePredictions';
 import { useFavoritesStore } from '../store';
 import PredictionWidget from '../components/match/PredictionWidget';
-import { MatchWinnerOdds, OverUnderOdds, BTTSOdds, ExactScoreOdds, HandicapOdds, ValueBetsList } from '../components/match/OddsTable';
+import { MatchWinnerOdds, OverUnderOdds, BTTSOdds, ExactScoreOdds, HandicapOdds, PlayerPropsOdds, ValueBetsList } from '../components/match/OddsTable';
 import BookmakersComparison from '../components/match/BookmakersComparison';
 import { GoalsHistogram } from '../components/match/ProbabilityChart';
 import ScorerPredictions from '../components/match/ScorerPredictions';
+import LiveOddsBanner from '../components/match/LiveOddsBanner';
 import { LoadingPage, ErrorState } from '../components/ui/Loading';
 import { formatMatchDate, getMatchStatus, getScoreDisplay } from '../utils/format';
 import clsx from 'clsx';
@@ -179,6 +180,7 @@ export default function MatchDetail() {
       <AnimatedTab>
         {tab === 'Analyse' && (
           <div className="space-y-4">
+            <LiveOddsBanner fixtureId={id} fixtureStatus={fix?.status?.short} />
             {analysisLoading ? (
               <div className="text-center py-8 text-white/30">Calcul des probabilités...</div>
             ) : (
@@ -213,6 +215,18 @@ export default function MatchDetail() {
                 <>
                   <div className="border-t border-white/5" />
                   <HandicapOdds data={oddsAnalysis.handicap} />
+                </>
+              )}
+              {oddsAnalysis?.anytimeGoalscorer?.length > 0 && (
+                <>
+                  <div className="border-t border-white/5" />
+                  <PlayerPropsOdds data={oddsAnalysis.anytimeGoalscorer} title="Buteurs (n'importe quand)" />
+                </>
+              )}
+              {oddsAnalysis?.firstGoalscorer?.length > 0 && (
+                <>
+                  <div className="border-t border-white/5" />
+                  <PlayerPropsOdds data={oddsAnalysis.firstGoalscorer} title="Premier buteur" />
                 </>
               )}
               {oddsAnalysis?.exactScore?.length > 0 && (
@@ -378,9 +392,25 @@ function PoissonMatrix({ xG, homeTeam, awayTeam }) {
         Probabilité de chaque score exact · xG dom. {xG.home} / ext. {xG.away}
       </p>
       {xG.source === 'season' && xG.sampleSize?.home != null && xG.sampleSize?.away != null && (
-        <div className="text-xs text-brand-400/70 mb-4 space-y-0.5">
+        <div className="text-xs text-brand-400/70 mb-2 space-y-0.5">
           <div>{homeTeam || 'Domicile'} · {xG.sampleSize.home} matchs joués cette saison</div>
           <div>{awayTeam || 'Extérieur'} · {xG.sampleSize.away} matchs joués cette saison</div>
+        </div>
+      )}
+      {(xG.lineupAdjustments?.home?.absentTopScorer || xG.lineupAdjustments?.away?.absentTopScorer) && (
+        <div className="text-xs text-orange-400/85 mb-3 space-y-0.5">
+          {xG.lineupAdjustments?.home?.absentTopScorer && (
+            <div>
+              ⚠️ {homeTeam || 'Domicile'} · top scoreur absent : {xG.lineupAdjustments.home.absentTopScorer.name}
+              {' '}({xG.lineupAdjustments.home.absentTopScorer.goals} buts) — xG ajusté −{Math.round(xG.lineupAdjustments.home.xgPenalty * 100)}%
+            </div>
+          )}
+          {xG.lineupAdjustments?.away?.absentTopScorer && (
+            <div>
+              ⚠️ {awayTeam || 'Extérieur'} · top scoreur absent : {xG.lineupAdjustments.away.absentTopScorer.name}
+              {' '}({xG.lineupAdjustments.away.absentTopScorer.goals} buts) — xG ajusté −{Math.round(xG.lineupAdjustments.away.xgPenalty * 100)}%
+            </div>
+          )}
         </div>
       )}
       {(!xG.source || xG.source !== 'season') && <div className="mb-4" />}

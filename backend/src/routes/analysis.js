@@ -23,10 +23,13 @@ router.get('/fixture/:fixtureId', async (req, res, next) => {
     const leagueId = fixture?.league?.id;
     const season = fixture?.league?.season;
     let teamStats = null;
+    let lineupContext = null;
     if (homeId && awayId && leagueId && season) {
-      const [homeStatsData, awayStatsData] = await Promise.allSettled([
+      const [homeStatsData, awayStatsData, lineupsData, scorersData] = await Promise.allSettled([
         api.getTeamStatistics(homeId, season, leagueId),
         api.getTeamStatistics(awayId, season, leagueId),
+        api.getFixtureLineups(fixtureId),
+        api.getTopScorers(leagueId, season),
       ]);
       const extract = (s) => {
         if (s.status !== 'fulfilled') return null;
@@ -35,10 +38,16 @@ router.get('/fixture/:fixtureId', async (req, res, next) => {
         return r && typeof r === 'object' ? r : null;
       };
       teamStats = { home: extract(homeStatsData), away: extract(awayStatsData) };
+
+      // Lineup-aware xG adjustment: same logic as pronosticsService
+      const lineups = lineupsData?.status === 'fulfilled' ? (lineupsData.value.response || []) : [];
+      const topScorers = scorersData?.status === 'fulfilled' ? (scorersData.value.response || []) : [];
+      const pronosticsService = require('../services/pronosticsService');
+      lineupContext = pronosticsService._computeLineupContext(lineups, topScorers, homeId, awayId);
     }
 
     const oddsAnalysis = oddsRaw ? analysisService.analyzeFixtureOdds(oddsRaw) : null;
-    const predAnalysis = predRaw ? analysisService.analyzePredictions(predRaw, teamStats) : null;
+    const predAnalysis = predRaw ? analysisService.analyzePredictions(predRaw, teamStats, lineupContext) : null;
 
     const full = analysisService.buildFullAnalysis(oddsAnalysis, predAnalysis, fixture);
 

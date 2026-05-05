@@ -84,11 +84,13 @@ class PronosticsService {
       tasks.push(
         api.getTeamStatistics(homeId, season, leagueId),
         api.getTeamStatistics(awayId, season, leagueId),
+        api.getFixtureLineups(fixtureId),
+        api.getTopScorers(leagueId, season),
       );
     }
 
     const results = await Promise.allSettled(tasks);
-    const [oddsData, predData, homeStatsData, awayStatsData] = results;
+    const [oddsData, predData, homeStatsData, awayStatsData, lineupsData, scorersData] = results;
 
     const oddsRaw = oddsData.status === 'fulfilled' ? oddsData.value.response?.[0] : null;
     const predRaw = predData.status === 'fulfilled' ? predData.value.response?.[0] : null;
@@ -104,11 +106,65 @@ class PronosticsService {
     const homeStats = extractStats(homeStatsData);
     const awayStats = extractStats(awayStatsData);
 
+    // Lineup + top scorers context for xG composition adjustment
+    const lineups = lineupsData?.status === 'fulfilled' ? (lineupsData.value.response || []) : [];
+    const topScorers = scorersData?.status === 'fulfilled' ? (scorersData.value.response || []) : [];
+    const lineupContext = this._computeLineupContext(lineups, topScorers, homeId, awayId);
+
     return {
       oddsAnalysis: oddsRaw ? analysisService.analyzeFixtureOdds(oddsRaw) : null,
       predAnalysis: predRaw
-        ? analysisService.analyzePredictions(predRaw, { home: homeStats, away: awayStats })
+        ? analysisService.analyzePredictions(predRaw, { home: homeStats, away: awayStats }, lineupContext)
         : null,
+    };
+  }
+
+  /**
+   * Detect whether a top-5 league scorer is absent from a team's starting XI.
+   * If so we'll downscale that team's xG by a calibrated amount.
+   * Returns { home: { absentTopScorer, xgPenalty }, away: { ... } } or null
+   * if lineups/scorers aren't available yet.
+   */
+  _computeLineupContext(lineups, topScorers, homeId, awayId) {
+    if (!lineups?.length || !topScorers?.length) return null;
+
+    const startXIs = {};
+    lineups.forEach((lu) => {
+      const teamId = lu.team?.id;
+      if (!teamId) return;
+      const ids = (lu.startXI || []).map((p) => p.player?.id).filter(Boolean);
+      startXIs[teamId] = ids;
+    });
+
+    const teamScorers = { home: [], away: [] };
+    topScorers.slice(0, 10).forEach((entry) => {
+      const playerId = entry.player?.id;
+      const playerName = entry.player?.name;
+      const goals = entry.statistics?.[0]?.goals?.total ?? 0;
+      const teamId = entry.statistics?.[0]?.team?.id;
+      if (!playerId || !teamId) return;
+      if (teamId === homeId) teamScorers.home.push({ playerId, playerName, goals });
+      if (teamId === awayId) teamScorers.away.push({ playerId, playerName, goals });
+    });
+
+    const buildSide = (teamId, scorers) => {
+      const xi = startXIs[teamId];
+      if (!xi || !scorers.length) return null;
+      const top = scorers[0];
+      const isStarting = xi.includes(top.playerId);
+      if (isStarting) return { absentTopScorer: null, xgPenalty: 0 };
+      // Penalty proportional to share of team goals — capped at 25%
+      // Safe default of 15% when we don't know the team's total goals.
+      const penalty = 0.15;
+      return {
+        absentTopScorer: { name: top.playerName, goals: top.goals },
+        xgPenalty: penalty,
+      };
+    };
+
+    return {
+      home: buildSide(homeId, teamScorers.home),
+      away: buildSide(awayId, teamScorers.away),
     };
   }
 

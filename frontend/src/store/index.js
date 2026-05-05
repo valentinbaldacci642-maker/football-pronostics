@@ -201,6 +201,12 @@ export const useHistoryStore = create(
         ),
       })),
 
+      setClosingOdd: (fixtureId, value) => set((s) => ({
+        entries: s.entries.map((e) =>
+          e.fixtureId === fixtureId ? { ...e, closingOdd: value === '' ? null : parseFloat(value) || null } : e
+        ),
+      })),
+
       clearAll: () => set({ entries: [] }),
 
       getStats: () => {

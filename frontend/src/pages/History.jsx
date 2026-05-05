@@ -530,13 +530,22 @@ export default function History() {
 function EntryCard({ entry, setMise, showMise = false }) {
   const setActualOdd = useHistoryStore((s) => s.setActualOdd);
   const setNote = useHistoryStore((s) => s.setNote);
+  const setClosingOdd = useHistoryStore((s) => s.setClosingOdd);
   const res = RESULT_CONFIG[entry.result] || RESULT_CONFIG[null];
   const ResIcon = res.icon;
   const [miseInput, setMiseInput] = useState(entry.mise != null ? String(entry.mise) : '');
   const [oddInput, setOddInput] = useState(entry.actualOdd != null ? String(entry.actualOdd) : '');
+  const [closingInput, setClosingInput] = useState(entry.closingOdd != null ? String(entry.closingOdd) : '');
   const [noteInput, setNoteInput] = useState(entry.note || '');
   const [noteOpen, setNoteOpen] = useState(false);
   const noteDirty = noteInput !== (entry.note || '');
+
+  // CLV (Closing Line Value) — positive means user got a better price than the
+  // closing market did, which is the standard proof of edge. Computed from the
+  // user-entered actualOdd vs closingOdd.
+  const clv = (entry.actualOdd && entry.closingOdd)
+    ? ((parseFloat(entry.actualOdd) / parseFloat(entry.closingOdd)) - 1) * 100
+    : null;
 
   // Use the user-entered actual bookmaker odd when present, otherwise the
   // system-suggested odd from when the prono was generated.
@@ -644,6 +653,33 @@ function EntryCard({ entry, setMise, showMise = false }) {
           </button>
         </div>
       </div>
+
+      {/* CLV row — only relevant once the user has placed a bet (mise > 0) */}
+      {parseFloat(miseInput) > 0 && (
+        <div className="mt-2 ml-11 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] text-white/30 font-heading">Cote au coup d'envoi:</span>
+          <div className="flex items-center gap-1 bg-dark-700 border border-white/[0.07] rounded-lg px-2 py-0.5">
+            <span className="text-[10px] text-white/25 font-mono">@</span>
+            <input
+              type="number"
+              min="1"
+              step="0.01"
+              value={closingInput}
+              onChange={(e) => { setClosingInput(e.target.value); setClosingOdd(entry.fixtureId, e.target.value); }}
+              placeholder="—"
+              className="w-12 bg-transparent text-xs text-white placeholder:text-white/20 focus:outline-none font-mono"
+            />
+          </div>
+          {clv !== null && (
+            <span className={clsx(
+              'text-[11px] font-display tracking-wider px-2 py-0.5 rounded-md',
+              clv >= 0 ? 'bg-brand-500/15 text-brand-400' : 'bg-red-500/15 text-red-400'
+            )}>
+              CLV {clv >= 0 ? '+' : ''}{clv.toFixed(1)}%
+            </span>
+          )}
+        </div>
+      )}
 
       {noteOpen && (
         <div className="mt-2 ml-11 flex gap-2">

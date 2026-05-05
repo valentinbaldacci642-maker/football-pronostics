@@ -54,6 +54,20 @@ class AnalysisService {
       analysis.handicap = this._analyzeHandicap(allMarkets['Asian Handicap']);
     }
 
+    // Player props — Anytime Goalscorer is the most universally available
+    const goalscorerMarket =
+      allMarkets['Anytime Goalscorer'] ||
+      allMarkets['Goalscorer Anytime'] ||
+      allMarkets['Player Goal'];
+    if (goalscorerMarket) {
+      analysis.anytimeGoalscorer = this._analyzePlayerMarket(goalscorerMarket);
+    }
+    const firstScorerMarket =
+      allMarkets['First Goalscorer'] || allMarkets['Goalscorer First'];
+    if (firstScorerMarket) {
+      analysis.firstGoalscorer = this._analyzePlayerMarket(firstScorerMarket);
+    }
+
     analysis.bestBet = this._findBestBet(analysis);
     analysis.valueBets = this._findValueBets(analysis);
     analysis.marketAnomaly = this._detectMarketAnomaly(allMarkets);
@@ -66,8 +80,10 @@ class AnalysisService {
    * Analyze predictions from API
    * @param {object} predictionData - raw API prediction response
    * @param {object} [teamStats] - optional season-wide stats { home, away } from /teams/statistics
+   * @param {object} [lineupContext] - optional { home, away } { absentTopScorer, xgPenalty }
+   *                                   from /fixtures/lineups + /players/topscorers
    */
-  analyzePredictions(predictionData, teamStats = null) {
+  analyzePredictions(predictionData, teamStats = null, lineupContext = null) {
     if (!predictionData) return null;
 
     const { predictions, teams, comparison, league, h2h } = predictionData;
@@ -121,8 +137,19 @@ class AnalysisService {
     // Venue-adjusted: home team uses its home scoring rate vs away team's away conceding rate
     const homeSeason = this._extractSeasonGoals(teamStats?.home);
     const awaySeason = this._extractSeasonGoals(teamStats?.away);
-    const homeExpectedGoals = this._calcExpectedGoals(homeSeason, awaySeason, 'home');
-    const awayExpectedGoals = this._calcExpectedGoals(awaySeason, homeSeason, 'away');
+    let homeExpectedGoals = this._calcExpectedGoals(homeSeason, awaySeason, 'home');
+    let awayExpectedGoals = this._calcExpectedGoals(awaySeason, homeSeason, 'away');
+
+    // Lineup-aware adjustment: if a top scorer is on the bench / out, scale that team's xG down
+    const homePenalty = lineupContext?.home?.xgPenalty || 0;
+    const awayPenalty = lineupContext?.away?.xgPenalty || 0;
+    if (homeExpectedGoals !== null && homePenalty > 0) {
+      homeExpectedGoals = homeExpectedGoals * (1 - homePenalty);
+    }
+    if (awayExpectedGoals !== null && awayPenalty > 0) {
+      awayExpectedGoals = awayExpectedGoals * (1 - awayPenalty);
+    }
+
     const xGAvailable = homeExpectedGoals !== null && awayExpectedGoals !== null;
 
     const scoreMatrix = xGAvailable ? generateScoreMatrix(homeExpectedGoals, awayExpectedGoals) : [];
@@ -152,6 +179,10 @@ class AnalysisService {
               && homeSeason.avgAgainstHome != null
               && awaySeason.avgAgainstAway != null,
             sampleSize: { home: homeSeason.played, away: awaySeason.played },
+            lineupAdjustments: {
+              home: lineupContext?.home || null,
+              away: lineupContext?.away || null,
+            },
           }
         : null,
       mostLikelyScores,
@@ -333,6 +364,17 @@ class AnalysisService {
       odd: data.avg,
       prob: parseFloat(oddsToImpliedProb(data.avg).toFixed(1)),
     }));
+  }
+
+  _analyzePlayerMarket(market) {
+    return Object.entries(market)
+      .map(([player, data]) => ({
+        player,
+        odd: data.avg,
+        prob: parseFloat(oddsToImpliedProb(data.avg).toFixed(1)),
+      }))
+      .sort((a, b) => b.prob - a.prob)
+      .slice(0, 12);
   }
 
   _findBestBet(analysis) {

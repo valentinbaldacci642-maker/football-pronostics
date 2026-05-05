@@ -41,6 +41,7 @@ export const predictionsApi = {
 export const oddsApi = {
   getByFixture: (id) => api.get(`/odds/fixture/${id}`),
   getBookmakers: () => api.get('/odds/bookmakers'),
+  getLive: (fixtureId) => api.get('/odds/live', { params: fixtureId ? { fixture: fixtureId } : {} }),
 };
 
 export const teamsApi = {
