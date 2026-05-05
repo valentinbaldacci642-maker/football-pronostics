@@ -361,34 +361,49 @@ export default function Help() {
       <Section icon={Activity} title="Modes de sélection (3 niveaux)" color="gold">
         <p>
           Dans Historique → Bankroll, choisis le seuil edge selon ton appétit risque.
-          Le mode filtre la <strong>liste Top 10 sur la home</strong> selon l'edge
-          des paris du match (pari principal OU value bet secondaire).
         </p>
+
+        <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
+          <p className="text-xs text-orange-300 font-heading leading-relaxed">
+            ⚠️ <strong>Ne change ce paramètre QUE si tu maîtrises déjà ce type de modèle.</strong>
+            {' '}Si tu débutes avec les value bets / Kelly, <strong>laisse Standard</strong> —
+            c'est calibré pour fonctionner sans connaissance avancée. Modifier sans comprendre
+            l'impact mathématique peut ruiner ton ROI.
+          </p>
+        </div>
+
         <div className="space-y-2">
           <div className="p-3 rounded-lg bg-dark-800 border border-white/10">
             <p className="font-heading font-bold text-white">Conservateur (edge ≥ 8%)</p>
             <p className="text-xs text-white/50">
-              0-2 cartes par jour, qualité maximale. Idéal si tu débutes ou veux du calme.
+              0-2 value bets par jour, qualité maximale. Pour parieurs avancés qui
+              veulent uniquement les opportunités les plus claires, au prix d'un volume
+              très faible.
             </p>
           </div>
           <div className="p-3 rounded-lg bg-gold-500/10 border border-gold-500/30">
             <p className="font-heading font-bold text-gold-400">Standard (edge ≥ 5%) · recommandé</p>
             <p className="text-xs text-white/50">
-              2-5 cartes par jour, edge minimum 5% (au-dessus de la marge d'erreur du
-              modèle ±3-4 points). Pour 95% des utilisateurs.
+              2-5 value bets par jour, edge minimum 5% (au-dessus de la marge d'erreur du
+              modèle ±3-4 points). <strong className="text-white">Mode par défaut</strong>
+              {' '}— pour 95% des utilisateurs, débutants compris.
             </p>
           </div>
           <div className="p-3 rounded-lg bg-dark-800 border border-white/10">
             <p className="font-heading font-bold text-white">Aggressif (tous les pronos)</p>
             <p className="text-xs text-white/50">
-              Voit tous les pronos même sans edge. Kelly reste désactivé sur ceux-là.
-              Risque : tentation de parier sur les paris sans edge → ROI dégradé.
+              Affiche tous les pronos même sans edge. Pour parieurs expérimentés qui
+              construisent leurs propres combinés ou veulent voir le contexte. Kelly
+              reste désactivé sur les non-value-bets — risque de tentation de miser sur
+              des paris perdants si on manque de discipline.
             </p>
           </div>
         </div>
+
         <p className="text-xs text-white/50 italic">
-          Le featured (Top Prono du jour) est <strong>toujours visible</strong> peu
-          importe le mode — c'est la tête d'affiche.
+          Si tu n'as pas encore mesuré ton ROI réel sur 50+ paris settlés, n'augmente PAS
+          le risque (vers Aggressif) ni ne descends en Conservateur — tu n'as pas encore
+          assez de données pour valider que ça te convient.
         </p>
       </Section>
 
