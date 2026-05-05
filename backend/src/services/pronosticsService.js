@@ -25,20 +25,18 @@ class PronosticsService {
       return [];
     }
 
-    // All upcoming matches sorted by league priority. Soft-capped at 50 to
-    // protect against API-Football rate-limit on extreme days (Saturdays
-    // can have 200+ fixtures globally). 50 × 2 calls = 100 API calls,
-    // batched 5 at a time = ~5 s total, fits under typical paid-plan
-    // burst windows. Goes up to all matches if fewer than 50.
-    const MAX_FIXTURES = 50;
+    // All upcoming matches sorted by league priority — no cap. User wants
+    // every prono of the day. The empty-response cache guard (apiFootball)
+    // means rate-limit hits don't poison the cache, so partial fetches
+    // recover on the next request. Some fixtures may be momentarily missing
+    // on first fetch of very heavy days; they fill in on subsequent loads.
     const upcoming = fixtures
       .filter((f) => ['NS', 'TBD'].includes(f.fixture?.status?.short))
       .sort((a, b) => {
         const pa = PRIORITY_LEAGUES.indexOf(a.league?.id);
         const pb = PRIORITY_LEAGUES.indexOf(b.league?.id);
         return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
-      })
-      .slice(0, MAX_FIXTURES);
+      });
 
     if (upcoming.length === 0) return [];
 
