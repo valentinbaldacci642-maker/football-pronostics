@@ -11,6 +11,7 @@ import BookmakersComparison from '../components/match/BookmakersComparison';
 import { GoalsHistogram } from '../components/match/ProbabilityChart';
 import ScorerPredictions from '../components/match/ScorerPredictions';
 import LiveOddsBanner from '../components/match/LiveOddsBanner';
+import ValueBetsKelly from '../components/match/ValueBetsKelly';
 import { LoadingPage, ErrorState } from '../components/ui/Loading';
 import { formatMatchDate, getMatchStatus, getScoreDisplay } from '../utils/format';
 import clsx from 'clsx';
@@ -181,6 +182,7 @@ export default function MatchDetail() {
         {tab === 'Analyse' && (
           <div className="space-y-4">
             <LiveOddsBanner fixtureId={id} fixtureStatus={fix?.status?.short} />
+            <ValueBetsKelly valueBets={oddsAnalysis?.valueBets} />
             {analysisLoading ? (
               <div className="text-center py-8 text-white/30">Calcul des probabilités...</div>
             ) : (
@@ -202,6 +204,7 @@ export default function MatchDetail() {
 
         {tab === 'Cotes' && (
           <div className="space-y-5">
+            <ValueBetsKelly valueBets={oddsAnalysis?.valueBets} />
             {oddsAnalysis?.valueBets?.length > 0 && (
               <ValueBetsList valueBets={oddsAnalysis.valueBets} />
             )}
