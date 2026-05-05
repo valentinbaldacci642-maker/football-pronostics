@@ -11,22 +11,39 @@ import clsx from 'clsx';
 
 const PRIORITY_LEAGUE_IDS = [39, 140, 78, 135, 61, 2, 3, 88, 94, 253, 71, 128];
 
+// Format helper: compare ISO date strings ('YYYY-MM-DD') directly to avoid
+// any local-vs-UTC offset issues from new Date()/.toISOString() round-trips.
+function localIso(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
 function formatDayLabel(iso) {
-  const d = new Date(iso + 'T00:00:00');
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-  const sameDay = (a, b) => a.toISOString().slice(0, 10) === b.toISOString().slice(0, 10);
-  if (sameDay(d, today)) return "Aujourd'hui";
-  if (sameDay(d, tomorrow)) return 'Demain';
-  if (sameDay(d, yesterday)) return 'Hier';
-  return format(d, 'EEEE d MMM', { locale: fr });
+  const todayIso = localIso(new Date());
+  const tmw = new Date(); tmw.setDate(tmw.getDate() + 1);
+  const tomorrowIso = localIso(tmw);
+  const yest = new Date(); yest.setDate(yest.getDate() - 1);
+  const yesterdayIso = localIso(yest);
+
+  if (iso === todayIso) return "Aujourd'hui";
+  if (iso === tomorrowIso) return 'Demain';
+  if (iso === yesterdayIso) return 'Hier';
+  // Build a local-anchored Date for the format() call so the day name matches the ISO date
+  const [y, m, d] = iso.split('-').map(Number);
+  return format(new Date(y, m - 1, d), 'EEEE d MMM', { locale: fr });
 }
 
 function shiftDate(iso, deltaDays) {
-  const d = new Date(iso + 'T00:00:00');
-  d.setDate(d.getDate() + deltaDays);
-  return d.toISOString().slice(0, 10);
+  // Build the date in UTC so the round-trip via toISOString() doesn't shift
+  // by the user's local-vs-UTC offset (e.g. Paris UTC+1/+2 was making
+  // shiftDate('2026-05-05', +1) return '2026-05-05').
+  const [y, m, d] = iso.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + deltaDays);
+  return date.toISOString().slice(0, 10);
 }
 
 const LEAGUE_FILTERS = [
@@ -113,7 +130,9 @@ function LeagueGroup({ league, matches, defaultExpanded = false }) {
 export default function Matchs() {
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState('date'); // 'date' or 'live'
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  // Use the user's local date for the initial selection — toISOString() would
+  // give UTC date which may be off by 1 day (e.g. 23:30 Paris time = next day UTC).
+  const [selectedDate, setSelectedDate] = useState(() => localIso(new Date()));
   const [selectedLeague, setSelectedLeague] = useState(null);
   const [allFixtures, setAllFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
