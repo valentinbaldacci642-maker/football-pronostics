@@ -172,43 +172,49 @@ function FixtureRow({ fixture }) {
     <Link to={`/match/${fix.id}`}>
       <motion.div
         whileHover={{ x: 2 }}
-        className="glass-card px-4 py-3 flex items-center gap-3 hover:border-white/10 transition-all"
+        className="glass-card px-3 py-3 flex flex-col gap-2 hover:border-white/10 transition-all"
       >
-        {/* Round */}
-        <div className="w-20 flex-shrink-0">
-          <p className="text-xs text-white/25 truncate">{league?.round}</p>
-        </div>
-
-        {/* Home team */}
-        <div className="flex-1 flex items-center gap-2 justify-end">
-          <span className="text-sm font-semibold text-white/80 text-right truncate">{teams.home.name}</span>
-          <img src={teams.home.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
-        </div>
-
-        {/* Score / Time */}
-        <div className="flex flex-col items-center gap-0.5 w-20 flex-shrink-0">
-          {isFinished || isLive ? (
-            <span className="font-black text-white text-lg tabular-nums">
-              {goals.home ?? 0} - {goals.away ?? 0}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-xs text-white/50">
+        {/* Top row: round + status/time */}
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <p className="text-white/25 truncate min-w-0 flex-1">{league?.round}</p>
+          {!isFinished && !isLive && (
+            <span className="flex items-center gap-1 text-white/50 flex-shrink-0">
               <Clock className="w-3 h-3" />
               {format(parseISO(fix.date), 'HH:mm')}
             </span>
           )}
-          <span className={`text-[10px] font-medium ${isLive ? 'text-red-400 animate-pulse' : status.color}`}>
+          <span className={`text-[10px] font-medium flex-shrink-0 ${isLive ? 'text-red-400 animate-pulse' : status.color}`}>
             {isLive ? `${fix.status.elapsed}'` : status.label}
           </span>
         </div>
 
-        {/* Away team */}
-        <div className="flex-1 flex items-center gap-2">
-          <img src={teams.away.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
-          <span className="text-sm font-semibold text-white/80 truncate">{teams.away.name}</span>
-        </div>
+        {/* Match row: home — score — away */}
+        <div className="flex items-center gap-2">
+          {/* Home */}
+          <div className="flex-1 flex items-center gap-2 justify-end min-w-0">
+            <span className="text-sm font-semibold text-white/80 text-right truncate min-w-0 flex-1">{teams.home.name}</span>
+            <img src={teams.home.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
+          </div>
 
-        <ChevronRight className="w-4 h-4 text-white/20 flex-shrink-0" />
+          {/* Score */}
+          <div className="w-14 flex-shrink-0 flex items-center justify-center">
+            {isFinished || isLive ? (
+              <span className="font-black text-white text-lg tabular-nums">
+                {goals.home ?? 0} - {goals.away ?? 0}
+              </span>
+            ) : (
+              <span className="text-white/30 text-sm font-mono">vs</span>
+            )}
+          </div>
+
+          {/* Away */}
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            <img src={teams.away.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
+            <span className="text-sm font-semibold text-white/80 truncate min-w-0 flex-1">{teams.away.name}</span>
+          </div>
+
+          <ChevronRight className="w-4 h-4 text-white/20 flex-shrink-0" />
+        </div>
       </motion.div>
     </Link>
   );
@@ -298,10 +304,10 @@ function ClassementsTab() {
                     // without an accent don't shift 2px relative to those that do.
                     <tr key={row.team.id} className={`border-b border-white/3 border-l-2 ${accentColor} hover:bg-white/3 transition-colors`}>
                       <td className="text-center py-3 text-white/40 text-xs font-medium tabular-nums">{row.rank}</td>
-                      <td className="pl-2 py-3">
+                      <td className="pl-2 py-3 overflow-hidden">
                         <div className="flex items-center gap-2 min-w-0">
                           <img src={row.team.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
-                          <span className="font-medium text-white/90 truncate">{row.team.name}</span>
+                          <span className="font-medium text-white/90 truncate min-w-0 flex-1">{row.team.name}</span>
                         </div>
                       </td>
                       <td className="text-center py-3 text-white/50 tabular-nums">{row.all.played}</td>
