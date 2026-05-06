@@ -85,7 +85,7 @@ export default function MatchDetail() {
         {/* Teams + Score */}
         <div className="flex items-center gap-6">
           {/* Home team */}
-          <div className="flex-1 flex flex-col items-center gap-3">
+          <Link to={`/team/${home?.id}`} className="flex-1 flex flex-col items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="w-20 h-20 rounded-2xl bg-dark-700 flex items-center justify-center p-3">
               <img src={home?.logo} alt={home?.name} className="w-full h-full object-contain"
                 onError={(e) => e.target.style.opacity = '0'} />
@@ -94,7 +94,7 @@ export default function MatchDetail() {
               <p className="font-bold text-white text-lg leading-tight">{home?.name}</p>
               <p className="text-xs text-white/30">{fixture?.players?.[0]?.team?.name || 'Domicile'}</p>
             </div>
-          </div>
+          </Link>
 
           {/* Score / VS */}
           <div className="flex flex-col items-center gap-2">
@@ -131,7 +131,7 @@ export default function MatchDetail() {
           </div>
 
           {/* Away team */}
-          <div className="flex-1 flex flex-col items-center gap-3">
+          <Link to={`/team/${away?.id}`} className="flex-1 flex flex-col items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="w-20 h-20 rounded-2xl bg-dark-700 flex items-center justify-center p-3">
               <img src={away?.logo} alt={away?.name} className="w-full h-full object-contain"
                 onError={(e) => e.target.style.opacity = '0'} />
@@ -140,7 +140,7 @@ export default function MatchDetail() {
               <p className="font-bold text-white text-lg leading-tight">{away?.name}</p>
               <p className="text-xs text-white/30">Extérieur</p>
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Consensus probs bar */}
