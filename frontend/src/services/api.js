@@ -14,6 +14,22 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Global rate-limit state — exposes a single source of truth that any
+// component can subscribe to for a live countdown banner. The error message
+// returned on a rejected request is just informational; the live UI ticks
+// off the actual remaining seconds via setInterval driven by this module.
+let rateLimitedUntil = 0;
+const rateLimitListeners = new Set();
+function notifyRateLimit() {
+  rateLimitListeners.forEach((cb) => { try { cb(rateLimitedUntil); } catch {} });
+}
+export function subscribeRateLimit(cb) {
+  rateLimitListeners.add(cb);
+  cb(rateLimitedUntil);
+  return () => rateLimitListeners.delete(cb);
+}
+export function getRateLimitedUntil() { return rateLimitedUntil; }
+
 api.interceptors.response.use(
   (res) => res.data,
   (err) => {
@@ -21,7 +37,15 @@ api.interceptors.response.use(
     const data = err.response?.data;
     // Surface API rate-limit errors with a friendly French message
     if (status === 429 || data?.code === 'RATE_LIMITED') {
-      const retrySec = Math.ceil((data?.retryAfterMs || 30000) / 1000);
+      const retryMs = Math.max(1000, data?.retryAfterMs || 30000);
+      const newUntil = Date.now() + retryMs;
+      // Don't let concurrent 429s push the deadline forward repeatedly —
+      // keep the maximum we've seen so the timer reflects the true wait.
+      if (newUntil > rateLimitedUntil) {
+        rateLimitedUntil = newUntil;
+        notifyRateLimit();
+      }
+      const retrySec = Math.ceil(retryMs / 1000);
       const friendly = `Trop de requêtes en peu de temps · réessaie dans ${retrySec} s`;
       const e = new Error(friendly);
       e.code = 'RATE_LIMITED';

@@ -8,6 +8,7 @@ import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
 import BottomNav from './components/common/BottomNav';
 import PageTransition from './components/common/PageTransition';
+import RateLimitBanner from './components/common/RateLimitBanner';
 import Home from './pages/Home';
 import Matchs from './pages/Matchs';
 import MatchDetail from './pages/MatchDetail';
@@ -77,6 +78,7 @@ export default function App() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         <Navbar />
+        <RateLimitBanner />
         <main className="flex-1 px-4 md:px-6 lg:px-8 pb-24 lg:pb-8 pt-20">
           <AnimatePresence mode="wait" initial={false}>
             <Routes location={location} key={location.pathname}>
