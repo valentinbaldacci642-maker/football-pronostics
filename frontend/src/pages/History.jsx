@@ -640,20 +640,33 @@ function BetCard({ bet }) {
             <span className="text-white/40 font-mono ml-2">· {bet.finalScore}</span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          {bet.odd && (
-            <span className="text-white/50 font-mono">
-              @{parseFloat(bet.odd).toFixed(2)}
+        <div className="flex flex-col items-end gap-0.5 text-xs">
+          <div className="flex items-center gap-3">
+            {bet.odd && (
+              <span className="text-white/50 font-mono">
+                @{parseFloat(bet.odd).toFixed(2)}
+              </span>
+            )}
+            <span className="text-white/70 font-mono">
+              {bet.mise.toFixed(2)} €
             </span>
-          )}
-          <span className="text-white/70 font-mono">
-            {bet.mise.toFixed(2)} €
-          </span>
-          {bet.result && (
-            <span className={clsx('font-display tracking-wider', pnl >= 0 ? 'text-brand-400' : 'text-danger')}>
-              {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)} €
-            </span>
-          )}
+            {bet.result && (
+              <span className={clsx('font-display tracking-wider', pnl >= 0 ? 'text-brand-400' : 'text-danger')}>
+                {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)} €
+              </span>
+            )}
+          </div>
+          {!bet.result && bet.odd && bet.mise > 0 && (() => {
+            const oddNum = parseFloat(bet.odd);
+            const potentialReturn = bet.mise * oddNum;
+            const potentialGain = bet.mise * (oddNum - 1);
+            return (
+              <span className="text-[10px] text-gold-400/70 font-mono">
+                Gain potentiel: <span className="text-gold-400">+{potentialGain.toFixed(2)} €</span>
+                <span className="text-white/30 ml-1">(retour {potentialReturn.toFixed(2)} €)</span>
+              </span>
+            );
+          })()}
         </div>
       </div>
     </div>
