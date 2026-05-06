@@ -663,7 +663,7 @@ function BetCard({ bet }) {
             return (
               <span className="text-[10px] text-gold-400/70 font-mono">
                 Gain potentiel: <span className="text-gold-400">+{potentialGain.toFixed(2)} €</span>
-                <span className="text-white/30 ml-1">(retour {potentialReturn.toFixed(2)} €)</span>
+                <span className="text-white/30 ml-1">(gain {potentialReturn.toFixed(2)} €)</span>
               </span>
             );
           })()}
