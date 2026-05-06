@@ -12,11 +12,13 @@ import { formatStake } from '../utils/formatStake';
 import { formatTime } from '../utils/format';
 import ValueBetSources from '../components/match/ValueBetSources';
 
-function MiseAndOddInputs({ fixtureId, topVB, suggestedStake, liveBankroll }) {
-  const { setMise, setActualOdd, entries } = useHistoryStore();
+function PerBetMiseInputs({ fixtureId, vb }) {
+  const betKey = `${vb.market}::${vb.selection}`;
+  const { setBetMise, setBetActualOdd, entries } = useHistoryStore();
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
-  const savedMise = existingEntry?.mise != null ? String(existingEntry.mise) : '';
-  const savedOdd = existingEntry?.actualOdd != null ? String(existingEntry.actualOdd) : '';
+  const saved = existingEntry?.bets?.[betKey] || {};
+  const savedMise = saved.mise != null ? String(saved.mise) : '';
+  const savedOdd = saved.actualOdd != null ? String(saved.actualOdd) : '';
   const [miseInput, setMiseInput] = useState(savedMise);
   const [oddInput, setOddInput] = useState(savedOdd);
 
@@ -24,25 +26,22 @@ function MiseAndOddInputs({ fixtureId, topVB, suggestedStake, liveBankroll }) {
   const miseDirty = miseInput !== savedMise;
   const oddDirty = oddInput !== savedOdd;
 
-  const saveMise = () => { if (miseDirty) setMise(fixtureId, miseInput); };
-  const saveOdd = () => { if (oddDirty) setActualOdd(fixtureId, oddInput); };
+  const saveMise = () => { if (miseDirty) setBetMise(fixtureId, betKey, miseInput); };
+  const saveOdd = () => { if (oddDirty) setBetActualOdd(fixtureId, betKey, oddInput); };
 
   return (
-    <div className="flex flex-col gap-1.5 pt-2 border-t border-gold-500/15">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          {suggestedStake > 0 ? (
-            <span className="text-[11px] text-gold-400/70 font-heading">
+    <div className="flex flex-col gap-1.5 pt-2 mt-1 border-t border-gold-500/15">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {vb.stake > 0 ? (
+            <span className="text-[11px] text-gold-400/70 font-heading truncate">
               <span className="font-display tracking-wider text-gold-400">
-                Mise: {formatStake(suggestedStake)}
-              </span>
-              <span className="text-white/40 ml-1.5">
-                sur {topVB.market} · {topVB.selection} (+{topVB.edge?.toFixed(1)}%)
+                Mise Kelly: {formatStake(vb.stake)}
               </span>
             </span>
           ) : (
-            <span className="text-[11px] text-white/25 font-heading whitespace-nowrap">
-              {liveBankroll <= 0 ? 'Définir bankroll pour voir Kelly' : 'Kelly inactif'}
+            <span className="text-[11px] text-white/25 font-heading">
+              Kelly inactif
             </span>
           )}
         </div>
@@ -77,10 +76,10 @@ function MiseAndOddInputs({ fixtureId, topVB, suggestedStake, liveBankroll }) {
       </div>
 
       {hasMise && (
-        <div className="flex items-center justify-between gap-1.5">
+        <div className="flex items-center justify-between gap-1.5 flex-wrap">
           <span className="flex items-center gap-1 text-[11px] font-heading text-brand-400/80">
             <Target className="w-3 h-3" />
-            Pari enregistré dans Historique pronos
+            Pari enregistré
           </span>
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-white/30 font-heading">Ma cote:</span>
@@ -88,7 +87,7 @@ function MiseAndOddInputs({ fixtureId, topVB, suggestedStake, liveBankroll }) {
               type="number"
               min="1"
               step="0.01"
-              placeholder={topVB.odd?.toFixed(2)}
+              placeholder={vb.odd?.toFixed(2)}
               value={oddInput}
               onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); }}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveOdd(); } }}
@@ -381,14 +380,6 @@ export default function ValueBets() {
                   )}
                 </div>
 
-                {/* Mise + cote inputs (apply to top-edge VB on this match) */}
-                <MiseAndOddInputs
-                  fixtureId={m.fixtureId}
-                  topVB={m.valueBets[0]}
-                  suggestedStake={m.valueBets[0]?.stake || 0}
-                  liveBankroll={liveBankroll}
-                />
-
                 {/* Stack of value bets on this match */}
                 <div className="space-y-2">
                   {m.valueBets.map((vb, i) => (
@@ -429,6 +420,8 @@ export default function ValueBets() {
                           </span>
                         )}
                       </p>
+                      {/* Per-VB mise + cote inputs */}
+                      <PerBetMiseInputs fixtureId={m.fixtureId} vb={vb} />
                     </div>
                   ))}
                 </div>

@@ -196,6 +196,31 @@ export const useHistoryStore = create(
         ),
       })),
 
+      // Per-value-bet tracking: a single match can have multiple distinct VBs
+      // (e.g. Under 2.5 + BTTS No on the same fixture). Stakes for each VB
+      // live under entries[i].bets[betKey] where betKey = "market::selection".
+      setBetMise: (fixtureId, betKey, amount) => set((s) => ({
+        entries: s.entries.map((e) => {
+          if (e.fixtureId !== fixtureId) return e;
+          const next = parseFloat(amount);
+          const bets = { ...(e.bets || {}) };
+          const cur = bets[betKey] || {};
+          bets[betKey] = { ...cur, mise: amount === '' || !Number.isFinite(next) ? null : next };
+          return { ...e, bets };
+        }),
+      })),
+
+      setBetActualOdd: (fixtureId, betKey, value) => set((s) => ({
+        entries: s.entries.map((e) => {
+          if (e.fixtureId !== fixtureId) return e;
+          const next = parseFloat(value);
+          const bets = { ...(e.bets || {}) };
+          const cur = bets[betKey] || {};
+          bets[betKey] = { ...cur, actualOdd: value === '' || !Number.isFinite(next) ? null : next };
+          return { ...e, bets };
+        }),
+      })),
+
       setNote: (fixtureId, note) => set((s) => ({
         entries: s.entries.map((e) =>
           e.fixtureId === fixtureId ? { ...e, note: note || null } : e
@@ -230,19 +255,33 @@ export const useHistoryStore = create(
       },
 
       getBankrollStats: () => {
-        const bets = get().entries.filter((e) => e.mise > 0);
+        const all = get().entries;
+        const sumPerBetMise = (e) =>
+          Object.values(e.bets || {}).reduce(
+            (s, b) => s + (Number.isFinite(b.mise) && b.mise > 0 ? b.mise : 0),
+            0,
+          );
+        const hasAnyMise = (e) => (e.mise > 0) || sumPerBetMise(e) > 0;
+        const bets = all.filter(hasAnyMise);
         const settled = bets.filter((e) => e.result);
         const pending = bets.filter((e) => !e.result);
 
-        const totalMise = settled.reduce((s, e) => s + e.mise, 0);
+        // Settlement: only the entry-level mise resolves with the match result.
+        // Per-bet stakes (bets[betKey]) are still counted as pending committed
+        // cash until settlement is implemented per-market.
+        const totalMise = settled.reduce((s, e) => s + (e.mise || 0), 0);
         const totalReturn = settled.reduce((s, e) => {
-          if (e.result === 'win') return s + e.mise * parseFloat(e.actualOdd || e.odd || 1);
+          if (e.result === 'win') return s + (e.mise || 0) * parseFloat(e.actualOdd || e.odd || 1);
           return s;
         }, 0);
         const pnl = totalReturn - totalMise;
 
-        // Cash committed in pending bets (sitting with the bookie, not in your pocket)
-        const pendingCommitted = pending.reduce((s, e) => s + e.mise, 0);
+        // Cash committed: entry-level pending mise + ALL per-bet stakes
+        // (entry-level settled per-bets remain "in the wild" but we don't
+        // know their outcome yet).
+        const pendingCommitted =
+          pending.reduce((s, e) => s + (e.mise || 0), 0)
+          + all.reduce((s, e) => s + sumPerBetMise(e), 0);
         const pendingCount = pending.length;
 
         const roi = totalMise > 0 ? parseFloat((pnl / totalMise * 100).toFixed(1)) : null;
