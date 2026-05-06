@@ -189,9 +189,9 @@ function FixtureRow({ fixture }) {
         </div>
 
         {/* Match row: home — score — away */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0 w-full overflow-hidden">
           {/* Home */}
-          <div className="flex-1 flex items-center gap-2 justify-end min-w-0">
+          <div className="flex-1 flex items-center gap-2 justify-end min-w-0 overflow-hidden">
             <span className="text-sm font-semibold text-white/80 text-right truncate min-w-0 flex-1">{teams.home.name}</span>
             <img src={teams.home.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
           </div>
@@ -208,7 +208,7 @@ function FixtureRow({ fixture }) {
           </div>
 
           {/* Away */}
-          <div className="flex-1 flex items-center gap-2 min-w-0">
+          <div className="flex-1 flex items-center gap-2 min-w-0 overflow-hidden">
             <img src={teams.away.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
             <span className="text-sm font-semibold text-white/80 truncate min-w-0 flex-1">{teams.away.name}</span>
           </div>
