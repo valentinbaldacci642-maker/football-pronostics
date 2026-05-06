@@ -50,12 +50,15 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
         runtimeCaching: [
           // API backend Render — NetworkFirst: données fraîches, fallback cache si hors ligne
+          // IMPORTANT: ONLY cache the Render API, NOT vercel.app itself.
+          // Caching vercel.app caught the app shell (HTML + JS/CSS bundles)
+          // and stale entries kept pointing at deleted hashed asset names
+          // post-deploy → page loaded with no CSS until SW was unregistered.
           {
-            urlPattern: ({ url }) =>
-              url.hostname.includes('onrender.com') || url.hostname.includes('vercel.app'),
+            urlPattern: ({ url }) => url.hostname.includes('onrender.com'),
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'api-cache',
+              cacheName: 'api-cache-v2',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60, // 1h
