@@ -102,16 +102,22 @@ function SidebarContent({ onClose }) {
         </div>
       </div>
 
-      {/* Footer */}
+      {/* Footer — settings shortcut only */}
       <div className="mt-4">
-        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-dark-700/60 border border-white/[0.05]">
-          <img src="/ball.webp" alt="logo" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-heading font-semibold text-white truncate">PronosDesFoufous</p>
-            <p className="text-xs text-white/25 font-mono">v1.0</p>
-          </div>
-          <Settings className="w-4 h-4 text-white/25 hover:text-white cursor-pointer transition-colors" />
-        </div>
+        <NavLink
+          to="/settings"
+          onClick={onClose}
+          className={({ isActive }) => clsx(
+            'flex items-center justify-center w-10 h-10 rounded-xl border transition-all cursor-pointer',
+            isActive
+              ? 'bg-brand-500/15 border-brand-500/40 text-brand-400'
+              : 'border-white/[0.06] text-white/35 hover:text-white hover:border-white/15 hover:bg-white/[0.04]'
+          )}
+          title="Paramètres"
+          aria-label="Paramètres"
+        >
+          <Settings className="w-4 h-4" />
+        </NavLink>
       </div>
     </div>
   );

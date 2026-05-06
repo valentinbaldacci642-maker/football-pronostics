@@ -20,6 +20,7 @@ import History from './pages/History';
 import News from './pages/News';
 import Help from './pages/Help';
 import ValueBets from './pages/ValueBets';
+import Settings from './pages/Settings';
 
 export default function App() {
   const location = useLocation();
@@ -91,6 +92,7 @@ export default function App() {
               <Route path="/news" element={<PageTransition><News /></PageTransition>} />
               <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
               <Route path="/value-bets" element={<PageTransition><ValueBets /></PageTransition>} />
+              <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
             </Routes>
           </AnimatePresence>
         </main>
