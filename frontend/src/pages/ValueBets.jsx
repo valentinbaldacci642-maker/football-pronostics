@@ -194,18 +194,22 @@ export default function ValueBets() {
 
   useEffect(() => { load({ date: selectedDay }); }, [selectedDay]);
 
-  // Auto-retry once rate-limit lockout expires
+  // Auto-retry once rate-limit lockout expires (capped at 3)
+  const [rateLimitRetries, setRateLimitRetries] = useState(0);
   useEffect(() => {
     if (error?.code !== 'RATE_LIMITED') return;
+    if (rateLimitRetries >= 3) return;
     const id = setInterval(() => {
       if (Date.now() >= getRateLimitedUntil()) {
         clearInterval(id);
+        setRateLimitRetries((n) => n + 1);
         load({ date: selectedDay });
       }
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [error?.code]);
+  }, [error?.code, rateLimitRetries]);
+  useEffect(() => { if (!error) setRateLimitRetries(0); }, [error]);
 
   // Group value bets BY MATCH so a single fixture with multiple value bets
   // (e.g. PSG-Bayern with Under 2.5 + BTTS No) shows up as one card containing

@@ -465,19 +465,25 @@ export default function Home() {
 
   useEffect(() => { load({ date: selectedDay }); }, [selectedDay]);
 
-  // Auto-retry once the rate-limit lockout expires so the user doesn't have
-  // to click 'Réessayer' manually after waiting for the timer.
+  // Auto-retry once the rate-limit lockout expires. Capped at 3 attempts
+  // total — beyond that the API is presumably saturated for real (daily
+  // quota, upstream outage, etc.) and looping every 30s helps no one.
+  const [rateLimitRetries, setRateLimitRetries] = useState(0);
   useEffect(() => {
     if (error?.code !== 'RATE_LIMITED') return;
+    if (rateLimitRetries >= 3) return;
     const id = setInterval(() => {
       if (Date.now() >= getRateLimitedUntil()) {
         clearInterval(id);
+        setRateLimitRetries((n) => n + 1);
         load({ date: selectedDay });
       }
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [error?.code]);
+  }, [error?.code, rateLimitRetries]);
+  // Reset retry counter on success (when error clears)
+  useEffect(() => { if (!error) setRateLimitRetries(0); }, [error]);
 
   const highConf = pronostics.filter((p) => p.confidence >= 70).length;
   const valueBets = pronostics.filter((p) => p.pick?.isValue).length;
