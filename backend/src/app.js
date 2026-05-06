@@ -38,9 +38,15 @@ const corsOptions = {
 app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
 
+// Backend rate limit per IP. Each match-detail page can fire 6-8 requests
+// (fixture, predictions, odds, stats, events, lineups, scorers, h2h) and a
+// single user navigating around easily blew through the previous 100/15min
+// cap, blocking themselves entirely. The real bottleneck is upstream
+// (API-Football per-min quota), already handled in apiFootball.js — this
+// limiter only needs to catch runaway loops, not throttle normal use.
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
+  max: parseInt(process.env.RATE_LIMIT_MAX) || 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' },

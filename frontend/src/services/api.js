@@ -30,9 +30,28 @@ export function subscribeRateLimit(cb) {
 }
 export function getRateLimitedUntil() { return rateLimitedUntil; }
 
+// Short-circuit outgoing requests while we're known to be rate-limited.
+// Without this, every page navigation fires fresh API calls that all hit
+// the backend simultaneously, each one returns a fresh 429 with
+// retryAfterMs=30s, and the deadline keeps getting pushed forward — the
+// counter visibly 'restarts' at 30s every time the user changes page.
+api.interceptors.request.use((config) => {
+  if (rateLimitedUntil > Date.now()) {
+    const e = new Error(`Trop de requêtes en peu de temps · réessaie dans ${Math.ceil((rateLimitedUntil - Date.now()) / 1000)} s`);
+    e.code = 'RATE_LIMITED';
+    e.config = config;
+    return Promise.reject(e);
+  }
+  return config;
+});
+
 api.interceptors.response.use(
   (res) => res.data,
   (err) => {
+    // Already rejected by the request interceptor — pass through unchanged
+    // (don't double-update the global rateLimitedUntil with a 'fresh' 30s
+    // window when the lockout is already in flight).
+    if (err.code === 'RATE_LIMITED' && !err.response) return Promise.reject(err);
     const status = err.response?.status;
     const data = err.response?.data;
     // Surface API rate-limit errors with a friendly French message

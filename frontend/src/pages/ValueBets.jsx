@@ -5,7 +5,7 @@ import { Flame, RefreshCw, ChevronRight, AlertTriangle, Star, Save, Target } fro
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
-import { pronosticsApi } from '../services/api';
+import { pronosticsApi, getRateLimitedUntil } from '../services/api';
 import { useBankrollStore, useHistoryStore, useFavoritesStore } from '../store';
 import { kellyStake } from '../utils/kelly';
 import { formatStake } from '../utils/formatStake';
@@ -186,13 +186,26 @@ export default function ValueBets() {
       setPronostics(data);
       if (data.length > 0) savePronostics(data);
     } catch (err) {
-      setError(err.message);
+      setError({ message: err.message, code: err.code });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { load({ date: selectedDay }); }, [selectedDay]);
+
+  // Auto-retry once rate-limit lockout expires
+  useEffect(() => {
+    if (error?.code !== 'RATE_LIMITED') return;
+    const id = setInterval(() => {
+      if (Date.now() >= getRateLimitedUntil()) {
+        clearInterval(id);
+        load({ date: selectedDay });
+      }
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error?.code]);
 
   // Group value bets BY MATCH so a single fixture with multiple value bets
   // (e.g. PSG-Bayern with Under 2.5 + BTTS No) shows up as one card containing

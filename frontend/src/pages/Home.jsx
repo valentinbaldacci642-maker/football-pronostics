@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Save, Flame } from 'lucide-react';
-import { pronosticsApi } from '../services/api';
+import { pronosticsApi, getRateLimitedUntil } from '../services/api';
 import { formatTime } from '../utils/format';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -457,13 +457,27 @@ export default function Home() {
       // need an existing entry with the matching fixtureId to update.
       if (data.length > 0) savePronostics(data);
     } catch (err) {
-      setError(err.message);
+      setError({ message: err.message, code: err.code });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { load({ date: selectedDay }); }, [selectedDay]);
+
+  // Auto-retry once the rate-limit lockout expires so the user doesn't have
+  // to click 'Réessayer' manually after waiting for the timer.
+  useEffect(() => {
+    if (error?.code !== 'RATE_LIMITED') return;
+    const id = setInterval(() => {
+      if (Date.now() >= getRateLimitedUntil()) {
+        clearInterval(id);
+        load({ date: selectedDay });
+      }
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error?.code]);
 
   const highConf = pronostics.filter((p) => p.confidence >= 70).length;
   const valueBets = pronostics.filter((p) => p.pick?.isValue).length;
@@ -567,10 +581,16 @@ export default function Home() {
       {loading && <Skeleton />}
 
       {/* Error */}
-      {!loading && error && (
+      {!loading && error && error.code === 'RATE_LIMITED' && (
+        <div className="glass-card p-8 text-center space-y-2 border-orange-500/20 bg-orange-500/[0.03]">
+          <p className="text-orange-300/90 font-heading">API surchargée — auto-retry dès que la limite reset</p>
+          <p className="text-white/30 text-xs font-heading">Le compte à rebours est en haut de page</p>
+        </div>
+      )}
+      {!loading && error && error.code !== 'RATE_LIMITED' && (
         <div className="glass-card p-10 text-center space-y-3">
           <div className="text-5xl font-display text-danger/60">ERR</div>
-          <p className="text-white/50 font-heading font-semibold text-lg">{error}</p>
+          <p className="text-white/50 font-heading font-semibold text-lg">{error.message}</p>
           <button onClick={load} className="btn-primary mt-2">Réessayer</button>
         </div>
       )}
