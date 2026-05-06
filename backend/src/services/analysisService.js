@@ -553,13 +553,11 @@ class AnalysisService {
         if (pvb.sources.includes('lineup') && !existing.sources.includes('lineup')) {
           existing.sources.push('lineup');
         }
-        // Use the higher edge between the two estimates so the user sees
-        // the strongest signal (often Poisson is higher when xG diverges
-        // from the bookie, which is the whole point of the cross-check).
-        if ((pvb.edge || 0) > (existing.edge || 0)) {
-          existing.edgePoisson = pvb.edge;
-          existing.trueProbPoisson = pvb.trueProb;
-        }
+        // Always expose the Poisson estimate so the UI can show "Poisson
+        // confirme à +X%" — useful even when Shin's edge is higher (a
+        // double confirmation strengthens the signal).
+        existing.edgePoisson = pvb.edge;
+        existing.trueProbPoisson = pvb.trueProb;
       } else {
         shinVBs.push(pvb);
       }
