@@ -45,8 +45,37 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Display-name overrides (fun personalization). Keyed by API-Football team
+// ID so we never accidentally rename a different club that shares a name.
+const TEAM_NAME_OVERRIDES = {
+  80: 'FC Gaëtan', // Lyon (Olympique Lyonnais) → FC Gaëtan
+};
+
+// Walk the response payload and rewrite every `team` / `home` / `away`
+// object whose `id` matches an override. Mutates in place — runs once per
+// response so cost is bounded.
+function applyTeamOverrides(value, depth = 0) {
+  if (!value || depth > 8) return; // depth guard against cyclic refs
+  if (Array.isArray(value)) {
+    for (const item of value) applyTeamOverrides(item, depth + 1);
+    return;
+  }
+  if (typeof value !== 'object') return;
+  if (typeof value.id === 'number' && typeof value.name === 'string'
+      && TEAM_NAME_OVERRIDES[value.id]) {
+    value.name = TEAM_NAME_OVERRIDES[value.id];
+  }
+  for (const k in value) {
+    const v = value[k];
+    if (v && typeof v === 'object') applyTeamOverrides(v, depth + 1);
+  }
+}
+
 api.interceptors.response.use(
-  (res) => res.data,
+  (res) => {
+    if (res.data) applyTeamOverrides(res.data);
+    return res.data;
+  },
   (err) => {
     // Already rejected by the request interceptor — pass through unchanged
     // (don't double-update the global rateLimitedUntil with a 'fresh' 30s
