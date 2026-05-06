@@ -45,9 +45,29 @@ export default function App() {
     return () => removeListener();
   }, []);
 
-  // Auto-resolve finished matches at app launch — run once per mount
+  // Auto-resolve finished matches at app launch + every 5 min while open.
+  // Only fires when there's at least one pending bet (entry-level OR per-VB),
+  // to avoid burning API quota when nothing's at stake. Also re-runs when the
+  // app returns from background (Android pause/resume, PC tab focus).
   useEffect(() => {
-    resolveFinishedMatches(entries, resolveResult).catch(() => {});
+    const tick = () => {
+      const all = useHistoryStore.getState().entries;
+      const hasPending = all.some((e) => {
+        if (Number.isFinite(e.mise) && e.mise > 0 && !e.result) return true;
+        return Object.values(e.bets || {}).some((b) => Number.isFinite(b.mise) && b.mise > 0 && !b.result);
+      });
+      if (!hasPending) return;
+      resolveFinishedMatches(useHistoryStore.getState().entries, resolveResult).catch(() => {});
+    };
+
+    tick(); // initial run
+    const id = setInterval(tick, 5 * 60 * 1000);
+    const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
