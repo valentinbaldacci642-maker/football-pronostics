@@ -3,6 +3,59 @@ const config = require('../config');
 const logger = require('../utils/logger');
 const cache = require('../utils/cache');
 
+/**
+ * Sliding-window rate limiter for outbound calls. API-Football Pro plan
+ * enforces 300 req/min, so we cap ourselves at 295 to stay safely under
+ * with a small margin. Cache hits bypass the limiter (no API call → no
+ * quota consumed). On a hot cache the limiter is invisible; on cold-burst
+ * it queues calls FIFO with ~203ms spacing once headroom is gone.
+ */
+class OutboundRateLimiter {
+  constructor(maxPerMinute = 295) {
+    this.max = maxPerMinute;
+    this.windowMs = 60_000;
+    this.timestamps = [];   // monotonic timestamps of recent calls
+    this.queue = [];        // pending acquire() resolvers, FIFO
+    this.processing = false;
+  }
+
+  acquire() {
+    return new Promise((resolve) => {
+      this.queue.push(resolve);
+      this._tick();
+    });
+  }
+
+  _tick() {
+    if (this.processing) return;
+    this.processing = true;
+    queueMicrotask(() => this._drain());
+  }
+
+  _drain() {
+    this.processing = false;
+    if (this.queue.length === 0) return;
+    const now = Date.now();
+    // Drop timestamps older than the rolling window
+    const cutoff = now - this.windowMs;
+    while (this.timestamps.length && this.timestamps[0] <= cutoff) {
+      this.timestamps.shift();
+    }
+    if (this.timestamps.length < this.max) {
+      this.timestamps.push(now);
+      const resolve = this.queue.shift();
+      resolve();
+      // Process the next item on the next microtask so a long burst doesn't
+      // monopolize the event loop.
+      if (this.queue.length > 0) this._tick();
+      return;
+    }
+    // No headroom: wait until the oldest call drops out of the window.
+    const waitMs = (this.timestamps[0] + this.windowMs) - now + 5;
+    setTimeout(() => this._drain(), Math.max(10, waitMs));
+  }
+}
+
 class ApiFootballService {
   constructor() {
     this.quotaRemaining = null;
@@ -11,6 +64,9 @@ class ApiFootballService {
     // so we can short-circuit subsequent calls instead of hammering and burning
     // through the per-minute window. Window is API-Football's 60s rolling.
     this.rateLimitedUntil = 0;
+    // Outbound throttle: hard ceiling at 295 req/min (under the 300/min Pro
+    // limit). Cache hits skip this entirely so normal browsing stays fast.
+    this.limiter = new OutboundRateLimiter(295);
 
     this.client = axios.create({
       baseURL: config.api.baseUrl,
@@ -79,6 +135,11 @@ class ApiFootballService {
       err.retryAfterMs = this.rateLimitedUntil - Date.now();
       throw err;
     }
+
+    // Block until the outbound limiter has headroom (stays under 295/min).
+    // Most calls pass through immediately; only bursts beyond the budget
+    // pay the queue cost.
+    await this.limiter.acquire();
 
     const { data } = await this.client.get(endpoint, { params });
 
