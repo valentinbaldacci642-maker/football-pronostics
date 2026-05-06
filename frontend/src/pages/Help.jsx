@@ -630,12 +630,75 @@ export default function Help() {
           à jour ton ROI sans rien faire :
         </p>
         <ul className="ml-3 space-y-1 text-xs">
-          <li>• Au lancement de l'app, vérifie tous les paris non résolus des 14 derniers jours</li>
+          <li>• En ouvrant la page Historique, vérifie tous les paris non résolus des 14 derniers jours</li>
           <li>• Si match = FT/AET/PEN → marque W ou L selon le score réel</li>
           <li>• Bankroll mise à jour en cascade (P&L recalculé, courbe redessinée)</li>
           <li>• Plafond : 30 paris par session (économie quota API)</li>
-          <li>• Bouton manuel <strong>"Vérifier les résultats"</strong> dans Bankroll pour forcer sans relancer l'app</li>
+          <li>• Bouton manuel <strong>"Vérifier les résultats"</strong> dans Paris en cours pour forcer sans relancer l'app</li>
         </ul>
+      </Section>
+
+      {/* Persistance des value bets sauvés */}
+      <Section icon={Flame} title="Que se passe-t-il quand un value bet disparaît ?" color="gold">
+        <p className="text-base text-white/85">
+          C'est <strong>la question la plus importante</strong> à comprendre pour parier sereinement
+          : un value bet sur lequel tu as déjà parié <strong>n'est pas annulé</strong> s'il sort
+          ensuite de la liste.
+        </p>
+
+        <div className="p-3 rounded-lg bg-gold-500/10 border border-gold-500/30 space-y-2">
+          <p className="font-heading font-bold text-gold-400">Règle simple</p>
+          <p className="text-sm">
+            Une fois que tu as <strong className="text-white">saisi ta cote + ta mise + clic Save</strong>{' '}
+            sur la page Value bets, le pari est <strong>verrouillé localement</strong> dans ton
+            historique. Il reste dans <strong>"Paris en cours"</strong> avec son badge "Value bet"
+            même si l'app le retire de la liste live.
+          </p>
+        </div>
+
+        <p className="font-heading font-bold text-white">Pourquoi un value bet peut disparaître</p>
+        <ul className="ml-3 space-y-1 text-xs text-white/70">
+          <li>• Les bookmakers <strong>resserrent leurs cotes</strong> au fil de la journée
+            (plus de paris arrivent, ils ajustent)</li>
+          <li>• Exemple : Under 2.5 passe de @1.50 → @1.42 → la proba implicite monte de 66.7% à 70.4%</li>
+          <li>• Si l'edge passe sous 5% → le pari ne s'affiche plus comme value bet</li>
+          <li>• Donc le VB peut <strong>apparaître puis disparaître</strong> en quelques heures</li>
+        </ul>
+
+        <p className="font-heading font-bold text-white pt-2">Pourquoi ton pari déjà placé reste bon</p>
+        <p className="text-sm">
+          La "value" est <strong className="text-gold-400">cristallisée au moment où tu places le pari</strong>.
+          Si à 14h tu paries Under 2.5 @1.50 alors que la cote équitable est de 1.43, tu as
+          verrouillé un edge positif. Le marché qui s'ajuste à 16h ne change rien — ton ticket
+          au bookmaker reste à @1.50.
+        </p>
+        <p className="text-sm text-white/70">
+          Mieux : si le marché se resserre <strong>après ton entrée</strong>, c'est la preuve
+          mathématique que tu as détecté la value <strong>avant que le marché s'aligne</strong>.
+          C'est exactement ce que les pros appellent le <strong className="text-gold-400">Closing Line Value</strong> (CLV)
+          positif — l'indicateur le plus fiable d'un edge réel sur le long terme.
+        </p>
+
+        <Formula>
+          CLV+ = ta cote &gt; cote de clôture → preuve d'edge (même si le pari perd ce jour-là)
+        </Formula>
+
+        <p className="font-heading font-bold text-white pt-2">Workflow concret</p>
+        <ul className="ml-3 space-y-1 text-xs">
+          <li>• 14h : tu vois Under 2.5 @1.50 sur Value bets (edge +6.5%)</li>
+          <li>• Tu saisis ta cote 1.50 + mise 0.30€ + clic Save → bankroll baisse de 0.30€</li>
+          <li>• Le pari va dans Historique → <strong>Paris en cours</strong> · badge "Value bet"</li>
+          <li>• 16h : le bookmaker baisse à @1.42, edge tombe à 4% → le VB disparaît de la liste live</li>
+          <li>• Mais ton pari reste visible dans Paris en cours, avec sa cote 1.50 et sa mise 0.30€</li>
+          <li>• 22h : match terminé Under 2.5 ✓ → auto-résolution → bankroll +0.15€ (gain 0.45€ retour)</li>
+          <li>• Le pari migre dans <strong>Historique pronos</strong> · onglet Gagnés</li>
+        </ul>
+
+        <p className="text-sm text-white/70 italic pt-1">
+          La page Value bets affiche les opportunités <strong>actuelles</strong> (à parier maintenant).
+          La page Historique affiche les paris <strong>déjà placés</strong> (verrouillés). Les deux
+          ne se mettent jamais en conflit.
+        </p>
       </Section>
 
       {/* Streaks */}
