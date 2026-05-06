@@ -264,42 +264,54 @@ function ClassementsTab() {
             </div>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-8" />
+                <col />
+                <col className="w-10" />
+                <col className="w-10" />
+                <col className="w-10" />
+                <col className="w-10" />
+                <col className="w-12 hidden sm:table-column" />
+                <col className="w-12" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-white/5 text-xs text-white/30">
-                  <th className="text-left px-4 py-2 font-medium w-6">#</th>
-                  <th className="text-left px-2 py-2 font-medium">Équipe</th>
-                  <th className="text-center px-2 py-2 font-medium">MJ</th>
-                  <th className="text-center px-2 py-2 font-medium">V</th>
-                  <th className="text-center px-2 py-2 font-medium">N</th>
-                  <th className="text-center px-2 py-2 font-medium">D</th>
-                  <th className="text-center px-2 py-2 font-medium hidden sm:table-cell">Diff</th>
-                  <th className="text-center px-4 py-2 font-medium font-bold">Pts</th>
+                  <th className="text-center py-2 font-medium">#</th>
+                  <th className="text-left pl-2 py-2 font-medium">Équipe</th>
+                  <th className="text-center py-2 font-medium">MJ</th>
+                  <th className="text-center py-2 font-medium">V</th>
+                  <th className="text-center py-2 font-medium">N</th>
+                  <th className="text-center py-2 font-medium">D</th>
+                  <th className="text-center py-2 font-medium hidden sm:table-cell">Diff</th>
+                  <th className="text-center py-2 font-bold">Pts</th>
                 </tr>
               </thead>
               <tbody>
                 {group.map((row) => {
                   const desc = (row.description || '').toLowerCase();
-                  let accent = '';
-                  if (desc.includes('qualif') || desc.includes('round of')) accent = 'border-l-2 border-l-green-500';
-                  else if (desc.includes('elimin')) accent = 'border-l-2 border-l-red-500';
+                  let accentColor = 'border-l-transparent';
+                  if (desc.includes('qualif') || desc.includes('round of')) accentColor = 'border-l-green-500';
+                  else if (desc.includes('elimin')) accentColor = 'border-l-red-500';
                   return (
-                    <tr key={row.team.id} className={`border-b border-white/3 hover:bg-white/3 transition-colors ${accent}`}>
-                      <td className="px-4 py-3 text-white/40 text-xs font-medium">{row.rank}</td>
-                      <td className="px-2 py-3">
-                        <div className="flex items-center gap-2">
-                          <img src={row.team.logo} alt="" className="w-5 h-5 object-contain" onError={e => e.target.style.display='none'} />
-                          <span className="font-medium text-white/90 truncate max-w-[100px] sm:max-w-none">{row.team.name}</span>
+                    // border-l-2 always present (transparent fallback) so rows
+                    // without an accent don't shift 2px relative to those that do.
+                    <tr key={row.team.id} className={`border-b border-white/3 border-l-2 ${accentColor} hover:bg-white/3 transition-colors`}>
+                      <td className="text-center py-3 text-white/40 text-xs font-medium tabular-nums">{row.rank}</td>
+                      <td className="pl-2 py-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <img src={row.team.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
+                          <span className="font-medium text-white/90 truncate">{row.team.name}</span>
                         </div>
                       </td>
-                      <td className="px-2 py-3 text-center text-white/50">{row.all.played}</td>
-                      <td className="px-2 py-3 text-center text-green-400">{row.all.win}</td>
-                      <td className="px-2 py-3 text-center text-white/40">{row.all.draw}</td>
-                      <td className="px-2 py-3 text-center text-red-400">{row.all.lose}</td>
-                      <td className={`px-2 py-3 text-center hidden sm:table-cell font-medium ${row.goalsDiff > 0 ? 'text-green-400' : row.goalsDiff < 0 ? 'text-red-400' : 'text-white/40'}`}>
+                      <td className="text-center py-3 text-white/50 tabular-nums">{row.all.played}</td>
+                      <td className="text-center py-3 text-green-400 tabular-nums">{row.all.win}</td>
+                      <td className="text-center py-3 text-white/40 tabular-nums">{row.all.draw}</td>
+                      <td className="text-center py-3 text-red-400 tabular-nums">{row.all.lose}</td>
+                      <td className={`text-center py-3 hidden sm:table-cell font-medium tabular-nums ${row.goalsDiff > 0 ? 'text-green-400' : row.goalsDiff < 0 ? 'text-red-400' : 'text-white/40'}`}>
                         {row.goalsDiff > 0 ? `+${row.goalsDiff}` : row.goalsDiff}
                       </td>
-                      <td className="px-4 py-3 text-center font-black text-white">{row.points}</td>
+                      <td className="text-center py-3 font-black text-white tabular-nums">{row.points}</td>
                     </tr>
                   );
                 })}
