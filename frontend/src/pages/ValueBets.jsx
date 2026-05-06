@@ -10,6 +10,7 @@ import { useBankrollStore, useHistoryStore } from '../store';
 import { kellyStake } from '../utils/kelly';
 import { formatStake } from '../utils/formatStake';
 import { formatTime } from '../utils/format';
+import ValueBetSources from '../components/match/ValueBetSources';
 
 function buildDayOptions() {
   return [0, 1, 2, 3].map((offset) => {
@@ -75,6 +76,9 @@ export default function ValueBets() {
           edge: vb.edge,
           odd: vb.odd,
           prob,
+          sources: vb.sources || [],
+          edgePoisson: vb.edgePoisson,
+          trueProbPoisson: vb.trueProbPoisson,
           stake: (vb.odd && prob) ? kellyStake(prob, vb.odd, liveBankroll, kFrac) : 0,
         };
       }).sort((a, b) => (b.edge || 0) - (a.edge || 0));
@@ -272,7 +276,10 @@ export default function ValueBets() {
                           +{vb.edge?.toFixed(1)}%
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] text-white/40 font-heading uppercase tracking-wider">{vb.market}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-[10px] text-white/40 font-heading uppercase tracking-wider">{vb.market}</p>
+                            <ValueBetSources sources={vb.sources} />
+                          </div>
                           <p className="text-sm font-heading font-bold text-white truncate">{vb.selection}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
@@ -286,13 +293,16 @@ export default function ValueBets() {
                           )}
                         </div>
                       </div>
-                      {/* Edge explanation */}
+                      {/* Edge explanation per source */}
                       <p className="text-[10px] text-white/40 font-heading leading-snug pt-1.5 border-t border-gold-500/15">
                         <span className="text-gold-400/70">Edge +{vb.edge?.toFixed(1)}%</span> :
                         notre modèle estime ce pari à {vb.prob?.toFixed(1)}% contre
                         {' '}{(100 / vb.odd).toFixed(1)}% implicite par la cote {vb.odd?.toFixed(2)}.
-                        {' '}Le bookie sous-évalue de {vb.edge?.toFixed(1)} points → tu gagnes
-                        statistiquement {vb.edge?.toFixed(1)}% de plus que ce que la cote paye.
+                        {vb.edgePoisson != null && (
+                          <span className="text-purple-300/80">
+                            {' · '}Poisson confirme à +{vb.edgePoisson.toFixed(1)}% ({vb.trueProbPoisson?.toFixed(1)}%).
+                          </span>
+                        )}
                       </p>
                     </div>
                   ))}

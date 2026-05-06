@@ -49,6 +49,11 @@ router.get('/fixture/:fixtureId', async (req, res, next) => {
     const oddsAnalysis = oddsRaw ? analysisService.analyzeFixtureOdds(oddsRaw) : null;
     const predAnalysis = predRaw ? analysisService.analyzePredictions(predRaw, teamStats, lineupContext) : null;
 
+    // Cross-source enrichment (Shin + Poisson + lineup) on detected value bets
+    if (oddsAnalysis && predAnalysis?.expectedGoals) {
+      analysisService.enrichValueBetsWithSources(oddsAnalysis, predAnalysis);
+    }
+
     const full = analysisService.buildFullAnalysis(oddsAnalysis, predAnalysis, fixture);
 
     res.json({ data: full, fixtureId });

@@ -357,6 +357,78 @@ export default function Help() {
         </p>
       </Section>
 
+      {/* 3 sources de calcul */}
+      <Section icon={Calculator} title="Les 3 sources de détection (badges Shin / Poisson / Compo)" color="info">
+        <p>
+          Chaque value bet est tagué avec la ou les <strong>sources</strong> qui l'ont
+          détecté. Tu choisis quelle source tu suis selon ta confiance dans chaque modèle.
+          Quand plusieurs sources s'accordent → badge ✓ Consensus → signal fort.
+        </p>
+
+        <Definition term={<><span className="inline-block px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30 text-[9px] font-bold uppercase tracking-wider">Shin</span> — Méthode Shin sur cotes bookmaker</>}>
+          <strong className="text-white">Mécanique :</strong> Shin (1992) retire la marge
+          du bookie de façon asymétrique. Les cotes bookies surévaluent les favoris
+          (informed money) et sous-évaluent les outsiders. Shin redistribue.
+          <Formula>fair = bookie's belief sans marge → edge = fair − implicite</Formula>
+          <strong className="text-white">Marchés :</strong> 1X2, BTTS, O/U 2.5.
+          <br />
+          <strong className="text-white">Force :</strong> méthode peer-reviewed,
+          fiable sur le long terme, ROI typique +2-4% sur paris disciplinés.
+          <br />
+          <strong className="text-white">Limite :</strong> on parasite l'estimation des
+          bookies — si TOUS les bookies se trompent (info récente non digérée), Shin ne
+          le détecte pas.
+        </Definition>
+
+        <Definition term={<><span className="inline-block px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[9px] font-bold uppercase tracking-wider">Poisson</span> — Modèle xG indépendant</>}>
+          <strong className="text-white">Mécanique :</strong> calcule la proba de chaque
+          issue à partir des Expected Goals (xG) saison venant des stats /teams/statistics.
+          C'est <em>notre</em> modèle, indépendant des cotes.
+          <Formula>O/U 2.5  : P(total &gt; 2) avec λ = home_xG + away_xG</Formula>
+          <Formula>BTTS Oui : (1 − e^−home_xG) × (1 − e^−away_xG)</Formula>
+          <strong className="text-white">Marchés :</strong> O/U 2.5, BTTS uniquement
+          (Poisson n'est pas adapté au 1X2).
+          <br />
+          <strong className="text-white">Force :</strong> 2ème opinion vraiment
+          indépendante. Si Poisson dit "value bet" sur Under 2.5 et Shin aussi,
+          c'est du consensus fort.
+          <br />
+          <strong className="text-white">Limite :</strong> nécessite stats saison
+          (uniquement disponible sur la page détail d'un match, pas dans la liste home).
+        </Definition>
+
+        <Definition term={<><span className="inline-block px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-300 border border-orange-500/30 text-[9px] font-bold uppercase tracking-wider">Compo</span> — Compositions ajustées</>}>
+          <strong className="text-white">Mécanique :</strong> quand le top scoreur de la
+          ligue est absent du XI de départ d'une équipe (info publiée ~1h avant le match),
+          son xG est réduit de 15%. Si ça génère un value bet Poisson qui n'apparaît pas
+          quand le joueur est titulaire → tag <strong>Compo</strong>.
+          <br />
+          <strong className="text-white">Force :</strong> capte les value bets qui
+          existent quelques heures avant le match, le temps que le marché digère
+          l'absence. Edge éphémère mais réel.
+          <br />
+          <strong className="text-white">Limite :</strong> fenêtre courte (les bookies
+          ajustent leurs cotes dans les 30-60 min après l'annonce des compos). Faut
+          parier rapidement.
+        </Definition>
+
+        <div className="mt-3 p-3 rounded-lg bg-dark-800 border border-white/10">
+          <p className="text-xs font-heading font-bold text-white mb-2">Comment lire les badges sur un value bet</p>
+          <ul className="ml-3 text-xs space-y-1">
+            <li>• <strong>Shin seul</strong> → bookie a mal réparti sa marge, edge classique</li>
+            <li>• <strong>Poisson seul</strong> → notre xG diffère sensiblement de la cote, opportunité indépendante</li>
+            <li>• <strong>Shin + Poisson</strong> ✓ <em>Consensus</em> → signal fort, deux modèles d'accord</li>
+            <li>• <strong>+ Compo</strong> → en plus, un top scoreur est absent → edge potentiellement éphémère</li>
+          </ul>
+        </div>
+
+        <p className="text-xs text-white/50 italic">
+          Le user choisit quel(s) modèle(s) suivre. Standard recommandé : suivre tout
+          ce que Kelly suggère, sans discriminer la source. Les value bets avec
+          consensus fort (≥ 2 sources) ont un risque réduit d'erreur de modèle.
+        </p>
+      </Section>
+
       {/* Modes edge */}
       <Section icon={Activity} title="Modes de sélection (3 niveaux)" color="gold">
         <p>

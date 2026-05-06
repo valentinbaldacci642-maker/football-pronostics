@@ -98,12 +98,32 @@ const calcBTTSProbability = (homeScoreProb, awayScoreProb) => {
 };
 
 /**
- * Poisson distribution for goal scoring
+ * Poisson distribution for goal scoring (PMF — probability of exactly k events)
  */
 const poisson = (lambda, k) => {
   let result = Math.exp(-lambda);
   for (let i = 0; i < k; i++) result *= lambda / (i + 1);
   return result;
+};
+
+/**
+ * Cumulative Poisson distribution: P(X ≤ k) for parameter lambda.
+ * Used for Over/Under markets — e.g. P(total goals ≤ 2) for Under 2.5.
+ */
+const poissonCDF = (lambda, k) => {
+  let sum = 0;
+  for (let i = 0; i <= k; i++) sum += poisson(lambda, i);
+  return sum;
+};
+
+/**
+ * Probability that BOTH teams score at least once, given each team's xG.
+ * Assumes scoring is independent between the two teams (standard simplification).
+ */
+const bttsYesProbability = (homeXG, awayXG) => {
+  const pHomeScore = 1 - Math.exp(-homeXG);
+  const pAwayScore = 1 - Math.exp(-awayXG);
+  return pHomeScore * pAwayScore;
 };
 
 /**
@@ -143,4 +163,6 @@ module.exports = {
   generateScoreMatrix,
   getConfidenceLevel,
   poisson,
+  poissonCDF,
+  bttsYesProbability,
 };

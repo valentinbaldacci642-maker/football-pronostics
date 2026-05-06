@@ -137,12 +137,19 @@ class PronosticsService {
       lineupContext = this._computeLineupContext(lineups, topScorers, homeId, awayId);
     }
 
-    return {
-      oddsAnalysis: oddsRaw ? analysisService.analyzeFixtureOdds(oddsRaw) : null,
-      predAnalysis: predRaw
-        ? analysisService.analyzePredictions(predRaw, teamStats, lineupContext)
-        : null,
-    };
+    const oddsAnalysis = oddsRaw ? analysisService.analyzeFixtureOdds(oddsRaw) : null;
+    const predAnalysis = predRaw
+      ? analysisService.analyzePredictions(predRaw, teamStats, lineupContext)
+      : null;
+
+    // Cross-source enrichment: add Poisson + lineup-derived value bets on
+    // top of Shin detection. Only runs in 'full' mode where xG is reliable
+    // (lite mode skips because expectedGoals is null without season stats).
+    if (oddsAnalysis && predAnalysis?.expectedGoals) {
+      analysisService.enrichValueBetsWithSources(oddsAnalysis, predAnalysis);
+    }
+
+    return { oddsAnalysis, predAnalysis };
   }
 
   /**

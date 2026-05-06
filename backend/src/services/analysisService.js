@@ -7,7 +7,11 @@ const {
   kellyCriterion,
   generateScoreMatrix,
   getConfidenceLevel,
+  poissonCDF,
+  bttsYesProbability,
 } = require('../utils/probabilityCalc');
+
+const config = require('../config');
 
 class AnalysisService {
   /**
@@ -408,30 +412,135 @@ class AnalysisService {
   }
 
   _findValueBets(analysis) {
+    // All value bets here come from the Shin's-method detection — bookmaker
+    // odds with their margin redistributed asymmetrically.
     const valueBets = [];
+    const tag = (vb) => ({ ...vb, sources: ['shin'] });
 
     if (analysis.matchWinner?.valueBets) {
       const { home, draw, away } = analysis.matchWinner.valueBets;
       const odds = analysis.matchWinner.odds;
-      if (home?.isValue) valueBets.push({ market: '1X2', selection: '1', ...home, odd: odds.home });
-      if (draw?.isValue) valueBets.push({ market: '1X2', selection: 'X', ...draw, odd: odds.draw });
-      if (away?.isValue) valueBets.push({ market: '1X2', selection: '2', ...away, odd: odds.away });
+      if (home?.isValue) valueBets.push(tag({ market: '1X2', selection: '1', ...home, odd: odds.home }));
+      if (draw?.isValue) valueBets.push(tag({ market: '1X2', selection: 'X', ...draw, odd: odds.draw }));
+      if (away?.isValue) valueBets.push(tag({ market: '1X2', selection: '2', ...away, odd: odds.away }));
     }
 
     if (analysis.btts?.valueBets) {
       const { yes, no } = analysis.btts.valueBets;
       const odds = analysis.btts.odds;
-      if (yes?.isValue) valueBets.push({ market: 'BTTS', selection: 'Oui', ...yes, odd: odds.yes });
-      if (no?.isValue) valueBets.push({ market: 'BTTS', selection: 'Non', ...no, odd: odds.no });
+      if (yes?.isValue) valueBets.push(tag({ market: 'BTTS', selection: 'Oui', ...yes, odd: odds.yes }));
+      if (no?.isValue) valueBets.push(tag({ market: 'BTTS', selection: 'Non', ...no, odd: odds.no }));
     }
 
     if (analysis.goalsOverUnder?.lines['2.5']) {
       const { over, under } = analysis.goalsOverUnder.lines['2.5'];
-      if (over?.valueInfo?.isValue) valueBets.push({ market: 'O/U 2.5', selection: 'Over 2.5', ...over.valueInfo, odd: over.odd });
-      if (under?.valueInfo?.isValue) valueBets.push({ market: 'O/U 2.5', selection: 'Under 2.5', ...under.valueInfo, odd: under.odd });
+      if (over?.valueInfo?.isValue) valueBets.push(tag({ market: 'O/U 2.5', selection: 'Over 2.5', ...over.valueInfo, odd: over.odd }));
+      if (under?.valueInfo?.isValue) valueBets.push(tag({ market: 'O/U 2.5', selection: 'Under 2.5', ...under.valueInfo, odd: under.odd }));
     }
 
     return valueBets.sort((a, b) => b.edge - a.edge);
+  }
+
+  /**
+   * Poisson source: independent value bet detection using xG-derived
+   * probabilities for O/U 2.5 and BTTS markets. Compares the model's
+   * Poisson estimate against the bookmaker implied prob — a different
+   * angle than Shin (which trusts the bookmaker's own ground truth).
+   *
+   * Marks value bets with sources: ['poisson'] (or ['poisson', 'lineup']
+   * when xG was lineup-adjusted). Lineup adjustment surfaces edges that
+   * appear when a top scorer is missing from the starting XI but the
+   * market hasn't fully digested it yet.
+   */
+  _detectPoissonValueBets(oddsAnalysis, predAnalysis) {
+    const xg = predAnalysis?.expectedGoals;
+    if (!xg || !Number.isFinite(xg.home) || !Number.isFinite(xg.away)) return [];
+
+    const lineupAdjusted = !!(
+      xg.lineupAdjustments?.home?.absentTopScorer
+      || xg.lineupAdjustments?.away?.absentTopScorer
+    );
+    const sources = lineupAdjusted ? ['poisson', 'lineup'] : ['poisson'];
+
+    const valueBets = [];
+    const minEdge = config.valueBet.minEdge;
+    const minProb = config.valueBet.minProb;
+    const minOdds = config.valueBet.minOdds;
+    const maxOdds = config.valueBet.maxOdds;
+
+    const tryAdd = (market, selection, trueProbPct, odd) => {
+      if (!odd || odd < minOdds || odd > maxOdds) return;
+      const impliedPct = oddsToImpliedProb(odd);
+      const edge = trueProbPct - impliedPct;
+      if (edge < minEdge) return;
+      if (trueProbPct < minProb) return;
+      valueBets.push({
+        market,
+        selection,
+        odd,
+        edge: parseFloat(edge.toFixed(2)),
+        trueProb: parseFloat(trueProbPct.toFixed(2)),
+        impliedProb: parseFloat(impliedPct.toFixed(2)),
+        isValue: true,
+        strength: edge >= config.analysis.strongValueThreshold ? 'strong' : 'moderate',
+        sources,
+      });
+    };
+
+    // O/U 2.5 — Poisson on (home_xG + away_xG)
+    const ou25 = oddsAnalysis?.goalsOverUnder?.lines?.['2.5'];
+    if (ou25?.over?.odd && ou25?.under?.odd) {
+      const lambda = xg.home + xg.away;
+      const pUnderOrEqual2 = poissonCDF(lambda, 2);
+      const pOver = (1 - pUnderOrEqual2) * 100;
+      const pUnder = pUnderOrEqual2 * 100;
+      tryAdd('O/U 2.5', 'Over 2.5', pOver, ou25.over.odd);
+      tryAdd('O/U 2.5', 'Under 2.5', pUnder, ou25.under.odd);
+    }
+
+    // BTTS — independent Poisson per team
+    const btts = oddsAnalysis?.btts;
+    if (btts?.odds?.yes && btts?.odds?.no) {
+      const pYes = bttsYesProbability(xg.home, xg.away) * 100;
+      const pNo = 100 - pYes;
+      tryAdd('BTTS', 'Oui', pYes, btts.odds.yes);
+      tryAdd('BTTS', 'Non', pNo, btts.odds.no);
+    }
+
+    return valueBets;
+  }
+
+  /**
+   * Cross-source enrichment: tags Shin value bets with sources=['shin'],
+   * runs Poisson detection, merges with same-selection Shin bets so users
+   * see WHICH model(s) detected each bet. Strong consensus = both Shin and
+   * Poisson agree → highest confidence signal.
+   */
+  enrichValueBetsWithSources(oddsAnalysis, predAnalysis) {
+    if (!oddsAnalysis) return;
+    const shinVBs = oddsAnalysis.valueBets || [];
+    const poissonVBs = this._detectPoissonValueBets(oddsAnalysis, predAnalysis);
+
+    poissonVBs.forEach((pvb) => {
+      const existing = shinVBs.find((s) => s.market === pvb.market && s.selection === pvb.selection);
+      if (existing) {
+        if (!existing.sources.includes('poisson')) existing.sources.push('poisson');
+        if (pvb.sources.includes('lineup') && !existing.sources.includes('lineup')) {
+          existing.sources.push('lineup');
+        }
+        // Use the higher edge between the two estimates so the user sees
+        // the strongest signal (often Poisson is higher when xG diverges
+        // from the bookie, which is the whole point of the cross-check).
+        if ((pvb.edge || 0) > (existing.edge || 0)) {
+          existing.edgePoisson = pvb.edge;
+          existing.trueProbPoisson = pvb.trueProb;
+        }
+      } else {
+        shinVBs.push(pvb);
+      }
+    });
+
+    oddsAnalysis.valueBets = shinVBs.sort((a, b) => (b.edge || 0) - (a.edge || 0));
   }
 
   _detectMarketAnomaly(markets) {

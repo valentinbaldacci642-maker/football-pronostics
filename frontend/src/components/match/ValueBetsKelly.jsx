@@ -3,6 +3,7 @@ import { Flame, AlertTriangle } from 'lucide-react';
 import { useBankrollStore, useHistoryStore } from '../../store';
 import { kellyStake } from '../../utils/kelly';
 import { formatStake } from '../../utils/formatStake';
+import ValueBetSources from './ValueBetSources';
 
 /**
  * Surfaces all detected value bets on a match with their Kelly stake in €.
@@ -54,7 +55,10 @@ export default function ValueBetsKelly({ valueBets }) {
                 +{vb.edge?.toFixed(1)}%
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-white/40 font-heading">{vb.market}</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-xs text-white/40 font-heading">{vb.market}</p>
+                  <ValueBetSources sources={vb.sources} />
+                </div>
                 <p className="text-sm font-heading font-bold text-white truncate">{vb.selection}</p>
               </div>
               <div className="text-right flex-shrink-0">
