@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Flame, RefreshCw, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Flame, RefreshCw, ChevronRight, AlertTriangle, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
 import { pronosticsApi } from '../services/api';
-import { useBankrollStore, useHistoryStore } from '../store';
+import { useBankrollStore, useHistoryStore, useFavoritesStore } from '../store';
 import { kellyStake } from '../utils/kelly';
 import { formatStake } from '../utils/formatStake';
 import { formatTime } from '../utils/format';
@@ -35,6 +35,7 @@ export default function ValueBets() {
 
   const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
   const { getBankrollStats, savePronostics } = useHistoryStore();
+  const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const _bk = getBankrollStats();
   const liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
 
@@ -249,6 +250,19 @@ export default function ValueBets() {
                       {formatTime(m.date)}
                     </span>
                   )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFav(m.fixtureId); }}
+                    className={clsx(
+                      'p-1 rounded-md transition-colors flex-shrink-0',
+                      isFavorite(m.fixtureId)
+                        ? 'text-gold-400 hover:text-gold-300'
+                        : 'text-white/25 hover:text-white/60'
+                    )}
+                    aria-label={isFavorite(m.fixtureId) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                  >
+                    <Star className="w-4 h-4" fill={isFavorite(m.fixtureId) ? 'currentColor' : 'none'} />
+                  </button>
                 </div>
 
                 {/* Teams */}

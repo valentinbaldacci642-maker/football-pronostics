@@ -23,11 +23,12 @@ export const useFavoritesStore = create(
     (set, get) => ({
       favorites: [],
       toggle: (fixtureId) => {
+        const fid = Number(fixtureId);
         const current = get().favorites;
-        const exists = current.includes(fixtureId);
-        set({ favorites: exists ? current.filter((id) => id !== fixtureId) : [...current, fixtureId] });
+        const exists = current.includes(fid);
+        set({ favorites: exists ? current.filter((id) => id !== fid) : [...current, fid] });
       },
-      isFavorite: (fixtureId) => get().favorites.includes(fixtureId),
+      isFavorite: (fixtureId) => get().favorites.includes(Number(fixtureId)),
       clear: () => set({ favorites: [] }),
     }),
     { name: 'pronostats-favorites' }
