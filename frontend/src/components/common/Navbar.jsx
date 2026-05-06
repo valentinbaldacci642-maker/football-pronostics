@@ -42,19 +42,24 @@ export default function Navbar() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 lg:left-64 z-40 h-14 flex items-center px-4 md:px-6 gap-4"
+    <header className="fixed top-0 left-0 right-0 lg:left-64 z-40 flex items-center px-3 md:px-6 gap-3"
       style={{
         background: '#050a12',
         borderBottom: '1px solid rgba(255,255,255,0.05)',
+        // Safe-area aware on Android/iOS so the bar never sits under the
+        // system status bar — adds the device inset on top of the regular
+        // 56px navbar height.
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        height: 'calc(56px + env(safe-area-inset-top, 0px))',
       }}
     >
       <Link to="/" className="flex items-center gap-2 lg:hidden flex-shrink-0">
         <img src="/ball.webp" alt="logo" className="w-7 h-7 rounded-lg object-cover" style={{ filter: 'drop-shadow(0 0 6px rgba(34,197,94,0.35))' }} />
-        <span className="font-display text-base text-white tracking-wider">PronosDesFoufous</span>
+        <span className="font-display text-base text-white tracking-wider hidden sm:inline">PronosDesFoufous</span>
       </Link>
 
-      {/* Search */}
-      <div className="flex-1 max-w-sm relative lg:ml-0">
+      {/* Search — min-w-0 so it shrinks before pushing the pill off-screen */}
+      <div className="flex-1 max-w-sm min-w-0 relative lg:ml-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
           {searching && (
@@ -92,21 +97,20 @@ export default function Navbar() {
       {showBankroll && (
         <Link
           to="/history"
-          className="ml-auto flex flex-col items-end justify-center px-3 py-1.5 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all flex-shrink-0 min-w-0"
+          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all flex-shrink-0"
           title={`Bankroll dispo${pendingCommitted > 0 ? ` · ${pendingCommitted.toFixed(2)} € en jeu` : ''}`}
         >
           <span className={clsx(
-            'font-display text-base sm:text-lg leading-none tracking-wider tabular-nums',
+            'font-display text-base leading-none tracking-wider tabular-nums',
             liveBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
           )}>
             {liveBankroll.toFixed(2)} €
           </span>
-          <span className="text-[10px] sm:text-xs text-white/45 font-heading leading-none mt-0.5 whitespace-nowrap">
-            Bankroll dispo
-            {pendingCommitted > 0 && (
-              <span className="text-gold-400/80 hidden sm:inline ml-1">· {pendingCommitted.toFixed(2)} € en jeu</span>
-            )}
-          </span>
+          {pendingCommitted > 0 && (
+            <span className="hidden sm:inline text-xs text-gold-400/80 font-mono leading-none whitespace-nowrap">
+              · {pendingCommitted.toFixed(2)} € en jeu
+            </span>
+          )}
         </Link>
       )}
     </header>

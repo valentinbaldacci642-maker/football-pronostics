@@ -79,7 +79,10 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         <Navbar />
         <RateLimitBanner />
-        <main className="flex-1 px-4 md:px-6 lg:px-8 pb-24 lg:pb-8 pt-20">
+        <main
+          className="flex-1 px-4 md:px-6 lg:px-8 pb-24 lg:pb-8"
+          style={{ paddingTop: 'calc(80px + env(safe-area-inset-top, 0px))' }}
+        >
           <AnimatePresence mode="wait" initial={false}>
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<PageTransition><Home /></PageTransition>} />
