@@ -494,6 +494,36 @@ export default function History() {
 
         return (
           <>
+            {/* Bankroll snapshot */}
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="glass-card px-3.5 py-3">
+                <p className={clsx(
+                  'stat-number text-xl leading-none',
+                  currentBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
+                )}>
+                  {currentBankroll.toFixed(2)} €
+                </p>
+                <p className="text-[11px] text-white/30 font-heading font-medium mt-0.5">Bankroll dispo</p>
+              </div>
+              <div className="glass-card px-3.5 py-3">
+                <p className="stat-number text-xl leading-none text-gold-400">
+                  {bkStats.pendingCommitted.toFixed(2)} €
+                </p>
+                <p className="text-[11px] text-white/30 font-heading font-medium mt-0.5">
+                  En jeu · {pending.length} pari{pending.length > 1 ? 's' : ''}
+                </p>
+              </div>
+              <div className="glass-card px-3.5 py-3">
+                <p className={clsx(
+                  'stat-number text-xl leading-none',
+                  bkStats.pnl >= 0 ? 'text-brand-400' : 'text-danger'
+                )}>
+                  {bkStats.pnl >= 0 ? '+' : ''}{bkStats.pnl.toFixed(2)} €
+                </p>
+                <p className="text-[11px] text-white/30 font-heading font-medium mt-0.5">P&L réglé</p>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={handleResolveNow}
@@ -506,9 +536,6 @@ export default function History() {
               {resolveMsg && (
                 <span className="text-xs text-white/50 font-heading">{resolveMsg}</span>
               )}
-              <span className="ml-auto text-xs text-white/40 font-heading">
-                {pending.length} pari{pending.length > 1 ? 's' : ''} · {bkStats.pendingCommitted.toFixed(2)} € engagés
-              </span>
             </div>
 
             {pending.length === 0 ? (
