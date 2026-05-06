@@ -72,7 +72,7 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto flex-shrink-0">
           <span className="text-sm text-white/45 font-heading">Ma cote:</span>
           <input
             type="number"
@@ -107,7 +107,7 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
           <Target className="w-3.5 h-3.5" />
           {parseFloat(miseInput) > 0 || parseFloat(savedMise) > 0 ? 'Pari enregistré' : 'Saisis ta mise'}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto flex-shrink-0">
           <span className="text-sm text-white/45 font-heading">Ma mise:</span>
           <input
             type="number"
