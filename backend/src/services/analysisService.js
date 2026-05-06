@@ -99,9 +99,18 @@ class AnalysisService {
     const drawProb = this._parsePercent(predictions?.percent?.draw);
     const awayWinProb = this._parsePercent(predictions?.percent?.away);
 
+    // Data quality checks:
+    //   - All 3 percent fields present (not null)
+    //   - Sum ≈ 100% (within 5pt slack)
+    //   - No issue at exactly 0 or 100 (indicates a stub / broken-data response)
+    //   - All in plausible 1X2 range [1, 99] — anything outside means small-league
+    //     data corruption from upstream, common on tier-3 / 4 competitions.
     const allPresent = homeWinProb !== null && drawProb !== null && awayWinProb !== null;
     const sum = (homeWinProb || 0) + (drawProb || 0) + (awayWinProb || 0);
-    const probabilitiesReliable = allPresent && Math.abs(sum - 100) <= 5;
+    const sumOk = allPresent && Math.abs(sum - 100) <= 5;
+    const noExtremes = allPresent &&
+      [homeWinProb, drawProb, awayWinProb].every((p) => p > 0 && p < 100);
+    const probabilitiesReliable = sumOk && noExtremes;
 
     const probabilities = probabilitiesReliable
       ? {
@@ -143,6 +152,22 @@ class AnalysisService {
     const awaySeason = this._extractSeasonGoals(teamStats?.away);
     let homeExpectedGoals = this._calcExpectedGoals(homeSeason, awaySeason, 'home');
     let awayExpectedGoals = this._calcExpectedGoals(awaySeason, homeSeason, 'away');
+
+    // Sanity guard: in tier-3 / 4 leagues with small samples, the venue-split
+    // xG calc can produce absurd numbers (e.g. 7.7 / 0.3 for one match in
+    // Mongolian Premier League). When xG goes beyond what real football
+    // produces (>5/team or >7 total) the data upstream is almost certainly
+    // corrupted, so we drop the xG entirely and let the user see no Poisson
+    // matrix rather than a misleading one.
+    const xgLooksCorrupt =
+      (homeExpectedGoals !== null && homeExpectedGoals > 5)
+      || (awayExpectedGoals !== null && awayExpectedGoals > 5)
+      || (homeExpectedGoals !== null && awayExpectedGoals !== null
+          && (homeExpectedGoals + awayExpectedGoals) > 7);
+    if (xgLooksCorrupt) {
+      homeExpectedGoals = null;
+      awayExpectedGoals = null;
+    }
 
     // Lineup-aware adjustment: if a top scorer is on the bench / out, scale that team's xG down
     const homePenalty = lineupContext?.home?.xgPenalty || 0;
@@ -574,13 +599,18 @@ class AnalysisService {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   _parseFormString(form) {
-    if (!form) return [];
-    return form.split('').map((c) => ({
-      result: c,
-      win: c === 'W',
-      draw: c === 'D',
-      loss: c === 'L',
-    }));
+    // API-Football sometimes returns the wrong field here (e.g. '73%' instead
+    // of 'WWLDW' for tier-3 leagues with poor data quality). Filter to keep
+    // only valid W/D/L characters; everything else is treated as missing.
+    if (!form || typeof form !== 'string') return [];
+    return form.split('')
+      .filter((c) => c === 'W' || c === 'D' || c === 'L')
+      .map((c) => ({
+        result: c,
+        win: c === 'W',
+        draw: c === 'D',
+        loss: c === 'L',
+      }));
   }
 
   _analyzeH2H(h2hFixtures) {

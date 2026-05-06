@@ -69,6 +69,15 @@ class PronosticsService {
         const { oddsAnalysis, predAnalysis } = result.value;
         if (!predAnalysis && !oddsAnalysis) return null;
 
+        // Drop matches whose upstream data is corrupted — common on tier-3 / 4
+        // small leagues (Mongolian Premier League, etc.) where the API returns
+        // 50/50/0 percent strings or 7.7-xG. Shin value bets might still be
+        // mathematically valid in those cases but the probability bar / xG
+        // matrix / form display are all broken, so showing the match misleads
+        // the user. Better to drop it entirely than half-display.
+        const predUnreliable = predAnalysis && predAnalysis.probabilitiesReliable === false;
+        if (predUnreliable) return null;
+
         const fixture = upcoming[i];
         const fullAnalysis = analysisService.buildFullAnalysis(oddsAnalysis, predAnalysis, fixture);
         const confidence = this._calculateConfidence(predAnalysis, oddsAnalysis);
