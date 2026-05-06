@@ -663,10 +663,10 @@ function BetCard({ bet }) {
             return (
               <div className="flex items-baseline gap-2 flex-wrap justify-end">
                 <span className="text-xs text-gold-400/70 font-mono">
-                  Gain potentiel: <span className="text-gold-400 font-semibold">+{potentialGain.toFixed(2)} €</span>
+                  Bénéfices potentiels: <span className="text-gold-400 font-semibold">+{potentialGain.toFixed(2)} €</span>
                 </span>
                 <span className="text-base font-display tracking-wider text-gold-400 bg-gold-400/15 px-2 py-0.5 rounded border border-gold-400/30">
-                  gain {potentialReturn.toFixed(2)} €
+                  gains potentiels {potentialReturn.toFixed(2)} €
                 </span>
               </div>
             );
