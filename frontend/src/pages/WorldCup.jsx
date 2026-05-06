@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Calendar, BarChart2, Clock, ChevronRight } from 'lucide-react';
 import { leaguesApi, fixturesApi } from '../services/api';
 import { ErrorState } from '../components/ui/Loading';
@@ -167,9 +167,15 @@ function FixtureRow({ fixture }) {
   const status = STATUS_LABELS[fix.status.short] || { label: fix.status.short, color: 'text-white/40' };
   const isLive = ['1H', 'HT', '2H', 'ET', 'BT'].includes(fix.status.short);
   const isFinished = fix.status.short === 'FT';
+  const navigate = useNavigate();
+
+  const onCardClick = () => navigate(`/match/${fix.id}`);
+  const stop = (e) => e.stopPropagation();
 
   return (
-    <Link to={`/match/${fix.id}`}>
+    // Whole card → match detail. Team areas (logo + name) → team page,
+    // via stopPropagation on the inner Link so the outer click doesn't fire.
+    <div onClick={onCardClick} className="cursor-pointer">
       <motion.div
         whileHover={{ x: 2 }}
         className="glass-card px-3 py-3 flex flex-col gap-2 hover:border-white/10 transition-all"
@@ -191,10 +197,14 @@ function FixtureRow({ fixture }) {
         {/* Match row: home — score — away */}
         <div className="flex items-center gap-2 min-w-0 w-full overflow-hidden">
           {/* Home */}
-          <div className="flex-1 flex items-center gap-2 justify-end min-w-0 overflow-hidden">
+          <Link
+            to={`/team/${teams.home.id}`}
+            onClick={stop}
+            className="flex-1 flex items-center gap-2 justify-end min-w-0 overflow-hidden hover:opacity-80 transition-opacity"
+          >
             <span className="text-sm font-semibold text-white/80 text-right truncate min-w-0 flex-1">{teams.home.name}</span>
             <img src={teams.home.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
-          </div>
+          </Link>
 
           {/* Score */}
           <div className="w-14 flex-shrink-0 flex items-center justify-center">
@@ -208,15 +218,19 @@ function FixtureRow({ fixture }) {
           </div>
 
           {/* Away */}
-          <div className="flex-1 flex items-center gap-2 min-w-0 overflow-hidden">
+          <Link
+            to={`/team/${teams.away.id}`}
+            onClick={stop}
+            className="flex-1 flex items-center gap-2 min-w-0 overflow-hidden hover:opacity-80 transition-opacity"
+          >
             <img src={teams.away.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
             <span className="text-sm font-semibold text-white/80 truncate min-w-0 flex-1">{teams.away.name}</span>
-          </div>
+          </Link>
 
           <ChevronRight className="w-4 h-4 text-white/20 flex-shrink-0" />
         </div>
       </motion.div>
-    </Link>
+    </div>
   );
 }
 
@@ -305,10 +319,13 @@ function ClassementsTab() {
                     <tr key={row.team.id} className={`border-b border-white/3 border-l-2 ${accentColor} hover:bg-white/3 transition-colors`}>
                       <td className="text-center py-3 text-white/40 text-xs font-medium tabular-nums">{row.rank}</td>
                       <td className="pl-2 py-3 overflow-hidden">
-                        <div className="flex items-center gap-2 min-w-0">
+                        <Link
+                          to={`/team/${row.team.id}`}
+                          className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity"
+                        >
                           <img src={row.team.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" onError={e => e.target.style.display='none'} />
                           <span className="font-medium text-white/90 truncate min-w-0 flex-1">{row.team.name}</span>
-                        </div>
+                        </Link>
                       </td>
                       <td className="text-center py-3 text-white/50 tabular-nums">{row.all.played}</td>
                       <td className="text-center py-3 text-green-400 tabular-nums">{row.all.win}</td>
