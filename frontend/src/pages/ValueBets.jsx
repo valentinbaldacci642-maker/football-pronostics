@@ -47,23 +47,23 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
   const saveOdd = () => { if (oddDirty) setBetActualOdd(fixtureId, betKey, oddInput); };
 
   return (
-    <div className="flex flex-col gap-1.5 pt-2 mt-1 border-t border-gold-500/15">
+    <div className="flex flex-col gap-2 pt-2.5 mt-1 border-t border-gold-500/15">
       {/* Step 1 — bookmaker odd (always visible, recomputes Kelly on change) */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {liveKellyStake > 0 ? (
-            <span className="text-[11px] text-gold-400/70 font-heading truncate">
+            <span className="text-sm text-gold-400/80 font-heading truncate">
               <span className="font-display tracking-wider text-gold-400">
                 Mise Kelly: {formatStake(liveKellyStake)}
               </span>
               {usingCustomOdd && liveEdge != null && (
-                <span className="text-white/40 ml-1.5">
+                <span className="text-white/45 ml-1.5">
                   · edge {liveEdge >= 0 ? '+' : ''}{liveEdge.toFixed(1)}% à @{effectiveOdd.toFixed(2)}
                 </span>
               )}
             </span>
           ) : (
-            <span className="text-[11px] text-white/25 font-heading">
+            <span className="text-sm text-white/35 font-heading">
               {liveBankroll <= 0
                 ? 'Définir bankroll pour voir Kelly'
                 : usingCustomOdd
@@ -72,8 +72,8 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-white/30 font-heading">Ma cote:</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-white/45 font-heading">Ma cote:</span>
           <input
             type="number"
             min="1"
@@ -83,32 +83,32 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
             onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveOdd(); } }}
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+            className="w-20 bg-dark-800 border border-white/10 rounded-md px-2 py-1 text-sm text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
           />
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveOdd(); }}
             disabled={!oddDirty}
             className={clsx(
-              'flex items-center justify-center w-6 h-6 rounded-md border transition-all',
+              'flex items-center justify-center w-7 h-7 rounded-md border transition-all',
               oddDirty
                 ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
                 : 'border-white/[0.05] text-white/15 cursor-not-allowed'
             )}
             title="Enregistrer la cote"
           >
-            <Save className="w-3 h-3" />
+            <Save className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Step 2 — actual stake */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="flex items-center gap-1 text-[11px] font-heading text-brand-400/80">
-          <Target className="w-3 h-3" />
+        <span className="flex items-center gap-1.5 text-sm font-heading text-brand-400/90">
+          <Target className="w-3.5 h-3.5" />
           {parseFloat(miseInput) > 0 || parseFloat(savedMise) > 0 ? 'Pari enregistré' : 'Saisis ta mise'}
         </span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-white/30 font-heading">Ma mise:</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-white/45 font-heading">Ma mise:</span>
           <input
             type="number"
             min="0"
@@ -118,21 +118,21 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
             onChange={(e) => { e.stopPropagation(); setMiseInput(e.target.value); }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveMise(); } }}
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+            className="w-20 bg-dark-800 border border-white/10 rounded-md px-2 py-1 text-sm text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
           />
-          <span className="text-[11px] text-white/30">€</span>
+          <span className="text-sm text-white/45">€</span>
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveMise(); }}
             disabled={!miseDirty}
             className={clsx(
-              'flex items-center justify-center w-6 h-6 rounded-md border transition-all',
+              'flex items-center justify-center w-7 h-7 rounded-md border transition-all',
               miseDirty
                 ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
                 : 'border-white/[0.05] text-white/15 cursor-not-allowed'
             )}
             title="Enregistrer la mise"
           >
-            <Save className="w-3 h-3" />
+            <Save className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -398,12 +398,12 @@ export default function ValueBets() {
                   {m.league?.logo && (
                     <img src={m.league.logo} alt="" className="w-4 h-4 object-contain opacity-60 flex-shrink-0" />
                   )}
-                  <span className="text-xs text-white/35 font-heading truncate">{m.league?.name}</span>
-                  <span className="text-[10px] text-gold-400/80 font-mono ml-auto">
+                  <span className="text-sm text-white/45 font-heading truncate">{m.league?.name}</span>
+                  <span className="text-xs text-gold-400/80 font-mono ml-auto">
                     {m.valueBets.length} value bet{m.valueBets.length > 1 ? 's' : ''}
                   </span>
                   {m.date && (
-                    <span className="text-xs font-mono text-white/30">
+                    <span className="text-sm font-mono text-white/40">
                       {formatTime(m.date)}
                     </span>
                   )}
@@ -425,13 +425,13 @@ export default function ValueBets() {
                 {/* Teams */}
                 <div className="flex items-center gap-2">
                   {m.home?.logo && (
-                    <img src={m.home.logo} alt={m.home?.name} className="w-5 h-5 object-contain flex-shrink-0" />
+                    <img src={m.home.logo} alt={m.home?.name} className="w-6 h-6 object-contain flex-shrink-0" />
                   )}
-                  <span className="text-sm font-heading font-bold text-white truncate flex-1">{m.home?.name}</span>
-                  <span className="matchup-vs text-xs flex-shrink-0">VS</span>
-                  <span className="text-sm font-heading font-bold text-white truncate flex-1 text-right">{m.away?.name}</span>
+                  <span className="text-base font-heading font-bold text-white truncate flex-1">{m.home?.name}</span>
+                  <span className="matchup-vs text-sm flex-shrink-0">VS</span>
+                  <span className="text-base font-heading font-bold text-white truncate flex-1 text-right">{m.away?.name}</span>
                   {m.away?.logo && (
-                    <img src={m.away.logo} alt={m.away?.name} className="w-5 h-5 object-contain flex-shrink-0" />
+                    <img src={m.away.logo} alt={m.away?.name} className="w-6 h-6 object-contain flex-shrink-0" />
                   )}
                 </div>
 
@@ -443,34 +443,34 @@ export default function ValueBets() {
                       className="px-3 py-2.5 rounded-lg bg-gold-500/[0.08] border border-gold-500/30 space-y-2"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-display tracking-wider text-gold-400 bg-gold-400/10 px-2 py-0.5 rounded leading-none">
+                        <span className="text-base font-display tracking-wider text-gold-400 bg-gold-400/10 px-2 py-0.5 rounded leading-none">
                           +{vb.edge?.toFixed(1)}%
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="text-[10px] text-white/40 font-heading uppercase tracking-wider">{vb.market}</p>
+                            <p className="text-xs text-white/50 font-heading uppercase tracking-wider">{vb.market}</p>
                             <ValueBetSources sources={vb.sources} />
                           </div>
-                          <p className="text-sm font-heading font-bold text-white truncate">{vb.selection}</p>
+                          <p className="text-base font-heading font-bold text-white truncate">{vb.selection}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="text-base font-display tracking-wider text-gold-400">@{vb.odd?.toFixed(2)}</p>
+                          <p className="text-lg font-display tracking-wider text-gold-400">@{vb.odd?.toFixed(2)}</p>
                           {vb.stake > 0 ? (
-                            <p className="text-xs text-gold-400/90 font-display tracking-wider mt-0.5">
+                            <p className="text-sm text-gold-400/90 font-display tracking-wider mt-0.5">
                               Mise: {formatStake(vb.stake)}
                             </p>
                           ) : (
-                            <p className="text-[10px] text-white/30 font-heading mt-0.5">{liveBankroll <= 0 ? 'Définir bankroll' : '—'}</p>
+                            <p className="text-xs text-white/30 font-heading mt-0.5">{liveBankroll <= 0 ? 'Définir bankroll' : '—'}</p>
                           )}
                         </div>
                       </div>
                       {/* Edge explanation per source */}
-                      <p className="text-[10px] text-white/40 font-heading leading-snug pt-1.5 border-t border-gold-500/15">
-                        <span className="text-gold-400/70">Edge +{vb.edge?.toFixed(1)}%</span> :
+                      <p className="text-xs text-white/55 font-heading leading-relaxed pt-1.5 border-t border-gold-500/15">
+                        <span className="text-gold-400/80 font-semibold">Edge +{vb.edge?.toFixed(1)}%</span> :
                         notre modèle estime ce pari à {vb.prob?.toFixed(1)}% contre
                         {' '}{(100 / vb.odd).toFixed(1)}% implicite par la cote {vb.odd?.toFixed(2)}.
                         {vb.edgePoisson != null && (
-                          <span className="text-purple-300/80">
+                          <span className="text-purple-300/90">
                             {' · '}Poisson confirme à +{vb.edgePoisson.toFixed(1)}% ({vb.trueProbPoisson?.toFixed(1)}%).
                           </span>
                         )}
