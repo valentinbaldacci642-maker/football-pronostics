@@ -473,6 +473,8 @@ export default function Home() {
   const isLowConfidenceFallback = pronostics.length > 0 && pronostics.every((p) => p.confidence < 45);
   const bankroll = useBankrollStore((s) => s.initialBankroll);
   const showLowBankrollHint = bankroll > 0 && bankroll < 50;
+  const bkStats = useHistoryStore((s) => s.getBankrollStats());
+  const liveBankroll = bankroll + (bkStats.pnl || 0) - (bkStats.pendingCommitted || 0);
 
   return (
     <div className="space-y-6 max-w-4xl xl:max-w-6xl mx-auto">
@@ -488,6 +490,26 @@ export default function Home() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {bankroll > 0 && (
+            <Link
+              to="/history"
+              className="px-3 py-2 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all text-right"
+              title="Bankroll dispo · cliquer pour gérer"
+            >
+              <p className={clsx(
+                'font-display text-lg leading-none tracking-wider',
+                liveBankroll >= bankroll ? 'text-brand-400' : 'text-danger'
+              )}>
+                {liveBankroll.toFixed(2)} €
+              </p>
+              <p className="text-[10px] text-white/30 font-mono mt-0.5">
+                Bankroll dispo
+                {bkStats.pendingCommitted > 0 && (
+                  <span className="text-gold-400/70"> · {bkStats.pendingCommitted.toFixed(2)}€ en jeu</span>
+                )}
+              </p>
+            </Link>
+          )}
           {histStats.settled > 0 && (
             <Link
               to="/history"
