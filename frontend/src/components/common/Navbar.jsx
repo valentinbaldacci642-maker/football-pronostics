@@ -9,6 +9,7 @@ export default function Navbar() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const navigate = useNavigate();
 
   // Live bankroll: only displayed when the user has explicitly set an initial
@@ -53,13 +54,24 @@ export default function Navbar() {
         height: 'calc(56px + env(safe-area-inset-top, 0px))',
       }}
     >
-      <Link to="/" className="flex items-center gap-2 lg:hidden flex-shrink-0">
+      <Link
+        to="/"
+        className={clsx(
+          'items-center gap-2 lg:hidden flex-shrink-0',
+          searchFocused ? 'hidden' : 'flex'
+        )}
+      >
         <img src="/ball.webp" alt="logo" className="w-7 h-7 rounded-lg object-cover" style={{ filter: 'drop-shadow(0 0 6px rgba(34,197,94,0.35))' }} />
         <span className="font-display text-base text-white tracking-wider hidden sm:inline">PronosDesFoufous</span>
       </Link>
 
-      {/* Search — min-w-0 so it shrinks before pushing the pill off-screen */}
-      <div className="flex-1 max-w-sm min-w-0 relative lg:ml-0">
+      {/* Search — when focused, claims the full row so the placeholder
+          'Chercher une équipe...' is fully visible. Logo + bankroll pill
+          are hidden during focus on mobile. */}
+      <div className={clsx(
+        'flex-1 min-w-0 relative lg:ml-0',
+        searchFocused ? 'lg:max-w-sm' : 'max-w-sm'
+      )}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
           {searching && (
@@ -69,6 +81,8 @@ export default function Navbar() {
             type="text"
             value={query}
             onChange={handleSearch}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             placeholder="Chercher une équipe..."
             className="w-full bg-dark-700 border border-white/[0.07] rounded-xl pl-9 pr-9 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-brand-500/40 transition-all duration-200 font-heading"
           />
@@ -93,11 +107,15 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Live bankroll pill — only when an initial bankroll is set (> 0) */}
+      {/* Live bankroll pill — only when an initial bankroll is set (> 0).
+          Hidden during search focus on mobile so the input gets full row. */}
       {showBankroll && (
         <Link
           to="/history"
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all flex-shrink-0"
+          className={clsx(
+            'ml-auto items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all flex-shrink-0',
+            searchFocused ? 'hidden lg:flex' : 'flex'
+          )}
           title={`Bankroll dispo${pendingCommitted > 0 ? ` · ${pendingCommitted.toFixed(2)} € en jeu` : ''}`}
         >
           <span className={clsx(
