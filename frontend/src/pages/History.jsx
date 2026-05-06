@@ -293,9 +293,9 @@ export default function History() {
                   'text-2xl font-display tracking-wider',
                   currentBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
                 )}>
-                  {currentBankroll.toFixed(0)} €
+                  {currentBankroll.toFixed(2)} €
                   <span className="text-xs text-white/30 ml-2 font-mono">
-                    ({bkStats.pnl >= 0 ? '+' : ''}{bkStats.pnl.toFixed(0)}€)
+                    ({bkStats.pnl >= 0 ? '+' : ''}{bkStats.pnl.toFixed(2)}€)
                   </span>
                 </span>
               </div>
@@ -305,7 +305,7 @@ export default function History() {
                     En jeu (paris en attente · {bkStats.pendingCount})
                   </span>
                   <span className="text-gold-400/80 font-mono">
-                    {bkStats.pendingCommitted.toFixed(0)} €
+                    {bkStats.pendingCommitted.toFixed(2)} €
                   </span>
                 </div>
               )}
@@ -333,9 +333,9 @@ export default function History() {
           {/* Bankroll stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {[
-              { label: 'Total misé', value: bkStats.totalMise > 0 ? `${bkStats.totalMise.toFixed(0)}€` : '—', color: 'text-white' },
-              { label: 'Retour', value: bkStats.totalReturn > 0 ? `${bkStats.totalReturn.toFixed(0)}€` : '—', color: 'text-white' },
-              { label: 'P&L', value: bkStats.count > 0 ? `${bkStats.pnl >= 0 ? '+' : ''}${bkStats.pnl.toFixed(1)}€` : '—', color: bkStats.pnl >= 0 ? 'text-brand-400' : 'text-danger' },
+              { label: 'Total misé', value: bkStats.totalMise > 0 ? `${bkStats.totalMise.toFixed(2)}€` : '—', color: 'text-white' },
+              { label: 'Retour', value: bkStats.totalReturn > 0 ? `${bkStats.totalReturn.toFixed(2)}€` : '—', color: 'text-white' },
+              { label: 'P&L', value: bkStats.count > 0 ? `${bkStats.pnl >= 0 ? '+' : ''}${bkStats.pnl.toFixed(2)}€` : '—', color: bkStats.pnl >= 0 ? 'text-brand-400' : 'text-danger' },
               { label: 'ROI réel', value: bkStats.roi !== null ? `${bkStats.roi >= 0 ? '+' : ''}${bkStats.roi}%` : '—', color: bkStats.roi >= 0 ? 'text-brand-400' : 'text-danger' },
             ].map(({ label, value, color }) => (
               <div key={label} className="glass-card px-3.5 py-3">

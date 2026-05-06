@@ -387,16 +387,16 @@ export default function Analytics() {
               <div className="pt-3 border-t border-white/[0.05] grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <p className="text-xs text-white/30 font-heading">Misé total</p>
-                  <p className="text-sm font-bold text-white/60 tabular-nums">{bkStats.totalMise.toFixed(0)}€</p>
+                  <p className="text-sm font-bold text-white/60 tabular-nums">{bkStats.totalMise.toFixed(2)}€</p>
                 </div>
                 <div>
                   <p className="text-xs text-white/30 font-heading">Retour total</p>
-                  <p className="text-sm font-bold text-white/60 tabular-nums">{bkStats.totalReturn.toFixed(0)}€</p>
+                  <p className="text-sm font-bold text-white/60 tabular-nums">{bkStats.totalReturn.toFixed(2)}€</p>
                 </div>
                 <div>
                   <p className="text-xs text-white/30 font-heading">P&L réel</p>
                   <p className={`text-sm font-bold tabular-nums ${bkStats.pnl >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
-                    {bkStats.pnl >= 0 ? '+' : ''}{bkStats.pnl.toFixed(1)}€
+                    {bkStats.pnl >= 0 ? '+' : ''}{bkStats.pnl.toFixed(2)}€
                   </p>
                 </div>
                 <div>
