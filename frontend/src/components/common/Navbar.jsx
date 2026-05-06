@@ -1,13 +1,28 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
+import clsx from 'clsx';
 import { teamsApi } from '../../services/api';
+import { useBankrollStore, useHistoryStore } from '../../store';
 
 export default function Navbar() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const navigate = useNavigate();
+
+  // Live bankroll: only displayed when the user has explicitly set an initial
+  // bankroll (> 0). After a reset, it's hidden everywhere.
+  const initialBankroll = useBankrollStore((s) => s.initialBankroll);
+  const entries = useHistoryStore((s) => s.entries);
+  const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
+  const showBankroll = initialBankroll > 0;
+  let liveBankroll = 0, pendingCommitted = 0;
+  if (showBankroll) {
+    const _bk = getBankrollStats();
+    liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
+    pendingCommitted = _bk.pendingCommitted || 0;
+  }
 
   const handleSearch = async (e) => {
     const val = e.target.value;
@@ -70,6 +85,28 @@ export default function Navbar() {
           </div>
         )}
       </div>
+
+      {/* Live bankroll pill — only when an initial bankroll is set (> 0) */}
+      {showBankroll && (
+        <Link
+          to="/history"
+          className="ml-auto px-3 py-1.5 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all text-right flex-shrink-0"
+          title="Bankroll dispo · cliquer pour gérer"
+        >
+          <p className={clsx(
+            'font-display text-base leading-none tracking-wider',
+            liveBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
+          )}>
+            {liveBankroll.toFixed(2)} €
+          </p>
+          <p className="text-[9px] text-white/30 font-mono mt-0.5 leading-none">
+            Bankroll dispo
+            {pendingCommitted > 0 && (
+              <span className="text-gold-400/70"> · {pendingCommitted.toFixed(2)}€ en jeu</span>
+            )}
+          </p>
+        </Link>
+      )}
     </header>
   );
 }

@@ -251,36 +251,14 @@ export default function ValueBets() {
             {' · '}Tous les paris où Kelly s'active (edge ≥ 5%)
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {initialBankroll > 0 && (
-            <Link
-              to="/history"
-              className="px-3 py-2 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all text-right"
-              title="Bankroll dispo · cliquer pour gérer"
-            >
-              <p className={clsx(
-                'font-display text-lg leading-none tracking-wider',
-                liveBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
-              )}>
-                {liveBankroll.toFixed(2)} €
-              </p>
-              <p className="text-[10px] text-white/30 font-mono mt-0.5">
-                Bankroll dispo
-                {_bk.pendingCommitted > 0 && (
-                  <span className="text-gold-400/70"> · {_bk.pendingCommitted.toFixed(2)}€ en jeu</span>
-                )}
-              </p>
-            </Link>
-          )}
-          <button
-            onClick={() => load({ force: true })}
-            disabled={loading}
-            className="btn-ghost !px-2.5 !py-2 flex items-center gap-2"
-          >
-            <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} />
-            <span className="text-xs hidden sm:block font-heading font-semibold tracking-wide">Actualiser</span>
-          </button>
-        </div>
+        <button
+          onClick={() => load({ force: true })}
+          disabled={loading}
+          className="btn-ghost !px-2.5 !py-2 flex items-center gap-2"
+        >
+          <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} />
+          <span className="text-xs hidden sm:block font-heading font-semibold tracking-wide">Actualiser</span>
+        </button>
       </div>
 
       {/* Note: les value bets sont dynamiques */}
