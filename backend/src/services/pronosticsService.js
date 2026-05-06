@@ -39,19 +39,23 @@ class PronosticsService {
 
     if (upcoming.length === 0) return [];
 
-    // Fetch predictions + odds for all selected fixtures. BATCHED to stay
-    // under API-Football Pro plan's 300 req/min = 5 req/sec average limit.
-    // Each fixture = 2 API calls (odds + predictions).
-    // Config: 2 fixtures × 2 calls per 800ms → ~5 req/sec sustained, leaves
-    // room for concurrent user-triggered calls (team page, match detail) on
-    // top of pronos fetching without tripping the rate limit.
-    const BATCH_SIZE = 2;
-    const BATCH_DELAY_MS = 800;
+    // Fetch predictions + odds + team stats for all selected fixtures.
+    // 'full' mode (each fixture = 6 API calls: odds, predictions, home stats,
+    // away stats, lineups, top scorers) is now used for the pronos list so
+    // Poisson + Lineup detection sources are exposed on the home Top 10 too,
+    // not only on the per-match detail page.
+    //
+    // Throttle: batch 1 × 1200ms → ~5 req/sec sustained on Pro plan
+    // (300 req/min limit). For 10 fixtures × 6 calls = 60 calls, total fetch
+    // is ~12-15 s — slow on cold cache but the 3 h cache absorbs subsequent
+    // reads to instant.
+    const BATCH_SIZE = 1;
+    const BATCH_DELAY_MS = 1200;
     const analyses = [];
     for (let i = 0; i < upcoming.length; i += BATCH_SIZE) {
       const batch = upcoming.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.allSettled(
-        batch.map((f) => this._fetchAnalysis(f))
+        batch.map((f) => this._fetchAnalysis(f, { full: true }))
       );
       analyses.push(...batchResults);
       if (i + BATCH_SIZE < upcoming.length) {
