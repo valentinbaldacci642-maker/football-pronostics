@@ -85,7 +85,7 @@ function CalendrierTab() {
       setLoading(true);
       setError(null);
       try {
-        const data = await fixturesApi.getByDate(null, WC_LEAGUE);
+        const data = await fixturesApi.getByLeagueSeason(WC_LEAGUE, WC_SEASON);
         setFixtures(data?.response || []);
       } catch (err) {
         setError(err.message);
