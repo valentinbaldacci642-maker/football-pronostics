@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Flame, RefreshCw, ChevronRight, AlertTriangle, Star } from 'lucide-react';
+import { Flame, RefreshCw, ChevronRight, AlertTriangle, Star, Save, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -11,6 +11,109 @@ import { kellyStake } from '../utils/kelly';
 import { formatStake } from '../utils/formatStake';
 import { formatTime } from '../utils/format';
 import ValueBetSources from '../components/match/ValueBetSources';
+
+function MiseAndOddInputs({ fixtureId, topVB, suggestedStake, liveBankroll }) {
+  const { setMise, setActualOdd, entries } = useHistoryStore();
+  const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
+  const savedMise = existingEntry?.mise != null ? String(existingEntry.mise) : '';
+  const savedOdd = existingEntry?.actualOdd != null ? String(existingEntry.actualOdd) : '';
+  const [miseInput, setMiseInput] = useState(savedMise);
+  const [oddInput, setOddInput] = useState(savedOdd);
+
+  const hasMise = parseFloat(miseInput) > 0 || parseFloat(savedMise) > 0;
+  const miseDirty = miseInput !== savedMise;
+  const oddDirty = oddInput !== savedOdd;
+
+  const saveMise = () => { if (miseDirty) setMise(fixtureId, miseInput); };
+  const saveOdd = () => { if (oddDirty) setActualOdd(fixtureId, oddInput); };
+
+  return (
+    <div className="flex flex-col gap-1.5 pt-2 border-t border-gold-500/15">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {suggestedStake > 0 ? (
+            <span className="text-[11px] text-gold-400/70 font-heading">
+              <span className="font-display tracking-wider text-gold-400">
+                Mise: {formatStake(suggestedStake)}
+              </span>
+              <span className="text-white/40 ml-1.5">
+                sur {topVB.market} · {topVB.selection} (+{topVB.edge?.toFixed(1)}%)
+              </span>
+            </span>
+          ) : (
+            <span className="text-[11px] text-white/25 font-heading whitespace-nowrap">
+              {liveBankroll <= 0 ? 'Définir bankroll pour voir Kelly' : 'Kelly inactif'}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-white/30 font-heading">Ma mise:</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            placeholder="—"
+            value={miseInput}
+            onChange={(e) => { e.stopPropagation(); setMiseInput(e.target.value); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveMise(); } }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+          />
+          <span className="text-[11px] text-white/30">€</span>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveMise(); }}
+            disabled={!miseDirty}
+            className={clsx(
+              'flex items-center justify-center w-6 h-6 rounded-md border transition-all',
+              miseDirty
+                ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
+                : 'border-white/[0.05] text-white/15 cursor-not-allowed'
+            )}
+            title="Enregistrer la mise"
+          >
+            <Save className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+
+      {hasMise && (
+        <div className="flex items-center justify-between gap-1.5">
+          <span className="flex items-center gap-1 text-[11px] font-heading text-brand-400/80">
+            <Target className="w-3 h-3" />
+            Pari enregistré dans Historique pronos
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-white/30 font-heading">Ma cote:</span>
+            <input
+              type="number"
+              min="1"
+              step="0.01"
+              placeholder={topVB.odd?.toFixed(2)}
+              value={oddInput}
+              onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveOdd(); } }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+            />
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveOdd(); }}
+              disabled={!oddDirty}
+              className={clsx(
+                'flex items-center justify-center w-6 h-6 rounded-md border transition-all',
+                oddDirty
+                  ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
+                  : 'border-white/[0.05] text-white/15 cursor-not-allowed'
+              )}
+              title="Enregistrer la cote"
+            >
+              <Save className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function buildDayOptions() {
   return [0, 1, 2, 3].map((offset) => {
@@ -277,6 +380,14 @@ export default function ValueBets() {
                     <img src={m.away.logo} alt={m.away?.name} className="w-5 h-5 object-contain flex-shrink-0" />
                   )}
                 </div>
+
+                {/* Mise + cote inputs (apply to top-edge VB on this match) */}
+                <MiseAndOddInputs
+                  fixtureId={m.fixtureId}
+                  topVB={m.valueBets[0]}
+                  suggestedStake={m.valueBets[0]?.stake || 0}
+                  liveBankroll={liveBankroll}
+                />
 
                 {/* Stack of value bets on this match */}
                 <div className="space-y-2">
