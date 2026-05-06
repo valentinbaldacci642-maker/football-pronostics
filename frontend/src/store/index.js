@@ -1,6 +1,58 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+/**
+ * Grade a single bet against a final score. Returns 'win' | 'loss' | 'push'
+ * or null when we don't know how to grade the selection (so we don't mark
+ * an unresolved bet as a loss by mistake).
+ *
+ * Selection formats supported:
+ *   1X2: '1', 'X' (or 'x'), '2', 'home', 'draw', 'away'
+ *   O/U: 'Over 2.5', 'Under 1.5', etc.
+ *   BTTS: 'Oui', 'Non', 'yes', 'no'
+ */
+function gradeBet(market, selection, homeGoals, awayGoals) {
+  const sel = (selection || '').trim().toLowerCase();
+  if (!sel) return null;
+  const total = homeGoals + awayGoals;
+  const m = (market || '').toLowerCase();
+
+  // 1X2
+  if (sel === '1' || sel === 'home' || (m === '1x2' && sel === 'home')) {
+    return homeGoals > awayGoals ? 'win' : 'loss';
+  }
+  if (sel === 'x' || sel === 'draw') {
+    return homeGoals === awayGoals ? 'win' : 'loss';
+  }
+  if (sel === '2' || sel === 'away') {
+    return awayGoals > homeGoals ? 'win' : 'loss';
+  }
+
+  // Over/Under (e.g. 'Over 2.5', 'Under 1.5')
+  if (sel.startsWith('over')) {
+    const line = parseFloat(sel.replace(/[^0-9.]/g, ''));
+    if (Number.isFinite(line)) {
+      if (total > line) return 'win';
+      if (total === line) return 'push';
+      return 'loss';
+    }
+  }
+  if (sel.startsWith('under')) {
+    const line = parseFloat(sel.replace(/[^0-9.]/g, ''));
+    if (Number.isFinite(line)) {
+      if (total < line) return 'win';
+      if (total === line) return 'push';
+      return 'loss';
+    }
+  }
+
+  // BTTS
+  if (sel === 'oui' || sel === 'yes') return (homeGoals > 0 && awayGoals > 0) ? 'win' : 'loss';
+  if (sel === 'non' || sel === 'no')  return (homeGoals === 0 || awayGoals === 0) ? 'win' : 'loss';
+
+  return null;
+}
+
 export const useFixturesStore = create((set, get) => ({
   fixtures: [],
   liveFixtures: [],
@@ -172,15 +224,36 @@ export const useHistoryStore = create(
 
       resolveResult: (fixtureId, homeGoals, awayGoals) => set((s) => ({
         entries: s.entries.map((e) => {
-          if (e.fixtureId !== fixtureId || e.result) return e;
-          const pick = (e.pick || '').toLowerCase();
-          let result = 'loss';
-          if (pick === 'home' && homeGoals > awayGoals) result = 'win';
-          else if (pick === 'draw' && homeGoals === awayGoals) result = 'win';
-          else if (pick === 'away' && awayGoals > homeGoals) result = 'win';
-          else if (pick.includes('over') && (homeGoals + awayGoals) > parseFloat(pick.replace(/[^0-9.]/g, ''))) result = 'win';
-          else if (pick.includes('under') && (homeGoals + awayGoals) < parseFloat(pick.replace(/[^0-9.]/g, ''))) result = 'win';
-          return { ...e, result, finalScore: `${homeGoals}-${awayGoals}` };
+          if (e.fixtureId !== fixtureId) return e;
+          let next = e;
+
+          // Entry-level pick (the "main" prono on the Pronos page)
+          if (!e.result) {
+            const graded = gradeBet(null, e.pick, homeGoals, awayGoals);
+            if (graded) {
+              next = { ...next, result: graded, finalScore: `${homeGoals}-${awayGoals}` };
+            }
+          }
+
+          // Per-VB stakes (the value bets staked on /value-bets)
+          if (e.bets) {
+            let bets = e.bets;
+            let changed = false;
+            for (const [betKey, bet] of Object.entries(e.bets)) {
+              if (bet.result) continue;
+              const [market, selection] = betKey.split('::');
+              const graded = gradeBet(market, selection, homeGoals, awayGoals);
+              if (graded) {
+                bets = { ...bets, [betKey]: { ...bet, result: graded } };
+                changed = true;
+              }
+            }
+            if (changed) {
+              next = { ...next, bets, finalScore: next.finalScore || `${homeGoals}-${awayGoals}` };
+            }
+          }
+
+          return next;
         }),
       })),
 
@@ -256,33 +329,56 @@ export const useHistoryStore = create(
 
       getBankrollStats: () => {
         const all = get().entries;
-        const sumPerBetMise = (e) =>
-          Object.values(e.bets || {}).reduce(
-            (s, b) => s + (Number.isFinite(b.mise) && b.mise > 0 ? b.mise : 0),
-            0,
-          );
-        const hasAnyMise = (e) => (e.mise > 0) || sumPerBetMise(e) > 0;
-        const bets = all.filter(hasAnyMise);
-        const settled = bets.filter((e) => e.result);
-        const pending = bets.filter((e) => !e.result);
 
-        // Settlement: only the entry-level mise resolves with the match result.
-        // Per-bet stakes (bets[betKey]) are still counted as pending committed
-        // cash until settlement is implemented per-market.
-        const totalMise = settled.reduce((s, e) => s + (e.mise || 0), 0);
-        const totalReturn = settled.reduce((s, e) => {
-          if (e.result === 'win') return s + (e.mise || 0) * parseFloat(e.actualOdd || e.odd || 1);
-          return s;
-        }, 0);
+        // Walk each entry and accumulate stats over the entry-level pick AND
+        // every per-bet stake. A pending bet is one with a mise > 0 and no
+        // result yet — its stake counts as "cash committed at the bookie".
+        let totalMise = 0;
+        let totalReturn = 0;
+        let pendingCommitted = 0;
+        let settledCount = 0;
+        let pendingCount = 0;
+
+        for (const e of all) {
+          // Entry-level
+          if (Number.isFinite(e.mise) && e.mise > 0) {
+            if (e.result === 'win') {
+              totalMise += e.mise;
+              totalReturn += e.mise * parseFloat(e.actualOdd || e.odd || 1);
+              settledCount++;
+            } else if (e.result === 'loss') {
+              totalMise += e.mise;
+              settledCount++;
+            } else if (e.result === 'push') {
+              totalMise += e.mise;
+              totalReturn += e.mise; // stake returned
+              settledCount++;
+            } else {
+              pendingCommitted += e.mise;
+              pendingCount++;
+            }
+          }
+          // Per-bet stakes
+          for (const bet of Object.values(e.bets || {})) {
+            if (!Number.isFinite(bet.mise) || bet.mise <= 0) continue;
+            if (bet.result === 'win') {
+              totalMise += bet.mise;
+              totalReturn += bet.mise * parseFloat(bet.actualOdd || 1);
+              settledCount++;
+            } else if (bet.result === 'loss') {
+              totalMise += bet.mise;
+              settledCount++;
+            } else if (bet.result === 'push') {
+              totalMise += bet.mise;
+              totalReturn += bet.mise;
+              settledCount++;
+            } else {
+              pendingCommitted += bet.mise;
+              pendingCount++;
+            }
+          }
+        }
         const pnl = totalReturn - totalMise;
-
-        // Cash committed: entry-level pending mise + ALL per-bet stakes
-        // (entry-level settled per-bets remain "in the wild" but we don't
-        // know their outcome yet).
-        const pendingCommitted =
-          pending.reduce((s, e) => s + (e.mise || 0), 0)
-          + all.reduce((s, e) => s + sumPerBetMise(e), 0);
-        const pendingCount = pending.length;
 
         const roi = totalMise > 0 ? parseFloat((pnl / totalMise * 100).toFixed(1)) : null;
         return {
@@ -290,7 +386,7 @@ export const useHistoryStore = create(
           totalReturn,
           pnl,
           roi,
-          count: settled.length,
+          count: settledCount,
           pendingCommitted,
           pendingCount,
         };

@@ -12,8 +12,67 @@ import clsx from 'clsx';
 const RESULT_CONFIG = {
   win:  { label: 'Gagné',    color: 'text-brand-400', bg: 'bg-brand-500/15 border-brand-500/30', icon: Check },
   loss: { label: 'Perdu',    color: 'text-danger',    bg: 'bg-danger/15 border-danger/30',       icon: X },
+  push: { label: 'Remboursé',color: 'text-white/50',  bg: 'bg-white/[0.06] border-white/15',     icon: Clock },
   null: { label: 'En cours', color: 'text-white/30',  bg: 'bg-white/5 border-white/10',          icon: Clock },
 };
+
+/**
+ * Flatten entries into a unified bet list:
+ *   - One item per entry-level mise > 0 (the main pronos pick)
+ *   - One item per per-VB mise > 0 (individual value bets staked on /value-bets)
+ *
+ * Decoupled from /value-bets API state — once saved, a bet stays here even
+ * if its underlying value bet disappears from the live list (edge dropped).
+ */
+function flattenBets(entries) {
+  const list = [];
+  for (const e of entries) {
+    if (Number.isFinite(e.mise) && e.mise > 0) {
+      list.push({
+        key: `${e.fixtureId}::main`,
+        fixtureId: e.fixtureId,
+        homeTeam: e.homeTeam, awayTeam: e.awayTeam,
+        homeLogo: e.homeLogo, awayLogo: e.awayLogo,
+        league: e.league, leagueLogo: e.leagueLogo,
+        date: e.date, savedAt: e.savedAt,
+        market: '1X2',
+        selection: e.pickLabel || e.pick,
+        rawSelection: e.pick,
+        mise: e.mise,
+        odd: e.actualOdd || e.odd || null,
+        modelOdd: e.odd || null,
+        result: e.result || null,
+        finalScore: e.finalScore || null,
+        source: 'pronos',
+      });
+    }
+    for (const [betKey, bet] of Object.entries(e.bets || {})) {
+      if (!Number.isFinite(bet.mise) || bet.mise <= 0) continue;
+      const [market, selection] = betKey.split('::');
+      list.push({
+        key: `${e.fixtureId}::${betKey}`,
+        fixtureId: e.fixtureId,
+        homeTeam: e.homeTeam, awayTeam: e.awayTeam,
+        homeLogo: e.homeLogo, awayLogo: e.awayLogo,
+        league: e.league, leagueLogo: e.leagueLogo,
+        date: e.date, savedAt: e.savedAt,
+        market, selection,
+        rawSelection: selection,
+        mise: bet.mise,
+        odd: bet.actualOdd || null,
+        modelOdd: null,
+        result: bet.result || null,
+        finalScore: e.finalScore || null,
+        source: 'value-bet',
+      });
+    }
+  }
+  // Sort: pending first (most recent savedAt), then settled by date desc
+  return list.sort((a, b) => {
+    if (!!a.result !== !!b.result) return a.result ? 1 : -1;
+    return (b.savedAt || '').localeCompare(a.savedAt || '');
+  });
+}
 
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
@@ -49,6 +108,21 @@ export default function History() {
   // Manual resolve trigger for the "Vérifier les résultats" button
   const [resolving, setResolving] = useState(false);
   const [resolveMsg, setResolveMsg] = useState(null);
+
+  // Auto-resolve on mount: any pending bet whose match has finished gets
+  // graded and moves to "Historique pronos" automatically. The user no
+  // longer needs to click the button — but it's still there for retry.
+  // Runs once per History page open.
+  useEffect(() => {
+    const hasPending = entries.some((e) => {
+      if (Number.isFinite(e.mise) && e.mise > 0 && !e.result) return true;
+      return Object.values(e.bets || {}).some((b) => Number.isFinite(b.mise) && b.mise > 0 && !b.result);
+    });
+    if (!hasPending) return;
+    resolveFinishedMatches(entries, resolveResult).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleResolveNow = async () => {
     setResolving(true);
     setResolveMsg(null);
@@ -88,7 +162,7 @@ export default function History() {
     resetBankroll();
   };
   const [filter, setFilter] = useState('all');
-  const [tab, setTab] = useState('matchs');
+  const [tab, setTab] = useState('pending');
   const [search, setSearch] = useState('');
   const stats = getStats();
   const bkStats = getBankrollStats();
@@ -155,7 +229,7 @@ export default function History() {
       {/* Tabs */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {[
-          { id: 'matchs',    label: 'Historique matchs', icon: HistoryIcon },
+          { id: 'pending',   label: 'Paris en cours',    icon: Clock },
           { id: 'pronos',    label: 'Historique pronos', icon: ListChecks },
           { id: 'bankroll',  label: 'Bankroll',          icon: Wallet },
           { id: 'recherche', label: 'Équipe',            icon: Search },
@@ -413,26 +487,69 @@ export default function History() {
       )}
 
       {/* ── HISTORIQUE MATCHS TAB ── (matchs terminés, ou pronos d'une date passée) */}
-      {tab === 'matchs' && (() => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const finished = entries.filter((e) => e.result || (e.date && e.date < todayStr));
-        const finishedFiltered = finished.filter((e) => {
-          if (filter === 'pending') return !e.result;
-          if (filter === 'win') return e.result === 'win';
-          if (filter === 'loss') return e.result === 'loss';
+      {/* ── PARIS EN COURS TAB ── (every staked bet without a result yet) */}
+      {tab === 'pending' && (() => {
+        const allBets = flattenBets(entries);
+        const pending = allBets.filter((b) => !b.result);
+
+        return (
+          <>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleResolveNow}
+                disabled={resolving || pending.length === 0}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-brand-500/30 bg-brand-500/[0.08] text-brand-400 text-xs font-heading font-semibold hover:bg-brand-500/[0.15] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={clsx('w-3.5 h-3.5', resolving && 'animate-spin')} />
+                Vérifier les résultats
+              </button>
+              {resolveMsg && (
+                <span className="text-xs text-white/50 font-heading">{resolveMsg}</span>
+              )}
+              <span className="ml-auto text-xs text-white/40 font-heading">
+                {pending.length} pari{pending.length > 1 ? 's' : ''} · {bkStats.pendingCommitted.toFixed(2)} € engagés
+              </span>
+            </div>
+
+            {pending.length === 0 ? (
+              <div className="glass-card p-12 text-center">
+                <Clock className="w-12 h-12 text-white/10 mx-auto mb-3" />
+                <p className="text-white/50 font-heading font-semibold">Aucun pari en cours</p>
+                <p className="text-white/25 text-sm mt-1 font-heading max-w-sm mx-auto">
+                  Saisis une mise sur la page Pronos ou Value bets pour qu'un pari apparaisse ici.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {pending.map((b) => <BetCard key={b.key} bet={b} />)}
+              </div>
+            )}
+          </>
+        );
+      })()}
+
+      {/* ── HISTORIQUE PRONOS TAB ── (every settled bet, won or lost) */}
+      {tab === 'pronos' && (() => {
+        const allBets = flattenBets(entries);
+        const settled = allBets.filter((b) => b.result);
+        const filtered = settled.filter((b) => {
+          if (filter === 'win') return b.result === 'win';
+          if (filter === 'loss') return b.result === 'loss';
           return true;
         });
-        const groupedF = finishedFiltered.reduce((acc, e) => {
-          const day = e.date || e.savedAt?.split('T')[0] || 'unknown';
-          (acc[day] = acc[day] || []).push(e);
+        const grouped = filtered.reduce((acc, b) => {
+          const day = b.date || b.savedAt?.split('T')[0] || 'unknown';
+          (acc[day] = acc[day] || []).push(b);
           return acc;
         }, {});
-        const daysF = Object.keys(groupedF).sort((a, b) => b.localeCompare(a));
+        const days = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
         return (
           <>
             <div className="flex gap-2">
-              {[['all', 'Tous'], ['pending', 'Sans résultat'], ['win', 'Gagnés'], ['loss', 'Perdus']].map(([val, label]) => (
+              {[['all', `Tous · ${settled.length}`],
+                ['win', `Gagnés · ${settled.filter((b) => b.result === 'win').length}`],
+                ['loss', `Perdus · ${settled.filter((b) => b.result === 'loss').length}`]].map(([val, label]) => (
                 <button
                   key={val}
                   onClick={() => setFilter(val)}
@@ -445,76 +562,27 @@ export default function History() {
               ))}
             </div>
 
-            {finished.length === 0 && (
-              <div className="glass-card p-12 text-center">
-                <HistoryIcon className="w-12 h-12 text-white/10 mx-auto mb-3" />
-                <p className="text-white/50 font-heading font-semibold">Aucun match terminé</p>
-                <p className="text-white/25 text-sm mt-1 font-heading max-w-xs mx-auto">
-                  Les pronos d’une journée passée apparaîtront ici une fois les matchs joués
-                </p>
-              </div>
-            )}
-
-            {finishedFiltered.length === 0 && finished.length > 0 && (
-              <div className="glass-card p-8 text-center">
-                <p className="text-white/35 text-sm font-heading">Aucun match dans cette catégorie</p>
-              </div>
-            )}
-
-            <div className="space-y-6">
-              {daysF.map((day) => (
-                <div key={day}>
-                  <p className="text-xs font-heading font-semibold text-white/25 uppercase tracking-widest mb-2 px-1">
-                    {day !== 'unknown' ? format(parseISO(day), 'EEEE d MMMM yyyy', { locale: fr }) : 'Date inconnue'}
-                  </p>
-                  <div className="space-y-2">
-                    {groupedF[day].map((entry) => (
-                      <EntryCard key={entry.fixtureId || entry.savedAt} entry={entry} setMise={setMise} showMise />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        );
-      })()}
-
-      {/* ── HISTORIQUE PRONOS TAB ── (paris où l’utilisateur a saisi une mise) */}
-      {tab === 'pronos' && (() => {
-        const withMise = entries.filter((e) => e.mise > 0);
-        const groupedP = withMise.reduce((acc, e) => {
-          const day = e.date || e.savedAt?.split('T')[0] || 'unknown';
-          (acc[day] = acc[day] || []).push(e);
-          return acc;
-        }, {});
-        const daysP = Object.keys(groupedP).sort((a, b) => b.localeCompare(a));
-
-        return (
-          <>
-            {withMise.length === 0 ? (
+            {settled.length === 0 ? (
               <div className="glass-card p-12 text-center">
                 <ListChecks className="w-12 h-12 text-white/10 mx-auto mb-3" />
-                <p className="text-white/50 font-heading font-semibold">Aucun prono misé</p>
-                <p className="text-white/25 text-sm mt-1 font-heading max-w-xs mx-auto">
-                  Saisis une mise sur un prono dans l'onglet Bankroll pour le voir apparaître ici
+                <p className="text-white/50 font-heading font-semibold">Aucun pari terminé</p>
+                <p className="text-white/25 text-sm mt-1 font-heading max-w-sm mx-auto">
+                  Tes paris terminés (gagnés ou perdus) apparaîtront ici une fois les matchs joués et les résultats vérifiés.
                 </p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="glass-card p-8 text-center">
+                <p className="text-white/35 text-sm font-heading">Aucun pari dans cette catégorie</p>
               </div>
             ) : (
               <div className="space-y-6">
-                {daysP.map((day) => (
+                {days.map((day) => (
                   <div key={day}>
                     <p className="text-xs font-heading font-semibold text-white/25 uppercase tracking-widest mb-2 px-1">
                       {day !== 'unknown' ? format(parseISO(day), 'EEEE d MMMM yyyy', { locale: fr }) : 'Date inconnue'}
                     </p>
                     <div className="space-y-2">
-                      {groupedP[day].map((entry) => (
-                        <EntryCard
-                          key={entry.fixtureId || entry.savedAt}
-                          entry={entry}
-                          setMise={setMise}
-                          showMise
-                        />
-                      ))}
+                      {grouped[day].map((b) => <BetCard key={b.key} bet={b} />)}
                     </div>
                   </div>
                 ))}
@@ -523,6 +591,71 @@ export default function History() {
           </>
         );
       })()}
+    </div>
+  );
+}
+
+/**
+ * Compact card for a single bet (entry-level OR per-VB). Used by both the
+ * 'Paris en cours' tab and the 'Historique pronos' (settled) tab.
+ */
+function BetCard({ bet }) {
+  const res = RESULT_CONFIG[bet.result] || RESULT_CONFIG[null];
+  const ResIcon = res.icon;
+  const pnl = bet.result === 'win' && bet.odd
+    ? bet.mise * (parseFloat(bet.odd) - 1)
+    : bet.result === 'loss'
+      ? -bet.mise
+      : 0;
+  const sourceLabel = bet.source === 'value-bet' ? 'Value bet' : 'Pronos';
+  const sourceClass = bet.source === 'value-bet' ? 'text-gold-400 bg-gold-500/[0.08]' : 'text-brand-400 bg-brand-500/[0.08]';
+
+  return (
+    <div className={clsx('p-3 rounded-xl border space-y-2', res.bg)}>
+      <div className="flex items-center gap-2 flex-wrap">
+        {bet.leagueLogo && <img src={bet.leagueLogo} alt="" className="w-3.5 h-3.5 object-contain opacity-60" />}
+        <span className="text-[11px] text-white/40 font-heading truncate flex-1 min-w-0">{bet.league}</span>
+        <span className={clsx('text-[10px] font-heading font-semibold px-1.5 py-0.5 rounded', sourceClass)}>
+          {sourceLabel}
+        </span>
+        <span className={clsx('inline-flex items-center gap-1 text-[10px] font-heading font-semibold px-1.5 py-0.5 rounded border', res.bg, res.color)}>
+          <ResIcon className="w-3 h-3" />
+          {res.label}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {bet.homeLogo && <img src={bet.homeLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
+        <span className="text-sm font-heading font-bold text-white truncate flex-1">{bet.homeTeam}</span>
+        <span className="text-[11px] text-white/30 font-display">VS</span>
+        <span className="text-sm font-heading font-bold text-white truncate flex-1 text-right">{bet.awayTeam}</span>
+        {bet.awayLogo && <img src={bet.awayLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-xs">
+          <span className="text-white/35 font-heading">{bet.market}</span>
+          <span className="text-white/60 font-heading font-semibold ml-1.5">{bet.selection}</span>
+          {bet.finalScore && (
+            <span className="text-white/40 font-mono ml-2">· {bet.finalScore}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          {bet.odd && (
+            <span className="text-white/50 font-mono">
+              @{parseFloat(bet.odd).toFixed(2)}
+            </span>
+          )}
+          <span className="text-white/70 font-mono">
+            {bet.mise.toFixed(2)} €
+          </span>
+          {bet.result && (
+            <span className={clsx('font-display tracking-wider', pnl >= 0 ? 'text-brand-400' : 'text-danger')}>
+              {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)} €
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
