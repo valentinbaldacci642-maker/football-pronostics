@@ -661,10 +661,14 @@ function BetCard({ bet }) {
             const potentialReturn = bet.mise * oddNum;
             const potentialGain = bet.mise * (oddNum - 1);
             return (
-              <span className="text-xs text-gold-400/80 font-mono">
-                Gain potentiel: <span className="text-gold-400 font-semibold">+{potentialGain.toFixed(2)} €</span>
-                <span className="text-white/40 ml-1.5">(gain {potentialReturn.toFixed(2)} €)</span>
-              </span>
+              <div className="flex items-baseline gap-2 flex-wrap justify-end">
+                <span className="text-xs text-gold-400/70 font-mono">
+                  Gain potentiel: <span className="text-gold-400 font-semibold">+{potentialGain.toFixed(2)} €</span>
+                </span>
+                <span className="text-base font-display tracking-wider text-gold-400 bg-gold-400/15 px-2 py-0.5 rounded border border-gold-400/30">
+                  gain {potentialReturn.toFixed(2)} €
+                </span>
+              </div>
             );
           })()}
         </div>
