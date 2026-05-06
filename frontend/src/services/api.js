@@ -48,7 +48,7 @@ api.interceptors.request.use((config) => {
 // Display-name overrides (fun personalization). Keyed by API-Football team
 // ID so we never accidentally rename a different club that shares a name.
 const TEAM_NAME_OVERRIDES = {
-  80: 'FC Gaëtan', // Lyon (Olympique Lyonnais) → FC Gaëtan
+  80: 'FC GETGET', // Lyon (Olympique Lyonnais) → FC GETGET
 };
 
 // Walk the response payload and rewrite every `team` / `home` / `away`
