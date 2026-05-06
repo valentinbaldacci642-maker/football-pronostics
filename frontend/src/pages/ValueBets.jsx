@@ -14,7 +14,9 @@ import ValueBetSources from '../components/match/ValueBetSources';
 
 function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
   const betKey = `${vb.market}::${vb.selection}`;
-  const { setBetMise, setBetActualOdd, entries } = useHistoryStore();
+  const setBetMise = useHistoryStore((s) => s.setBetMise);
+  const setBetActualOdd = useHistoryStore((s) => s.setBetActualOdd);
+  const entries = useHistoryStore((s) => s.entries);
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
   const saved = existingEntry?.bets?.[betKey] || {};
   const savedMise = saved.mise != null ? String(saved.mise) : '';
@@ -160,7 +162,14 @@ export default function ValueBets() {
   const isToday = selectedDay === dayOptions[0].iso;
 
   const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
-  const { getBankrollStats, savePronostics } = useHistoryStore();
+  // Subscribe to entries explicitly: a per-bet mise save mutates
+  // entries[i].bets which Zustand tracks at the entries-array level.
+  // Without an explicit selector, parent re-render isn't guaranteed when
+  // only nested data changes — caused the bankroll pill to look frozen
+  // on /value-bets while the underlying state was actually updating.
+  const entries = useHistoryStore((s) => s.entries);
+  const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
+  const savePronostics = useHistoryStore((s) => s.savePronostics);
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const _bk = getBankrollStats();
   const liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
