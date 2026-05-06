@@ -92,19 +92,19 @@ export default function Navbar() {
       {showBankroll && (
         <Link
           to="/history"
-          className="ml-auto flex flex-col items-end gap-0.5 px-3.5 py-1.5 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all flex-shrink-0"
+          className="ml-auto flex flex-col items-end gap-1 px-4 py-2 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all flex-shrink-0"
           title="Bankroll dispo · cliquer pour gérer"
         >
           <span className={clsx(
-            'font-display text-lg leading-none tracking-wider tabular-nums',
+            'font-display text-xl leading-none tracking-wider tabular-nums',
             liveBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
           )}>
             {liveBankroll.toFixed(2)} €
           </span>
-          <span className="text-[11px] text-white/45 font-heading leading-none">
+          <span className="text-sm text-white/55 font-heading leading-none">
             Bankroll dispo
             {pendingCommitted > 0 && (
-              <span className="text-gold-400/70 ml-1.5">· {pendingCommitted.toFixed(2)} € en jeu</span>
+              <span className="text-gold-400/80 ml-1.5">· {pendingCommitted.toFixed(2)} € en jeu</span>
             )}
           </span>
         </Link>
