@@ -24,6 +24,47 @@
   </head>
   <body class="bg-dark-900 text-white">
     <div id="root"></div>
+    <!--
+      One-shot kill-switch. Earlier versions of the service worker were
+      caching the entire vercel.app domain (including index.html), which
+      pinned users to deleted hashed-asset filenames after each deploy.
+      This block runs once per browser, wipes every cache and unregisters
+      every SW, then reloads cleanly. Localstorage flag prevents the loop
+      from repeating after the cleanup is done.
+    -->
+    <script>
+      (function () {
+        var KEY = 'pdf-sw-cleanup-v1';
+        try {
+          if (localStorage.getItem(KEY)) return;
+        } catch (e) { return; }
+        var done = false;
+        var finish = function () {
+          if (done) return;
+          done = true;
+          try { localStorage.setItem(KEY, '1'); } catch (e) {}
+          location.reload();
+        };
+        var tasks = [];
+        if ('caches' in window) {
+          tasks.push(caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+          }));
+        }
+        if ('serviceWorker' in navigator) {
+          tasks.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (r) { return r.unregister(); }));
+          }));
+        }
+        if (tasks.length === 0) {
+          try { localStorage.setItem(KEY, '1'); } catch (e) {}
+          return;
+        }
+        Promise.all(tasks).then(finish).catch(finish);
+        // Safety net: reload after 3s even if a task hangs
+        setTimeout(finish, 3000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
