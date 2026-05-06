@@ -12,7 +12,7 @@ import { formatStake } from '../utils/formatStake';
 import { formatTime } from '../utils/format';
 import ValueBetSources from '../components/match/ValueBetSources';
 
-function PerBetMiseInputs({ fixtureId, vb }) {
+function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
   const betKey = `${vb.market}::${vb.selection}`;
   const { setBetMise, setBetActualOdd, entries } = useHistoryStore();
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
@@ -22,36 +22,96 @@ function PerBetMiseInputs({ fixtureId, vb }) {
   const [miseInput, setMiseInput] = useState(savedMise);
   const [oddInput, setOddInput] = useState(savedOdd);
 
-  const hasMise = parseFloat(miseInput) > 0 || parseFloat(savedMise) > 0;
   const miseDirty = miseInput !== savedMise;
   const oddDirty = oddInput !== savedOdd;
+
+  // Kelly is recomputed live against the user-entered bookmaker odd. The
+  // odd shown on the site is just an indicative average — the user's actual
+  // bookmaker (Unibet, Betclic, Winamax…) often differs by ±0.05-0.10, which
+  // shifts both the edge AND the Kelly stake materially. Falling back to
+  // vb.odd while the input is empty keeps the suggestion meaningful from
+  // the start.
+  const effectiveOdd = parseFloat(oddInput) || vb.odd;
+  const trueProb = vb.prob ?? vb.trueProb;
+  const liveKellyStake = (effectiveOdd && trueProb)
+    ? kellyStake(trueProb, effectiveOdd, liveBankroll, kFrac)
+    : 0;
+  const liveEdge = (effectiveOdd && trueProb)
+    ? trueProb - (100 / effectiveOdd)
+    : null;
+  const usingCustomOdd = parseFloat(oddInput) > 0 && parseFloat(oddInput) !== vb.odd;
 
   const saveMise = () => { if (miseDirty) setBetMise(fixtureId, betKey, miseInput); };
   const saveOdd = () => { if (oddDirty) setBetActualOdd(fixtureId, betKey, oddInput); };
 
   return (
     <div className="flex flex-col gap-1.5 pt-2 mt-1 border-t border-gold-500/15">
+      {/* Step 1 — bookmaker odd (always visible, recomputes Kelly on change) */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {vb.stake > 0 ? (
+          {liveKellyStake > 0 ? (
             <span className="text-[11px] text-gold-400/70 font-heading truncate">
               <span className="font-display tracking-wider text-gold-400">
-                Mise Kelly: {formatStake(vb.stake)}
+                Mise Kelly: {formatStake(liveKellyStake)}
               </span>
+              {usingCustomOdd && liveEdge != null && (
+                <span className="text-white/40 ml-1.5">
+                  · edge {liveEdge >= 0 ? '+' : ''}{liveEdge.toFixed(1)}% à @{effectiveOdd.toFixed(2)}
+                </span>
+              )}
             </span>
           ) : (
             <span className="text-[11px] text-white/25 font-heading">
-              Kelly inactif
+              {liveBankroll <= 0
+                ? 'Définir bankroll pour voir Kelly'
+                : usingCustomOdd
+                  ? `Pas d'edge à @${effectiveOdd.toFixed(2)}`
+                  : 'Kelly inactif'}
             </span>
           )}
         </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-white/30 font-heading">Ma cote:</span>
+          <input
+            type="number"
+            min="1"
+            step="0.01"
+            placeholder={vb.odd?.toFixed(2)}
+            value={oddInput}
+            onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveOdd(); } }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+          />
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveOdd(); }}
+            disabled={!oddDirty}
+            className={clsx(
+              'flex items-center justify-center w-6 h-6 rounded-md border transition-all',
+              oddDirty
+                ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
+                : 'border-white/[0.05] text-white/15 cursor-not-allowed'
+            )}
+            title="Enregistrer la cote"
+          >
+            <Save className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* Step 2 — actual stake */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="flex items-center gap-1 text-[11px] font-heading text-brand-400/80">
+          <Target className="w-3 h-3" />
+          {parseFloat(miseInput) > 0 || parseFloat(savedMise) > 0 ? 'Pari enregistré' : 'Saisis ta mise'}
+        </span>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-white/30 font-heading">Ma mise:</span>
           <input
             type="number"
             min="0"
             step="1"
-            placeholder="—"
+            placeholder={liveKellyStake > 0 ? liveKellyStake.toFixed(2) : '—'}
             value={miseInput}
             onChange={(e) => { e.stopPropagation(); setMiseInput(e.target.value); }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveMise(); } }}
@@ -74,42 +134,6 @@ function PerBetMiseInputs({ fixtureId, vb }) {
           </button>
         </div>
       </div>
-
-      {hasMise && (
-        <div className="flex items-center justify-between gap-1.5 flex-wrap">
-          <span className="flex items-center gap-1 text-[11px] font-heading text-brand-400/80">
-            <Target className="w-3 h-3" />
-            Pari enregistré
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-white/30 font-heading">Ma cote:</span>
-            <input
-              type="number"
-              min="1"
-              step="0.01"
-              placeholder={vb.odd?.toFixed(2)}
-              value={oddInput}
-              onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveOdd(); } }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-              className="w-16 bg-dark-800 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
-            />
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveOdd(); }}
-              disabled={!oddDirty}
-              className={clsx(
-                'flex items-center justify-center w-6 h-6 rounded-md border transition-all',
-                oddDirty
-                  ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
-                  : 'border-white/[0.05] text-white/15 cursor-not-allowed'
-              )}
-              title="Enregistrer la cote"
-            >
-              <Save className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -421,7 +445,12 @@ export default function ValueBets() {
                         )}
                       </p>
                       {/* Per-VB mise + cote inputs */}
-                      <PerBetMiseInputs fixtureId={m.fixtureId} vb={vb} />
+                      <PerBetMiseInputs
+                        fixtureId={m.fixtureId}
+                        vb={vb}
+                        liveBankroll={liveBankroll}
+                        kFrac={kFrac}
+                      />
                     </div>
                   ))}
                 </div>
