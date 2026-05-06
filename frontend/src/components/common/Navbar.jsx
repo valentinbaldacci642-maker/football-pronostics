@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import clsx from 'clsx';
 import { teamsApi } from '../../services/api';
@@ -12,11 +12,13 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   // Live bankroll: only displayed when the user has explicitly set an initial
-  // bankroll (> 0). After a reset, it's hidden everywhere.
+  // bankroll (> 0). After a reset, it's hidden everywhere. Also hidden on the
+  // Help page where it would compete with the explanatory content.
+  const location = useLocation();
   const initialBankroll = useBankrollStore((s) => s.initialBankroll);
   const entries = useHistoryStore((s) => s.entries);
   const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
-  const showBankroll = initialBankroll > 0;
+  const showBankroll = initialBankroll > 0 && location.pathname !== '/help';
   let liveBankroll = 0, pendingCommitted = 0;
   if (showBankroll) {
     const _bk = getBankrollStats();
