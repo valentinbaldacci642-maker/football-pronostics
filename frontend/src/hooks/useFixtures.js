@@ -46,26 +46,60 @@ export function useFixtureDetail(id) {
 
   useEffect(() => {
     if (!id) return;
-    const fetch = async () => {
-      setLoading(true);
+    let cancelled = false;
+
+    // Fetch the main fixture with one automatic retry. If the backend is
+    // momentarily rate-limited we'd otherwise show "Match introuvable" while
+    // the fixture actually exists — wait briefly and try again.
+    const fetchFixture = async () => {
       try {
-        const [fix, st, ev, lu] = await Promise.allSettled([
-          fixturesApi.getById(id),
+        const res = await fixturesApi.getById(id);
+        return { ok: true, data: res?.response?.[0] };
+      } catch (err) {
+        if (err.code === 'RATE_LIMITED') {
+          await new Promise((r) => setTimeout(r, 1500));
+          try {
+            const res = await fixturesApi.getById(id);
+            return { ok: true, data: res?.response?.[0] };
+          } catch (err2) {
+            return { ok: false, error: err2.message };
+          }
+        }
+        return { ok: false, error: err.message };
+      }
+    };
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      const fixResult = await fetchFixture();
+      if (cancelled) return;
+
+      if (!fixResult.ok) {
+        setError(fixResult.error);
+        setFixture(null);
+      } else if (!fixResult.data) {
+        setError('Match introuvable côté API');
+        setFixture(null);
+      } else {
+        setFixture(fixResult.data);
+        // Secondary calls — failures here are non-fatal, just leave the
+        // panels empty rather than blocking the whole page.
+        const [st, ev, lu] = await Promise.allSettled([
           fixturesApi.getStatistics(id),
           fixturesApi.getEvents(id),
           fixturesApi.getLineups(id),
         ]);
-        if (fix.status === 'fulfilled') setFixture(fix.value?.response?.[0]);
+        if (cancelled) return;
         if (st.status === 'fulfilled') setStats(st.value?.response);
         if (ev.status === 'fulfilled') setEvents(ev.value?.response || []);
         if (lu.status === 'fulfilled') setLineups(lu.value?.response);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     };
-    fetch();
+
+    run();
+    return () => { cancelled = true; };
   }, [id]);
 
   return { fixture, stats, events, lineups, loading, error };
