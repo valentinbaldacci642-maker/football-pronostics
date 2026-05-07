@@ -174,15 +174,21 @@ export default function History() {
   };
 
   const handleResetStatsOnly = () => {
+    const _bk = bkStats;
+    const liveBk = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
     const ok = window.confirm(
       'Réinitialiser les stats Total / Réussite / Gagnés / ROI ?\n\n' +
-      'Seules les entrées non-pariées (pronos auto-trackés par l\'app) sont supprimées.\n' +
-      'Tes paris réels (avec mise saisie) restent en place.\n' +
-      'Bankroll, P&L et Paris en cours conservés.\n\n' +
+      `Tous les paris (en cours + terminés) seront supprimés.\n` +
+      `Ta bankroll de ${liveBk.toFixed(2)} € est conservée (figée comme nouvelle bankroll initiale).\n` +
+      'Kelly + mode edge inchangés.\n\n' +
       'Action irréversible.'
     );
     if (!ok) return;
-    clearUnstakedEntries();
+    // Materialize current live bankroll as the new initial so the bankroll
+    // pill keeps its value despite wiping all entries (which would otherwise
+    // reset pnl + pendingCommitted to 0).
+    setInitialBankroll(parseFloat(liveBk.toFixed(2)));
+    clearAll();
   };
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('pending');
