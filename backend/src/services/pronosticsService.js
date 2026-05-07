@@ -10,10 +10,21 @@ class PronosticsService {
   async getBestPronostics(forceRefresh = false, date = null) {
     const targetDate = date || new Date().toISOString().split('T')[0];
     const cacheKey = cache.buildKey('pronostics', targetDate);
+    const lastScanKey = cache.buildKey('pronostics-lastscan', targetDate);
 
     if (!forceRefresh) {
       const cached = cache.get(cacheKey);
       if (cached && cached.length > 0) return cached;
+    } else {
+      // Force-refresh cooldown: even with force=true we refuse to re-scan if
+      // the last scan completed less than 10 min ago. Prevents an aggressive
+      // user from blowing through the daily quota by spamming the Actualiser
+      // button. Returns the cached result instead.
+      const lastScan = cache.get(lastScanKey);
+      if (lastScan && Date.now() - lastScan < 10 * 60 * 1000) {
+        const cached = cache.get(cacheKey);
+        if (cached && cached.length > 0) return cached;
+      }
     }
 
     let fixtures = [];
@@ -25,78 +36,107 @@ class PronosticsService {
       return [];
     }
 
-    // Top-10 mode: take the 10 highest-priority upcoming fixtures of the day
-    // and analyze them. Keeps the API call volume predictable (20 calls
-    // batched) and the page focused on the day's best pronos.
     const upcoming = fixtures
       .filter((f) => ['NS', 'TBD'].includes(f.fixture?.status?.short))
       .sort((a, b) => {
         const pa = PRIORITY_LEAGUES.indexOf(a.league?.id);
         const pb = PRIORITY_LEAGUES.indexOf(b.league?.id);
         return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
-      })
-      .slice(0, 10);
+      });
 
     if (upcoming.length === 0) return [];
 
-    // Fetch predictions + odds + team stats for all selected fixtures.
-    // 'full' mode (each fixture = 6 API calls: odds, predictions, home stats,
-    // away stats, lineups, top scorers) is now used for the pronos list so
-    // Poisson + Lineup detection sources are exposed on the home Top 10 too,
-    // not only on the per-match detail page.
-    //
-    // Throttle: batch 1 × 1200ms → ~5 req/sec sustained on Pro plan
-    // (300 req/min limit). For 10 fixtures × 6 calls = 60 calls, total fetch
-    // is ~12-15 s — slow on cold cache but the 3 h cache absorbs subsequent
-    // reads to instant.
-    const BATCH_SIZE = 1;
-    const BATCH_DELAY_MS = 1200;
-    const analyses = [];
-    for (let i = 0; i < upcoming.length; i += BATCH_SIZE) {
-      const batch = upcoming.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.allSettled(
-        batch.map((f) => this._fetchAnalysis(f, { full: true }))
-      );
-      analyses.push(...batchResults);
-      if (i + BATCH_SIZE < upcoming.length) {
-        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+    // Step 1 — full analysis on the top-10 priority fixtures.
+    // 6 API calls each (odds, predictions, home stats, away stats, lineups,
+    // top scorers). Outbound throttler in apiFootball.js handles pacing.
+    const top10 = upcoming.slice(0, 10);
+    const top10Analyses = await this._analyzeBatch(top10, { full: true });
+
+    // Step 2 — LITE SCAN on every remaining fixture (odds-only, 1 call each).
+    // Filter to those with a Shin value bet detected. This catches edge
+    // opportunities on lower-priority leagues that wouldn't have made it
+    // into the top 10 list.
+    const remaining = upcoming.slice(10);
+    const liteScanCandidates = await this._liteScanForValueBets(remaining);
+
+    // Step 3 — full analysis on the lite-scan candidates that DID find a VB.
+    // Only these get the expensive enrichment. Caps at 20 to bound cost.
+    const cappedCandidates = liteScanCandidates.slice(0, 20);
+    const candidateAnalyses = await this._analyzeBatch(cappedCandidates, { full: true });
+
+    // Combine
+    const combined = [
+      ...this._buildPronostics(top10, top10Analyses),
+      ...this._buildPronostics(cappedCandidates, candidateAnalyses),
+    ];
+
+    // Dedupe by fixture id (top10 vs candidates shouldn't overlap, but safety)
+    const seen = new Set();
+    const unique = combined.filter((p) => {
+      const id = p.fixture?.fixture?.id;
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }).sort((a, b) => b.confidence - a.confidence);
+
+    const reliable = unique.filter((p) => p.confidence >= 45);
+    const pronostics = reliable.length > 0 ? reliable : unique.slice(0, 3);
+
+    cache.set(cacheKey, pronostics, 3600);              // 1h cache
+    cache.set(lastScanKey, Date.now(), 3600);           // mark last scan time
+    logger.info(`Pronostics: ${pronostics.length} returned (top10=${top10.length}, lite-scanned=${remaining.length}, VB candidates=${cappedCandidates.length})`);
+    return pronostics;
+  }
+
+  /**
+   * Lite scan: fetch ONLY the odds for each fixture and run Shin's method.
+   * Returns the fixtures that have at least one Shin value bet detected.
+   * Outbound throttler ensures we don't burst — typically 50-100 fixtures
+   * paced at ~240ms = 12-24 sec total wall time.
+   */
+  async _liteScanForValueBets(fixtures) {
+    const candidates = [];
+    for (const f of fixtures) {
+      try {
+        const oddsData = await api.getOddsByFixture(f.fixture.id);
+        const oddsRaw = oddsData.response?.[0];
+        if (!oddsRaw) continue;
+        const oddsAnalysis = analysisService.analyzeFixtureOdds(oddsRaw);
+        if (oddsAnalysis?.valueBets?.length > 0) {
+          candidates.push(f);
+        }
+      } catch (e) {
+        // Single fixture failure is fine — keep scanning the others
       }
     }
+    return candidates;
+  }
 
-    const all = analyses
+  async _analyzeBatch(fixtures, opts) {
+    if (fixtures.length === 0) return [];
+    const results = await Promise.allSettled(
+      fixtures.map((f) => this._fetchAnalysis(f, opts)),
+    );
+    return results;
+  }
+
+  /** Build pronostic objects from raw analyses + filter unreliable upstream data. */
+  _buildPronostics(fixtures, analyses) {
+    return analyses
       .map((result, i) => {
         if (result.status !== 'fulfilled' || !result.value) return null;
         const { oddsAnalysis, predAnalysis } = result.value;
         if (!predAnalysis && !oddsAnalysis) return null;
-
-        // Drop matches whose upstream data is corrupted — common on tier-3 / 4
-        // small leagues (Mongolian Premier League, etc.) where the API returns
-        // 50/50/0 percent strings or 7.7-xG. Shin value bets might still be
-        // mathematically valid in those cases but the probability bar / xG
-        // matrix / form display are all broken, so showing the match misleads
-        // the user. Better to drop it entirely than half-display.
         const predUnreliable = predAnalysis && predAnalysis.probabilitiesReliable === false;
         if (predUnreliable) return null;
-
-        const fixture = upcoming[i];
+        const fixture = fixtures[i];
         const fullAnalysis = analysisService.buildFullAnalysis(oddsAnalysis, predAnalysis, fixture);
         const confidence = this._calculateConfidence(predAnalysis, oddsAnalysis);
         const pick = this._selectBestPick(fullAnalysis, fixture);
-
         if (!pick) return null;
-
         return { fixture, analysis: fullAnalysis, confidence, pick };
       })
-      .filter(Boolean)
-      .sort((a, b) => b.confidence - a.confidence);
-
-    // Return up to 10 pronos sorted by confidence desc. Soft fallback to top
-    // 3 if no match passes confidence ≥ 45 (rare days with very poor data).
-    const reliable = all.filter((p) => p.confidence >= 45).slice(0, 10);
-    const pronostics = reliable.length > 0 ? reliable : all.slice(0, 3);
-
-    cache.set(cacheKey, pronostics, 10800); // 3h cache
-    return pronostics;
+      .filter(Boolean);
   }
 
   async _fetchAnalysis(fixture, opts = {}) {
