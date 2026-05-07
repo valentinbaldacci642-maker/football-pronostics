@@ -26,6 +26,8 @@ const TOP_LEAGUES = [
   { id: 135, name: 'Serie A', flag: '🇮🇹', color: '#2563eb' },
   { id: 61, name: 'Ligue 1', flag: '🇫🇷', color: '#16a34a' },
   { id: 2, name: 'Champions League', flag: '🏆', color: '#b45309' },
+  { id: 3, name: 'Europa League', flag: '🇪🇺', color: '#ea580c' },
+  { id: 848, name: 'Conference League', flag: '🌍', color: '#0ea5e9' },
 ];
 
 function SidebarContent({ onClose }) {

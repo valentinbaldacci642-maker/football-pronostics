@@ -55,6 +55,7 @@ const LEAGUE_FILTERS = [
   { id: 61, name: 'Ligue 1', flag: '🇫🇷' },
   { id: 2, name: 'Champions League', flag: '🏆' },
   { id: 3, name: 'Europa League', flag: '🟠' },
+  { id: 848, name: 'Conference League', flag: '🌍' },
 ];
 
 function groupByLeague(fixtures) {

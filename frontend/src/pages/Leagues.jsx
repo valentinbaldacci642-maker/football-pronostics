@@ -5,7 +5,7 @@ import { Search, Trophy, ChevronRight, BarChart2, List, Award } from 'lucide-rea
 import { leaguesApi, playersApi } from '../services/api';
 import { SkeletonCard, EmptyState, ErrorState } from '../components/ui/Loading';
 
-const TOP_LEAGUES_IDS = [39, 140, 78, 135, 61, 2, 3, 1, 94, 88];
+const TOP_LEAGUES_IDS = [39, 140, 78, 135, 61, 2, 3, 848, 1, 94, 88];
 
 // Top 5 European leagues (always shown at the top of the Classement picker)
 const TOP5_EU_LEAGUES = [
@@ -21,6 +21,7 @@ const STANDINGS_LEAGUES = [
   ...TOP5_EU_LEAGUES,
   { id: 2,   name: 'Champions League',  flag: '🏆', season: 2025 },
   { id: 3,   name: 'Europa League',     flag: '🇪🇺', season: 2025 },
+  { id: 848, name: 'Conference League', flag: '🌍', season: 2025 },
   { id: 94,  name: 'Primeira Liga',     flag: '🇵🇹', season: 2025 },
   { id: 88,  name: 'Eredivisie',        flag: '🇳🇱', season: 2025 },
   { id: 144, name: 'Jupiler Pro',       flag: '🇧🇪', season: 2025 },
@@ -467,7 +468,7 @@ function StandingsGroup({ group, leagueId, viewMode = 'all' }) {
       <div className="px-4 py-2 border-t border-white/[0.04] flex gap-4 flex-wrap">
         {[
           { color: 'bg-brand-500', label: 'Champions League' },
-          { color: 'bg-gold-500', label: 'Europa League' },
+          { color: 'bg-gold-500', label: 'Europa / Conference' },
           { color: 'bg-danger', label: 'Relégation' },
         ].map(({ color, label }) => (
           <div key={label} className="flex items-center gap-1.5">
