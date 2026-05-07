@@ -75,10 +75,11 @@ class ApiFootballService {
     // so we can short-circuit subsequent calls instead of hammering and burning
     // through the per-minute window. Window is API-Football's 60s rolling.
     this.rateLimitedUntil = 0;
-    // Outbound throttle: 350 req/min + 200ms gap = ~5 req/s sustained.
-    // API-Football Ultra plan: 450 req/min ceiling, so 350 leaves a 25%
-    // safety margin. Cache hits skip this entirely.
-    this.limiter = new OutboundRateLimiter(350, 200);
+    // Outbound throttle: 420 req/min + 150ms gap = ~6.6 req/s sustained.
+    // API-Football Ultra plan: 450 req/min ceiling, so 420 leaves a ~7%
+    // safety margin. Tightened to speed up the 14-day "Actualiser tout"
+    // bulk refresh. Cache hits skip this entirely.
+    this.limiter = new OutboundRateLimiter(420, 150);
 
     this.client = axios.create({
       baseURL: config.api.baseUrl,

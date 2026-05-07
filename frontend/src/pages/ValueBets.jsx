@@ -156,19 +156,20 @@ function buildDayOptions() {
 }
 
 export default function ValueBets() {
-  const [pronostics, setPronostics] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // pronosticsByDay: { 'YYYY-MM-DD': [...pronostics] } — fetched in the
+  // background for all 14 days so navigation is instant once loaded.
+  const [pronosticsByDay, setPronosticsByDay] = useState({});
+  const [loadingDays, setLoadingDays] = useState({}); // { 'YYYY-MM-DD': true }
   const [error, setError] = useState(null);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
   const dayOptions = buildDayOptions();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0].iso);
   const isToday = selectedDay === dayOptions[0].iso;
 
+  const pronostics = pronosticsByDay[selectedDay] || [];
+  const loading = !!loadingDays[selectedDay];
+
   const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
-  // Subscribe to entries explicitly: a per-bet mise save mutates
-  // entries[i].bets which Zustand tracks at the entries-array level.
-  // Without an explicit selector, parent re-render isn't guaranteed when
-  // only nested data changes — caused the bankroll pill to look frozen
-  // on /value-bets while the underlying state was actually updating.
   const entries = useHistoryStore((s) => s.entries);
   const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
   const savePronostics = useHistoryStore((s) => s.savePronostics);
@@ -176,25 +177,69 @@ export default function ValueBets() {
   const _bk = getBankrollStats();
   const liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
 
-  const load = async ({ force = false, date = selectedDay } = {}) => {
-    setLoading(true);
-    setError(null);
+  // Fetch one day, populate pronosticsByDay
+  const loadDay = async (date, { force = false } = {}) => {
+    setLoadingDays((prev) => ({ ...prev, [date]: true }));
     try {
       const res = await pronosticsApi.getBestToday({
         force,
-        date: date && date !== dayOptions[0].iso ? date : null,
+        date: date !== dayOptions[0].iso ? date : null,
       });
       const data = res?.data || [];
-      setPronostics(data);
+      setPronosticsByDay((prev) => ({ ...prev, [date]: data }));
       if (data.length > 0) savePronostics(data);
+      return data;
     } catch (err) {
       setError({ message: err.message, code: err.code });
+      return null;
     } finally {
-      setLoading(false);
+      setLoadingDays((prev) => {
+        const next = { ...prev };
+        delete next[date];
+        return next;
+      });
     }
   };
 
-  useEffect(() => { load({ date: selectedDay }); }, [selectedDay]);
+  // Refresh every day in dayOptions with bounded parallelism (3 in flight).
+  // Backend's outbound throttler caps at 420/min, so 3 concurrent day-scans
+  // saturate the queue without bursting upstream. Triggered manually by the
+  // Actualiser button — not on mount, to avoid burning the daily quota when
+  // the user only wants to glance at today.
+  const loadAllDays = async ({ force = false, concurrency = 3 } = {}) => {
+    setError(null);
+    const total = dayOptions.length;
+    setProgress({ done: 0, total });
+    let done = 0;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < dayOptions.length) {
+        const i = cursor++;
+        const { iso } = dayOptions[i];
+        // eslint-disable-next-line no-await-in-loop
+        await loadDay(iso, { force });
+        done += 1;
+        setProgress({ done, total });
+      }
+    };
+    await Promise.all(Array.from({ length: concurrency }, worker));
+    setProgress({ done: 0, total: 0 });
+  };
+
+  // On mount: only load the selected day. Other days load on click (or via
+  // the Actualiser button which refreshes all 14 in parallel).
+  useEffect(() => {
+    loadDay(selectedDay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When user picks a day not yet loaded, fetch it on demand
+  useEffect(() => {
+    if (!pronosticsByDay[selectedDay] && !loadingDays[selectedDay]) {
+      loadDay(selectedDay);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDay]);
 
   // Auto-retry once rate-limit lockout expires (capped at 3)
   const [rateLimitRetries, setRateLimitRetries] = useState(0);
@@ -205,7 +250,7 @@ export default function ValueBets() {
       if (Date.now() >= getRateLimitedUntil()) {
         clearInterval(id);
         setRateLimitRetries((n) => n + 1);
-        load({ date: selectedDay });
+        loadDay(selectedDay);
       }
     }, 1000);
     return () => clearInterval(id);
@@ -271,14 +316,33 @@ export default function ValueBets() {
           </p>
         </div>
         <button
-          onClick={() => load({ force: true })}
-          disabled={loading}
+          onClick={() => loadAllDays({ force: true })}
+          disabled={progress.total > 0}
           className="btn-ghost !px-2.5 !py-2 flex items-center gap-2"
+          title="Actualise les 14 jours d'un coup"
         >
-          <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} />
-          <span className="text-xs hidden sm:block font-heading font-semibold tracking-wide">Actualiser</span>
+          <RefreshCw className={clsx('w-4 h-4', progress.total > 0 && 'animate-spin')} />
+          <span className="text-xs hidden sm:block font-heading font-semibold tracking-wide">
+            {progress.total > 0 ? `${progress.done}/${progress.total}` : 'Actualiser tout'}
+          </span>
         </button>
       </div>
+
+      {/* Bulk refresh progress bar (Actualiser tout) */}
+      {progress.total > 0 && (
+        <div className="px-3.5 py-2.5 rounded-xl bg-brand-500/[0.08] border border-brand-500/25 space-y-2">
+          <div className="flex items-center justify-between text-xs font-heading text-brand-300">
+            <span>Actualisation des 14 jours · {progress.done}/{progress.total} jours scannés</span>
+            <span className="text-brand-400/70">~8-10 min</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-brand-500/15 overflow-hidden">
+            <div
+              className="h-full bg-brand-400 transition-all duration-500"
+              style={{ width: `${(progress.done / progress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Note: les value bets sont dynamiques */}
       <div className="px-3.5 py-2.5 rounded-xl bg-orange-500/[0.08] border border-orange-500/25">
@@ -348,8 +412,8 @@ export default function ValueBets() {
       {!loading && error && (
         <div className="glass-card p-10 text-center space-y-3">
           <div className="text-5xl font-display text-danger/60">ERR</div>
-          <p className="text-white/50 font-heading font-semibold text-lg">{error}</p>
-          <button onClick={() => load()} className="btn-primary mt-2">Réessayer</button>
+          <p className="text-white/50 font-heading font-semibold text-lg">{error.message || String(error)}</p>
+          <button onClick={() => loadDay(selectedDay, { force: true })} className="btn-primary mt-2">Réessayer</button>
         </div>
       )}
 
