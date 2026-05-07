@@ -7,12 +7,18 @@ import { SkeletonCard, EmptyState, ErrorState } from '../components/ui/Loading';
 
 const TOP_LEAGUES_IDS = [39, 140, 78, 135, 61, 2, 3, 1, 94, 88];
 
-const STANDINGS_LEAGUES = [
+// Top 5 European leagues (always shown at the top of the Classement picker)
+const TOP5_EU_LEAGUES = [
   { id: 39,  name: 'Premier League',    flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', season: 2025 },
   { id: 140, name: 'La Liga',           flag: '🇪🇸', season: 2025 },
   { id: 78,  name: 'Bundesliga',        flag: '🇩🇪', season: 2025 },
   { id: 135, name: 'Serie A',           flag: '🇮🇹', season: 2025 },
   { id: 61,  name: 'Ligue 1',           flag: '🇫🇷', season: 2025 },
+];
+
+// All leagues we know how to show standings for
+const STANDINGS_LEAGUES = [
+  ...TOP5_EU_LEAGUES,
   { id: 2,   name: 'Champions League',  flag: '🏆', season: 2025 },
   { id: 3,   name: 'Europa League',     flag: '🇪🇺', season: 2025 },
   { id: 94,  name: 'Primeira Liga',     flag: '🇵🇹', season: 2025 },
@@ -212,21 +218,11 @@ function StandingsTab() {
     }
   }, [selected, subTab]);
 
-  // Card grid picker — same visual as Compétitions tab
+  // Card grid picker — same visual as Compétitions tab.
+  // Top section: Top 5 European leagues (always shown).
+  // Bottom section: 'Autres compétitions' shown after clicking 'Toutes'.
   if (!selected) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Trophy className="w-4 h-4 text-gold-400" />
-          <h2 className="text-sm font-bold text-white/80">Choisis une compétition pour voir son classement</h2>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {STANDINGS_LEAGUES.map((league) => (
-            <StandingsLeagueCard key={league.id} league={league} onPick={() => setSelected(league)} />
-          ))}
-        </div>
-      </div>
-    );
+    return <StandingsPicker onPick={setSelected} />;
   }
 
   return (
@@ -484,7 +480,59 @@ function StandingsGroup({ group, leagueId, viewMode = 'all' }) {
   );
 }
 
-function StandingsLeagueCard({ league, onPick }) {
+function StandingsPicker({ onPick }) {
+  const [showAll, setShowAll] = useState(false);
+  const others = STANDINGS_LEAGUES.filter(
+    (l) => !TOP5_EU_LEAGUES.some((t) => t.id === l.id),
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Top 5 européens */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Trophy className="w-4 h-4 text-gold-400" />
+          <h2 className="text-sm font-bold text-white/80">Top 5 ligues européennes</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {TOP5_EU_LEAGUES.map((league) => (
+            <StandingsLeagueCard key={league.id} league={league} onPick={() => onPick(league)} featured />
+          ))}
+        </div>
+      </div>
+
+      {/* Toutes les compétitions */}
+      {!showAll ? (
+        <button
+          onClick={() => setShowAll(true)}
+          className="w-full glass-card p-4 flex items-center justify-center gap-2 cursor-pointer hover:border-brand-500/30 transition-all text-sm font-heading font-semibold text-white/60 hover:text-white"
+        >
+          <span>Voir toutes les compétitions</span>
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-white/60">Autres compétitions</h2>
+            <button
+              onClick={() => setShowAll(false)}
+              className="text-xs text-white/35 hover:text-white/60 font-heading"
+            >
+              Réduire
+            </button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {others.map((league) => (
+              <StandingsLeagueCard key={league.id} league={league} onPick={() => onPick(league)} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StandingsLeagueCard({ league, onPick, featured = false }) {
   // Card-grid picker for the Classement sub-tab — visually mirrors the
   // Compétitions LeagueCard but instead of linking to /matchs?league=…,
   // calls onPick to swap the StandingsTab into the league-specific view.
@@ -493,13 +541,17 @@ function StandingsLeagueCard({ league, onPick }) {
       whileHover={{ y: -2 }}
       onClick={onPick}
       type="button"
-      className="glass-card p-4 flex items-center gap-3 cursor-pointer hover:border-brand-500/30 transition-all text-left w-full"
+      className={`glass-card p-4 flex items-center gap-3 cursor-pointer hover:border-brand-500/30 transition-all text-left w-full ${
+        featured ? 'border-brand-500/15' : ''
+      }`}
     >
       <div className="w-11 h-11 rounded-xl bg-dark-700 flex items-center justify-center flex-shrink-0 text-2xl">
         {league.flag}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-white truncate">{league.name}</p>
+        <p className={`font-semibold truncate ${featured ? 'text-white' : 'text-white/80'}`}>
+          {league.name}
+        </p>
         <p className="text-xs text-white/30 mt-0.5">Saison {league.season}</p>
       </div>
       <ChevronRight className="w-4 h-4 text-white/20 flex-shrink-0" />
