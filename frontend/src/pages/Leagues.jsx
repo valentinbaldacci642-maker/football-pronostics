@@ -432,13 +432,19 @@ function TopScorersTable({ scorers }) {
 function FormDots({ form }) {
   if (!form) return null;
   return (
-    <div className="flex gap-0.5">
+    <div className="flex gap-1 justify-center">
       {form.slice(-5).split('').map((c, i) => (
-        <span key={i} className={`w-4 h-4 rounded-sm flex items-center justify-center text-[9px] font-display ${
-          c === 'W' ? 'bg-brand-500/25 text-brand-400' :
-          c === 'D' ? 'bg-white/10 text-white/40' :
-                      'bg-danger/25 text-danger'
-        }`}>{c}</span>
+        <span
+          key={i}
+          className={`w-5 h-5 rounded-sm flex items-center justify-center text-[11px] font-bold leading-none ${
+            c === 'W' ? 'bg-brand-500/30 text-brand-300 border border-brand-500/40' :
+            c === 'D' ? 'bg-white/10 text-white/70 border border-white/20' :
+            c === 'L' ? 'bg-danger/30 text-red-300 border border-danger/40' :
+                        'bg-white/5 text-white/40'
+          }`}
+        >
+          {c}
+        </span>
       ))}
     </div>
   );
