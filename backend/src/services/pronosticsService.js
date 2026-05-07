@@ -51,13 +51,12 @@ class PronosticsService {
     const top10 = upcoming.slice(0, 10);
     const top10Analyses = await this._analyzeBatch(top10, { full: true });
 
-    // Step 2 — LITE SCAN the next 50 priority fixtures (odds-only, 1 call
-    // each). Cap to keep wall-clock under 25s and avoid scanning obscure
-    // youth/reserve leagues that don't have bookmaker markets anyway.
-    // Filter to those with a Shin value bet detected. This catches edge
-    // opportunities on lower-priority leagues that wouldn't have made it
-    // into the top 10 list.
-    const remaining = upcoming.slice(10, 60);
+    // Step 2 — LITE SCAN the next 30 priority fixtures (odds-only, 1 call
+    // each). Cap to keep wall-clock predictable on busy days — exceeding
+    // 120s frontend axios timeout produces a black screen for the user.
+    // Filter to those with a Shin value bet detected. Catches edges on
+    // lower-priority leagues that didn't make the top 10.
+    const remaining = upcoming.slice(10, 40);
     const liteScanCandidates = await this._liteScanForValueBets(remaining);
 
     // Step 3 — full analysis on the lite-scan candidates that DID find a VB.
