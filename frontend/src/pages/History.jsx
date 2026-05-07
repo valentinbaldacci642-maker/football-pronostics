@@ -240,7 +240,7 @@ export default function History() {
       <div className="space-y-2">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {[
-            { label: 'Réussite', value: stats.rate !== null ? `${stats.rate}%` : '—', color: stats.rate >= 55 ? 'text-brand-400' : stats.rate !== null ? 'text-gold-400' : 'text-white/30', icon: Target },
+            { label: stats.settled > 0 ? `Réussite · ${stats.wins}/${stats.settled}` : 'Réussite', value: stats.rate !== null ? `${stats.rate}%` : '—', color: stats.rate >= 55 ? 'text-brand-400' : stats.rate !== null ? 'text-gold-400' : 'text-white/30', icon: Target },
             { label: 'Gagnés', value: stats.wins, color: 'text-brand-400', icon: Check },
             { label: 'Perdus', value: stats.losses, color: 'text-danger', icon: X },
             { label: 'ROI', value: stats.roi !== null ? `${stats.roi > 0 ? '+' : ''}${stats.roi}%` : '—', color: stats.roi > 0 ? 'text-brand-400' : stats.roi !== null ? 'text-danger' : 'text-white/30', icon: TrendingUp },
