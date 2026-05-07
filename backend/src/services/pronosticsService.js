@@ -16,12 +16,11 @@ class PronosticsService {
       const cached = cache.get(cacheKey);
       if (cached && cached.length > 0) return cached;
     } else {
-      // Force-refresh cooldown: even with force=true we refuse to re-scan if
-      // the last scan completed less than 10 min ago. Prevents an aggressive
-      // user from blowing through the daily quota by spamming the Actualiser
-      // button. Returns the cached result instead.
+      // Force-refresh cooldown: minimum 2 min between scans. Prevents
+      // accidental double-clicks / runaway loops from burning the daily
+      // quota, but stays responsive for legitimate manual refresh.
       const lastScan = cache.get(lastScanKey);
-      if (lastScan && Date.now() - lastScan < 10 * 60 * 1000) {
+      if (lastScan && Date.now() - lastScan < 2 * 60 * 1000) {
         const cached = cache.get(cacheKey);
         if (cached && cached.length > 0) return cached;
       }
