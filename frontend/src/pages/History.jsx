@@ -172,6 +172,17 @@ export default function History() {
     if (!ok) return;
     resetBankroll();
   };
+
+  const handleResetStatsOnly = () => {
+    const ok = window.confirm(
+      'Réinitialiser les stats Total / Réussite / Gagnés / ROI ?\n\n' +
+      'Tout l\'historique des pronos sera supprimé (les paris en cours et terminés).\n' +
+      'La bankroll initiale + Kelly + mode edge sont conservés.\n\n' +
+      'Action irréversible.'
+    );
+    if (!ok) return;
+    clearAll();
+  };
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('pending');
   const [search, setSearch] = useState('');
@@ -220,21 +231,34 @@ export default function History() {
       </div>
 
       {/* Stats globales */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        {[
-          { label: 'Total', value: stats.total, color: 'text-white', icon: BarChart3 },
-          { label: 'Réussite', value: stats.rate !== null ? `${stats.rate}%` : '—', color: stats.rate >= 55 ? 'text-brand-400' : stats.rate !== null ? 'text-gold-400' : 'text-white/30', icon: Target },
-          { label: 'Gagnés', value: stats.wins, color: 'text-brand-400', icon: Check },
-          { label: 'ROI', value: stats.roi !== null ? `${stats.roi > 0 ? '+' : ''}${stats.roi}%` : '—', color: stats.roi > 0 ? 'text-brand-400' : stats.roi !== null ? 'text-danger' : 'text-white/30', icon: TrendingUp },
-        ].map(({ label, value, color, icon: Icon }) => (
-          <div key={label} className="glass-card px-3.5 py-3 flex items-center gap-3">
-            <Icon className={`w-4 h-4 flex-shrink-0 ${color}`} />
-            <div className="min-w-0">
-              <p className={`stat-number text-xl leading-none ${color}`}>{value}</p>
-              <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">{label}</p>
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {[
+            { label: 'Total', value: stats.total, color: 'text-white', icon: BarChart3 },
+            { label: 'Réussite', value: stats.rate !== null ? `${stats.rate}%` : '—', color: stats.rate >= 55 ? 'text-brand-400' : stats.rate !== null ? 'text-gold-400' : 'text-white/30', icon: Target },
+            { label: 'Gagnés', value: stats.wins, color: 'text-brand-400', icon: Check },
+            { label: 'ROI', value: stats.roi !== null ? `${stats.roi > 0 ? '+' : ''}${stats.roi}%` : '—', color: stats.roi > 0 ? 'text-brand-400' : stats.roi !== null ? 'text-danger' : 'text-white/30', icon: TrendingUp },
+          ].map(({ label, value, color, icon: Icon }) => (
+            <div key={label} className="glass-card px-3.5 py-3 flex items-center gap-3">
+              <Icon className={`w-4 h-4 flex-shrink-0 ${color}`} />
+              <div className="min-w-0">
+                <p className={`stat-number text-xl leading-none ${color}`}>{value}</p>
+                <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">{label}</p>
+              </div>
             </div>
+          ))}
+        </div>
+        {stats.total > 0 && (
+          <div className="flex justify-end">
+            <button
+              onClick={handleResetStatsOnly}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.06] text-[11px] font-heading font-semibold text-white/35 hover:text-white/70 hover:border-white/15 transition-all"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Réinitialiser ces stats
+            </button>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Tabs */}
