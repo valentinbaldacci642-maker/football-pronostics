@@ -43,6 +43,11 @@ app.use(cors(corsOptions));
 // can't reintroduce the 200-cap that was blocking pronostics page loads.
 // Real protection sits one layer up in apiFootball.js (upstream quota
 // short-circuit) and at the API-Football provider level.
+// Trust the first proxy in front (Render's load balancer) so
+// express-rate-limit can correctly read X-Forwarded-For for IP
+// identification. Avoids ERR_ERL_UNEXPECTED_X_FORWARDED_FOR warning.
+app.set('trust proxy', 1);
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100000,
