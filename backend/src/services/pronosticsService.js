@@ -95,8 +95,18 @@ class PronosticsService {
       return true;
     }).sort((a, b) => b.confidence - a.confidence);
 
+    // Two-tier inclusion:
+    //   1. Confident matches (≥45) → always shown
+    //   2. Matches with ANY value bet → always shown (even if confidence is low)
+    //      so a Shin VB from clean bookmaker odds can never be silently dropped
+    //      because the prediction-derived confidence happened to fall short.
+    //   3. Fallback: top 3 by confidence so the homepage never shows nothing.
+    const hasVB = (p) => ((p.analysis?.odds?.valueBets) || []).length > 0;
     const reliable = unique.filter((p) => p.confidence >= 45);
-    const pronostics = reliable.length > 0 ? reliable : unique.slice(0, 3);
+    const valueBetMatches = unique.filter((p) => p.confidence < 45 && hasVB(p));
+    const pronostics = (reliable.length > 0 || valueBetMatches.length > 0)
+      ? [...reliable, ...valueBetMatches]
+      : unique.slice(0, 3);
 
     cache.set(cacheKey, pronostics, 2 * 3600);          // 2h cache (Ultra quota allows fresher data)
     cache.set(lastScanKey, Date.now(), 2 * 3600);       // mark last scan time
@@ -155,7 +165,27 @@ class PronosticsService {
         const fixture = fixtures[i];
         const fullAnalysis = analysisService.buildFullAnalysis(oddsAnalysis, predAnalysis, fixture);
         const confidence = this._calculateConfidence(predAnalysis, oddsAnalysis);
-        const pick = this._selectBestPick(fullAnalysis, fixture);
+        let pick = this._selectBestPick(fullAnalysis, fixture);
+        // If no pick was selected but the match has at least one Shin value
+        // bet, synthesise a pick from the top VB so the match still shows.
+        // Without this fallback, a non-1X2 VB on a clear-favorite match
+        // (e.g. BTTS on PSG-Bayern) would silently drop the entire match
+        // because _selectBestPick prefers a 1X2 pick that doesn't exist.
+        if (!pick) {
+          const vbs = oddsAnalysis?.valueBets || [];
+          if (vbs.length > 0) {
+            const top = vbs[0];
+            pick = {
+              market: top.market,
+              selection: top.selection,
+              selectionLabel: this._selectionLabel(top.selection, fixture.teams?.home?.name, fixture.teams?.away?.name),
+              probability: top.trueProb ?? top.prob,
+              odd: top.odd,
+              isValue: true,
+              edge: top.edge,
+            };
+          }
+        }
         if (!pick) return null;
         return { fixture, analysis: fullAnalysis, confidence, pick };
       })
@@ -213,16 +243,33 @@ class PronosticsService {
       lineupContext = this._computeLineupContext(lineups, topScorers, homeId, awayId);
     }
 
-    const oddsAnalysis = oddsRaw ? analysisService.analyzeFixtureOdds(oddsRaw) : null;
-    const predAnalysis = predRaw
-      ? analysisService.analyzePredictions(predRaw, teamStats, lineupContext)
-      : null;
+    // Each analysis step is isolated — a bug in predictions analysis must
+    // never silently drop a match whose bookmaker odds yielded a clean Shin
+    // value bet. Same logic for the cross-source enrichment.
+    let oddsAnalysis = null;
+    if (oddsRaw) {
+      try {
+        oddsAnalysis = analysisService.analyzeFixtureOdds(oddsRaw);
+      } catch (e) {
+        logger.warn(`analyzeFixtureOdds failed for fixture ${fixtureId}: ${e.message}`);
+      }
+    }
 
-    // Cross-source enrichment: add Poisson + lineup-derived value bets on
-    // top of Shin detection. Only runs in 'full' mode where xG is reliable
-    // (lite mode skips because expectedGoals is null without season stats).
+    let predAnalysis = null;
+    if (predRaw) {
+      try {
+        predAnalysis = analysisService.analyzePredictions(predRaw, teamStats, lineupContext);
+      } catch (e) {
+        logger.warn(`analyzePredictions failed for fixture ${fixtureId}: ${e.message}`);
+      }
+    }
+
     if (oddsAnalysis && predAnalysis?.expectedGoals) {
-      analysisService.enrichValueBetsWithSources(oddsAnalysis, predAnalysis);
+      try {
+        analysisService.enrichValueBetsWithSources(oddsAnalysis, predAnalysis);
+      } catch (e) {
+        logger.warn(`enrichValueBetsWithSources failed for fixture ${fixtureId}: ${e.message}`);
+      }
     }
 
     return { oddsAnalysis, predAnalysis };
