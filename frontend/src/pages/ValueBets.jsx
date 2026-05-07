@@ -143,7 +143,7 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
 }
 
 function buildDayOptions() {
-  return [0, 1, 2, 3, 4, 5, 6].map((offset) => {
+  return Array.from({ length: 14 }, (_, i) => i).map((offset) => {
     const d = new Date();
     d.setDate(d.getDate() + offset);
     const iso = d.toISOString().split('T')[0];
