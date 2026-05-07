@@ -333,6 +333,12 @@ export default function ValueBets() {
 
       {loading && (
         <div className="space-y-3">
+          <div className="px-3.5 py-2.5 rounded-xl bg-brand-500/[0.08] border border-brand-500/25 flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-brand-400 animate-spin flex-shrink-0" />
+            <p className="text-xs text-brand-300 font-heading leading-relaxed">
+              Analyse en cours · scan des matchs et détection des value bets sur toutes les ligues du jour. Peut prendre 30-50 secondes au premier chargement.
+            </p>
+          </div>
           {[...Array(3)].map((_, i) => (
             <div key={i} className="football-card p-4 h-24 skeleton" />
           ))}
