@@ -19,9 +19,14 @@ const FEEDS = [
 ];
 
 // Hi-res favicon URL via Google's S2 service. Returns a real PNG (~120px) of
-// the site's branding — works for every domain in FEEDS. Used as the visible
-// thumbnail when the article doesn't carry its own image.
-const SOURCE_DOMAIN = Object.fromEntries(FEEDS.map((f) => [f.source, f.domain]));
+// the site's branding. Used as the visible thumbnail when the article doesn't
+// carry its own image. Includes sources from the backend feed list too.
+const SOURCE_DOMAIN = {
+  ...Object.fromEntries(FEEDS.map((f) => [f.source, f.domain])),
+  "BBC Sport":    'bbc.co.uk',
+  "Le Monde":     'lemonde.fr',
+  "Google News":  'news.google.com',
+};
 function sourceLogo(source) {
   const domain = SOURCE_DOMAIN[source];
   if (!domain) return null;
@@ -156,12 +161,14 @@ async function fetchDirectRSS() {
     .slice(0, 40);
 }
 const SOURCE_COLORS = {
-  "Google News":  { bg: 'bg-blue-500/15 text-blue-400',    dot: 'bg-blue-400' },
-  "RMC Sport":    { bg: 'bg-brand-500/15 text-brand-400',  dot: 'bg-brand-400' },
-  "90min":        { bg: 'bg-gold-500/15 text-gold-400',    dot: 'bg-gold-400' },
-  "L'Équipe":     { bg: 'bg-red-500/15 text-red-400',      dot: 'bg-red-400' },
+  "Google News":  { bg: 'bg-blue-500/15 text-blue-400',     dot: 'bg-blue-400' },
+  "RMC Sport":    { bg: 'bg-brand-500/15 text-brand-400',   dot: 'bg-brand-400' },
+  "90min":        { bg: 'bg-gold-500/15 text-gold-400',     dot: 'bg-gold-400' },
+  "L'Équipe":     { bg: 'bg-red-500/15 text-red-400',       dot: 'bg-red-400' },
   "Maxifoot":     { bg: 'bg-violet-500/15 text-violet-400', dot: 'bg-violet-400' },
   "Foot Mercato": { bg: 'bg-orange-500/15 text-orange-400', dot: 'bg-orange-400' },
+  "BBC Sport":    { bg: 'bg-yellow-500/15 text-yellow-400', dot: 'bg-yellow-400' },
+  "Le Monde":     { bg: 'bg-info/15 text-info',             dot: 'bg-info' },
 };
 
 function timeAgo(dateStr) {
