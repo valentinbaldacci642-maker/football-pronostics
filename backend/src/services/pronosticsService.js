@@ -141,10 +141,17 @@ class PronosticsService {
     return analyses
       .map((result, i) => {
         if (result.status !== 'fulfilled' || !result.value) return null;
-        const { oddsAnalysis, predAnalysis } = result.value;
+        const { oddsAnalysis, predAnalysis: rawPred } = result.value;
+        // Predictions API can return wonky percentages on lopsided fixtures
+        // (e.g. home=0% / away=95%) or leagues with sparse data — that flips
+        // probabilitiesReliable to false. Previously we dropped the match
+        // entirely, which silenced Shin value bets that the bookmaker odds
+        // alone fully justify. Now we degrade to odds-only when predictions
+        // are unreliable, so the VB still surfaces.
+        const predAnalysis = (rawPred && rawPred.probabilitiesReliable === false)
+          ? null
+          : rawPred;
         if (!predAnalysis && !oddsAnalysis) return null;
-        const predUnreliable = predAnalysis && predAnalysis.probabilitiesReliable === false;
-        if (predUnreliable) return null;
         const fixture = fixtures[i];
         const fullAnalysis = analysisService.buildFullAnalysis(oddsAnalysis, predAnalysis, fixture);
         const confidence = this._calculateConfidence(predAnalysis, oddsAnalysis);
