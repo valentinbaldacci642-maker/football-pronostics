@@ -143,7 +143,7 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
 }
 
 function buildDayOptions() {
-  return Array.from({ length: 14 }, (_, i) => i).map((offset) => {
+  return Array.from({ length: 7 }, (_, i) => i).map((offset) => {
     const d = new Date();
     d.setDate(d.getDate() + offset);
     const iso = d.toISOString().split('T')[0];
@@ -157,7 +157,7 @@ function buildDayOptions() {
 
 export default function ValueBets() {
   // pronosticsByDay: { 'YYYY-MM-DD': [...pronostics] } — fetched in the
-  // background for all 14 days so navigation is instant once loaded.
+  // background for all 7 days so navigation is instant once loaded.
   const [pronosticsByDay, setPronosticsByDay] = useState({});
   const [loadingDays, setLoadingDays] = useState({}); // { 'YYYY-MM-DD': true }
   const [error, setError] = useState(null);
@@ -205,7 +205,8 @@ export default function ValueBets() {
   // Backend's outbound throttler caps at 420/min, so 3 concurrent day-scans
   // saturate the queue without bursting upstream. Triggered manually by the
   // Actualiser button — not on mount, to avoid burning the daily quota when
-  // the user only wants to glance at today.
+  // the user only wants to glance at today. 7 days × ~280 req ≈ 2000 req,
+  // ~5 min at 420/min throttle.
   const loadAllDays = async ({ force = false, concurrency = 3 } = {}) => {
     setError(null);
     const total = dayOptions.length;
@@ -319,7 +320,7 @@ export default function ValueBets() {
           onClick={() => loadAllDays({ force: true })}
           disabled={progress.total > 0}
           className="btn-ghost !px-2.5 !py-2 flex items-center gap-2"
-          title="Actualise les 14 jours d'un coup"
+          title="Actualise les 7 jours d'un coup"
         >
           <RefreshCw className={clsx('w-4 h-4', progress.total > 0 && 'animate-spin')} />
           <span className="text-xs hidden sm:block font-heading font-semibold tracking-wide">
@@ -332,8 +333,8 @@ export default function ValueBets() {
       {progress.total > 0 && (
         <div className="px-3.5 py-2.5 rounded-xl bg-brand-500/[0.08] border border-brand-500/25 space-y-2">
           <div className="flex items-center justify-between text-xs font-heading text-brand-300">
-            <span>Actualisation des 14 jours · {progress.done}/{progress.total} jours scannés</span>
-            <span className="text-brand-400/70">~8-10 min</span>
+            <span>Actualisation des 7 jours · {progress.done}/{progress.total} jours scannés</span>
+            <span className="text-brand-400/70">~4-5 min</span>
           </div>
           <div className="h-1.5 rounded-full bg-brand-500/15 overflow-hidden">
             <div
