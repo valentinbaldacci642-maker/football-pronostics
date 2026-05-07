@@ -17,7 +17,7 @@ router.get('/today', async (req, res, next) => {
       data,
       count: data.length,
       date: date || new Date().toISOString().split('T')[0],
-      engine: 'lite-scan-v3-6h-cache',
+      engine: 'lite-scan-v4-ultra',
     });
   } catch (err) {
     next(err);

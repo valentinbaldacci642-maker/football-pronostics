@@ -16,11 +16,10 @@ class PronosticsService {
       const cached = cache.get(cacheKey);
       if (cached && cached.length > 0) return cached;
     } else {
-      // Force-refresh cooldown: minimum 2 min between scans. Prevents
-      // accidental double-clicks / runaway loops from burning the daily
-      // quota, but stays responsive for legitimate manual refresh.
+      // Force-refresh cooldown: minimum 1 min between scans. Just enough
+      // to prevent double-clicks / runaway loops on Ultra's generous quota.
       const lastScan = cache.get(lastScanKey);
-      if (lastScan && Date.now() - lastScan < 2 * 60 * 1000) {
+      if (lastScan && Date.now() - lastScan < 60 * 1000) {
         const cached = cache.get(cacheKey);
         if (cached && cached.length > 0) return cached;
       }
@@ -51,17 +50,15 @@ class PronosticsService {
     const top10 = upcoming.slice(0, 10);
     const top10Analyses = await this._analyzeBatch(top10, { full: true });
 
-    // Step 2 — LITE SCAN the next 30 priority fixtures (odds-only, 1 call
-    // each). Cap to keep wall-clock predictable on busy days — exceeding
-    // 120s frontend axios timeout produces a black screen for the user.
-    // Filter to those with a Shin value bet detected. Catches edges on
-    // lower-priority leagues that didn't make the top 10.
-    const remaining = upcoming.slice(10, 40);
+    // Step 2 — LITE SCAN the next 90 priority fixtures (odds-only, 1 call
+    // each). On Ultra plan we have generous quota so we can cover a much
+    // larger slice of the day's matches than under Pro.
+    const remaining = upcoming.slice(10, 100);
     const liteScanCandidates = await this._liteScanForValueBets(remaining);
 
     // Step 3 — full analysis on the lite-scan candidates that DID find a VB.
-    // Only these get the expensive enrichment. Caps at 20 to bound cost.
-    const cappedCandidates = liteScanCandidates.slice(0, 20);
+    // Cap at 40 to bound cost on exceptionally rich days.
+    const cappedCandidates = liteScanCandidates.slice(0, 40);
     const candidateAnalyses = await this._analyzeBatch(cappedCandidates, { full: true });
 
     // Combine
@@ -82,8 +79,8 @@ class PronosticsService {
     const reliable = unique.filter((p) => p.confidence >= 45);
     const pronostics = reliable.length > 0 ? reliable : unique.slice(0, 3);
 
-    cache.set(cacheKey, pronostics, 6 * 3600);          // 6h cache
-    cache.set(lastScanKey, Date.now(), 6 * 3600);       // mark last scan time
+    cache.set(cacheKey, pronostics, 2 * 3600);          // 2h cache (Ultra quota allows fresher data)
+    cache.set(lastScanKey, Date.now(), 2 * 3600);       // mark last scan time
     logger.info(`Pronostics: ${pronostics.length} returned (top10=${top10.length}, lite-scanned=${remaining.length}, VB candidates=${cappedCandidates.length})`);
     return pronostics;
   }
