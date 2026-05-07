@@ -331,6 +331,23 @@ export default function Help() {
 
       {/* Détection des value bets */}
       <Section icon={Zap} title="Comment les value bets sont détectés" color="info">
+        <div className="p-3 rounded-lg bg-brand-500/[0.08] border border-brand-500/25 space-y-2 mb-3">
+          <p className="font-heading font-bold text-brand-300">Périmètre du scan quotidien</p>
+          <p className="text-xs text-white/70">
+            Chaque jour l'app scanne les <strong className="text-white">60 matchs prioritaires</strong>{' '}
+            (UCL → UEL → Conf League → Top 5 → ligues majeures) :
+          </p>
+          <ul className="ml-3 space-y-1 text-xs text-white/70">
+            <li>• <strong className="text-white">Top 10 prioritaires</strong> → analyse complète Shin + Poisson + lineups (toujours affichés, même sans VB)</li>
+            <li>• <strong className="text-white">50 matchs suivants</strong> → lite scan odds-only (1 appel API par match)</li>
+            <li>• Sur ces 50, les matchs avec un value bet Shin détecté passent en analyse complète, <strong className="text-white">capé à 20 max</strong></li>
+            <li>• <strong className="text-white">Total renvoyé</strong> : 10-30 matchs (10 top + jusqu'à 20 VBs trouvés sur les 50 suivants)</li>
+          </ul>
+          <p className="text-xs text-white/50 italic">
+            Les matchs au-delà du 60ème par priorité (youth, reserve, ligues exotiques sans cotes bookies) ne sont pas scannés.
+            Le scan complet prend ~25-50 sec à froid, puis le résultat est mis en cache 1h.
+          </p>
+        </div>
         <p>
           La détection se fait par la fonction <code className="text-brand-300">detectValueBet</code>
           {' '}sur 3 marchés. Pour qu'un pari soit marqué <strong>VALUE</strong>, il
