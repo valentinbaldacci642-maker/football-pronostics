@@ -4,16 +4,21 @@ const logger = require('../utils/logger');
 const cache = require('../utils/cache');
 
 /**
- * Sliding-window rate limiter for outbound calls. API-Football Pro plan
- * enforces 300 req/min, so we cap ourselves at 295 to stay safely under
- * with a small margin. Cache hits bypass the limiter (no API call → no
- * quota consumed). On a hot cache the limiter is invisible; on cold-burst
- * it queues calls FIFO with ~203ms spacing once headroom is gone.
+ * Outbound rate limiter for API-Football. Two safeguards:
+ *  1) Sliding-window cap (max 280 / 60s) — backstop matching their per-min quota.
+ *  2) Minimum gap between consecutive requests (240ms) — prevents bursts that
+ *     would technically fit the 60s window but exceed their per-second tolerance.
+ *
+ * Cache hits bypass the limiter (no API call → no quota consumed). On a hot
+ * cache the limiter is invisible; on a cold burst (e.g. opening MatchDetail
+ * fires 7 calls), each request is paced ~240ms apart, capping us at ~4 req/s
+ * sustained — well below the 300/min ceiling without bursting.
  */
 class OutboundRateLimiter {
-  constructor(maxPerMinute = 295) {
+  constructor(maxPerMinute = 280, minGapMs = 240) {
     this.max = maxPerMinute;
     this.windowMs = 60_000;
+    this.minGapMs = minGapMs;
     this.timestamps = [];   // monotonic timestamps of recent calls
     this.queue = [];        // pending acquire() resolvers, FIFO
     this.processing = false;
@@ -36,23 +41,29 @@ class OutboundRateLimiter {
     this.processing = false;
     if (this.queue.length === 0) return;
     const now = Date.now();
-    // Drop timestamps older than the rolling window
     const cutoff = now - this.windowMs;
     while (this.timestamps.length && this.timestamps[0] <= cutoff) {
       this.timestamps.shift();
     }
-    if (this.timestamps.length < this.max) {
+
+    // Check minimum gap from last request
+    const lastTs = this.timestamps.length ? this.timestamps[this.timestamps.length - 1] : 0;
+    const gapWait = lastTs ? Math.max(0, (lastTs + this.minGapMs) - now) : 0;
+
+    if (this.timestamps.length < this.max && gapWait === 0) {
       this.timestamps.push(now);
       const resolve = this.queue.shift();
       resolve();
-      // Process the next item on the next microtask so a long burst doesn't
-      // monopolize the event loop.
       if (this.queue.length > 0) this._tick();
       return;
     }
-    // No headroom: wait until the oldest call drops out of the window.
-    const waitMs = (this.timestamps[0] + this.windowMs) - now + 5;
-    setTimeout(() => this._drain(), Math.max(10, waitMs));
+
+    // Either window full or gap not elapsed — wait for the relevant condition
+    const windowWait = this.timestamps.length >= this.max
+      ? (this.timestamps[0] + this.windowMs) - now + 5
+      : 0;
+    const waitMs = Math.max(gapWait, windowWait, 10);
+    setTimeout(() => this._drain(), waitMs);
   }
 }
 
@@ -64,9 +75,9 @@ class ApiFootballService {
     // so we can short-circuit subsequent calls instead of hammering and burning
     // through the per-minute window. Window is API-Football's 60s rolling.
     this.rateLimitedUntil = 0;
-    // Outbound throttle: hard ceiling at 295 req/min (under the 300/min Pro
-    // limit). Cache hits skip this entirely so normal browsing stays fast.
-    this.limiter = new OutboundRateLimiter(295);
+    // Outbound throttle: 280 req/min cap + 240ms minimum gap between calls.
+    // Cache hits skip this entirely so normal browsing stays fast.
+    this.limiter = new OutboundRateLimiter(280, 240);
 
     this.client = axios.create({
       baseURL: config.api.baseUrl,

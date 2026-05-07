@@ -1,45 +1,58 @@
 import { fixturesApi } from '../services/api';
 
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN'];
-const MAX_LOOKUPS = 30;
+const MAX_LOOKUPS = 20;
 const MAX_AGE_DAYS = 14;
+const MIN_AGE_MINUTES = 90; // matches need ~90 min of play before finishing
+const REQUEST_GAP_MS = 250;
 
 /**
- * Try to resolve unresolved entries from the past N days by querying the API
- * for each fixture's final status. Calls onResolve(fixtureId, hg, ag) for any
- * match that's now finished.
- *
- * Returns { checked, resolved } counts.
+ * Resolve unresolved bets from the past N days by querying each fixture's
+ * final status. Sequential with a small gap so we don't burst the upstream
+ * rate limit; only checks bets old enough that the match could plausibly be
+ * over (savedAt + 90min). Calls onResolve(fixtureId, hg, ag) for finished
+ * matches.
  */
 export async function resolveFinishedMatches(entries, onResolve) {
-  const cutoff = new Date();
+  const now = Date.now();
+  const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - MAX_AGE_DAYS);
   const cutoffStr = cutoff.toISOString().split('T')[0];
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date(now).toISOString().split('T')[0];
+  const minAgeMs = MIN_AGE_MINUTES * 60_000;
 
   const candidates = entries
-    .filter((e) => !e.result && e.fixtureId && e.date && e.date >= cutoffStr && e.date <= todayStr)
+    .filter((e) => {
+      if (e.result || !e.fixtureId || !e.date) return false;
+      if (e.date < cutoffStr || e.date > todayStr) return false;
+      // Skip bets too fresh — match not over yet, no point hitting the API
+      const saved = e.savedAt ? new Date(e.savedAt).getTime() : 0;
+      if (saved && now - saved < minAgeMs) return false;
+      return true;
+    })
     .slice(0, MAX_LOOKUPS);
 
   if (candidates.length === 0) return { checked: 0, resolved: 0 };
 
-  const results = await Promise.allSettled(
-    candidates.map((e) => fixturesApi.getById(e.fixtureId).then((res) => ({ entry: e, raw: res })))
-  );
-
   let resolved = 0;
-  results.forEach((r) => {
-    if (r.status !== 'fulfilled') return;
-    const { entry, raw } = r.value;
-    const fixture = raw?.response?.[0] || raw?.data?.response?.[0];
-    const status = fixture?.fixture?.status?.short;
-    const hg = fixture?.goals?.home;
-    const ag = fixture?.goals?.away;
-    if (FINISHED_STATUSES.includes(status) && Number.isFinite(hg) && Number.isFinite(ag)) {
-      onResolve(entry.fixtureId, hg, ag);
-      resolved += 1;
+  // Sequential with a small gap — keeps us well under the upstream
+  // 295-req/min ceiling even if other parts of the app are also calling.
+  for (const entry of candidates) {
+    try {
+      const raw = await fixturesApi.getById(entry.fixtureId);
+      const fixture = raw?.response?.[0] || raw?.data?.response?.[0];
+      const status = fixture?.fixture?.status?.short;
+      const hg = fixture?.goals?.home;
+      const ag = fixture?.goals?.away;
+      if (FINISHED_STATUSES.includes(status) && Number.isFinite(hg) && Number.isFinite(ag)) {
+        onResolve(entry.fixtureId, hg, ag);
+        resolved += 1;
+      }
+    } catch {
+      // Single-call failure is fine — try the next one
     }
-  });
+    await new Promise((r) => setTimeout(r, REQUEST_GAP_MS));
+  }
 
   return { checked: candidates.length, resolved };
 }

@@ -5,14 +5,14 @@ module.exports = {
     timeout: 15000,
   },
   cache: {
-    ttl: parseInt(process.env.CACHE_TTL) || 300,
-    maxKeys: parseInt(process.env.CACHE_MAX_KEYS) || 500,
-    ttlLive: 60,
-    ttlOdds: 300,
-    ttlFixtures: 600,
-    ttlTeams: 7200,
-    ttlTransfers: 180,
-    ttlLeagues: 86400,
+    ttl: parseInt(process.env.CACHE_TTL) || 600,        // default 10 min
+    maxKeys: parseInt(process.env.CACHE_MAX_KEYS) || 1000,
+    ttlLive: 60,                                          // 1 min live data
+    ttlOdds: 900,                                         // 15 min — odds drift slowly
+    ttlFixtures: 1200,                                    // 20 min — fixture metadata stable
+    ttlTeams: 7200,                                       // 2 h — team profiles
+    ttlTransfers: 600,                                    // 10 min
+    ttlLeagues: 86400,                                    // 24 h
   },
   valueBet: {
     minEdge: 5,

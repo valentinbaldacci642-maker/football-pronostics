@@ -63,7 +63,7 @@ export default function App() {
     };
 
     tick(); // initial run
-    const id = setInterval(tick, 5 * 60 * 1000);
+    const id = setInterval(tick, 15 * 60 * 1000); // every 15 min
     const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
