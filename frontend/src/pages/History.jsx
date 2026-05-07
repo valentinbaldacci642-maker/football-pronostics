@@ -29,6 +29,11 @@ function flattenBets(entries) {
   const list = [];
   for (const e of entries) {
     if (Number.isFinite(e.mise) && e.mise > 0) {
+      // Fallback for legacy entries: any pronos pick that's a value bet
+      // shows at least the Shin badge (every detected VB has Shin).
+      const fallbackSources = e.pickSources && e.pickSources.length
+        ? e.pickSources
+        : (e.pickIsValue ? ['shin'] : []);
       list.push({
         key: `${e.fixtureId}::main`,
         fixtureId: e.fixtureId,
@@ -45,12 +50,15 @@ function flattenBets(entries) {
         result: e.result || null,
         finalScore: e.finalScore || null,
         source: 'pronos',
-        detectionSources: e.pickSources || [],
+        detectionSources: fallbackSources,
       });
     }
     for (const [betKey, bet] of Object.entries(e.bets || {})) {
       if (!Number.isFinite(bet.mise) || bet.mise <= 0) continue;
       const [market, selection] = betKey.split('::');
+      // Per-VB stakes always come from the value-bets page → Shin minimum.
+      // If sources were stored at save time, use those; otherwise fall back.
+      const fallbackSources = (bet.sources && bet.sources.length) ? bet.sources : ['shin'];
       list.push({
         key: `${e.fixtureId}::${betKey}`,
         fixtureId: e.fixtureId,
@@ -66,7 +74,7 @@ function flattenBets(entries) {
         result: bet.result || null,
         finalScore: e.finalScore || null,
         source: 'value-bet',
-        detectionSources: bet.sources || [],
+        detectionSources: fallbackSources,
       });
     }
   }
