@@ -32,7 +32,11 @@ const TOP_LEAGUES = [
 
 function SidebarContent({ onClose }) {
   return (
-    <div className="flex flex-col h-full py-5 px-3 overflow-y-auto overscroll-contain">
+    // pb-28 + safe-area on mobile so the Settings cog clears the BottomNav.
+    <div
+      className="flex flex-col h-full pt-5 px-3 overflow-y-auto overscroll-contain pb-5 lg:pb-5"
+      style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}
+    >
       {/* Logo */}
       <NavLink to="/" onClick={onClose} className="flex items-center gap-3 mb-6 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors">
         <div className="relative">
