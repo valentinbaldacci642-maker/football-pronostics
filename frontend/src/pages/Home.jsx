@@ -250,9 +250,24 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         </div>
       )}
 
-      {/* Value bets widget removed: matches with detected value bets are filtered
-          out of /pronostics and live exclusively on /value-bets so the two pages
-          don't overlap. */}
+      {/* Value bets indicator — shown when this match has at least one
+          detected value bet. Clickable shortcut to the dedicated /value-bets
+          page where users can see the full list with Kelly stakes. */}
+      {allValueBets.length > 0 && (
+        <Link
+          to="/value-bets"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gold-500/[0.08] border border-gold-500/25 hover:border-gold-500/50 hover:bg-gold-500/[0.12] transition-all"
+        >
+          <Flame className="w-4 h-4 text-gold-400 flex-shrink-0" />
+          <span className="text-xs font-heading font-semibold text-gold-300 flex-1">
+            {allValueBets.length === 1
+              ? '1 value bet détecté'
+              : `${allValueBets.length} value bets détectés`}
+          </span>
+          <ChevronRight className="w-3.5 h-3.5 text-gold-400/70" />
+        </Link>
+      )}
 
       {/* Kelly stake suggestion + actual stake/odd input (when there's a pick with odds) */}
       {pick?.odd && (
@@ -612,65 +627,33 @@ export default function Home() {
         </div>
       )}
 
-      {/* Pronostics — strictly NON-value-bet matches.
-          Matches with detected value bets live on the /value-bets page so the
-          two views don't overlap. This page shows the safer 'informational'
-          predictions where the bookmaker priced everything fairly. */}
-      {!loading && !error && pronostics.length > 0 && (() => {
-        const hasAnyValueBet = (p) =>
-          p.pick?.isValue || (p.analysis?.odds?.valueBets || []).length > 0;
-        const nonValuePronos = pronostics.filter((p) => !hasAnyValueBet(p));
-
-        if (nonValuePronos.length === 0) {
-          return (
-            <div className="glass-card p-12 text-center space-y-4">
-              <Flame className="w-10 h-10 text-gold-400 mx-auto" />
-              <div>
-                <p className="text-white/80 font-heading font-bold">Tous les pronos du jour sont des value bets</p>
-                <p className="text-white/40 text-xs mt-1 font-heading max-w-md mx-auto">
-                  Excellente journée pour parier ! Tous les top pronos détectés ont un edge mathématique.
-                  Va dans Value bets pour voir la liste avec les mises Kelly.
-                </p>
-              </div>
-              <Link to="/value-bets" className="inline-flex items-center gap-2 btn-primary mt-2">
-                Voir les value bets <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
-          );
-        }
-
-        return (
+      {/* Top 10 pronos — every match (value-bet ones too). Cards with
+          detected value bets show a 'X value bets détectés' indicator that
+          links to /value-bets for the dedicated Kelly view. */}
+      {!loading && !error && pronostics.length > 0 && (
         <>
-          {isLowConfidenceFallback ? (
+          {isLowConfidenceFallback && (
             <div className="px-3.5 py-2.5 rounded-xl bg-gold-500/[0.06] border border-gold-500/20">
               <p className="text-xs text-gold-400/70 font-heading leading-relaxed">
                 <span className="text-gold-400 font-semibold">Données limitées aujourd'hui —</span>{' '}
                 Aucun pronostic à haute confiance disponible. Voici les meilleures opportunités du jour à titre indicatif.
               </p>
             </div>
-          ) : (
-            <div className="px-3.5 py-2.5 rounded-xl bg-dark-800/60 border border-white/[0.04]">
-              <p className="text-xs text-white/20 font-heading leading-relaxed">
-                <span className="text-white/40 font-semibold">Pronos informatifs —</span>{' '}
-                Prédictions sans edge mathématique (cotes bookies alignées). Pas conseillés
-                à parier. Pour les paris rentables, va dans <Link to="/value-bets" className="text-gold-400 hover:underline">Value bets</Link>.
-              </p>
-            </div>
           )}
 
-          <PronosticCard pronostic={nonValuePronos[0]} featured index={0} />
+          <PronosticCard pronostic={pronostics[0]} featured index={0} />
 
           {/* Top 10 meilleurs pronos — featured ([0]) + 9 next, by confidence desc */}
           <div className="space-y-3 pt-2">
             <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">
               Top 10 meilleurs pronos du jour
             </h2>
-            {nonValuePronos.slice(1, 10).length === 0 ? (
+            {pronostics.slice(1, 10).length === 0 ? (
               <div className="text-center text-xs text-white/30 py-6 font-heading">
                 Aucun autre prono pour ce jour. Reviens plus tard ou clique Actualiser.
               </div>
             ) : (
-              nonValuePronos.slice(1, 10).map((p, i) => (
+              pronostics.slice(1, 10).map((p, i) => (
                 <Link
                   key={p.fixture?.fixture?.id || i}
                   to={`/match/${p.fixture?.fixture?.id}`}
@@ -682,8 +665,7 @@ export default function Home() {
             )}
           </div>
         </>
-        );
-      })()}
+      )}
     </div>
   );
 }
