@@ -5,26 +5,55 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 
+// Direct site RSS feeds — Google News RSS strips article images so we'd
+// always render placeholders. Native feeds expose <media:content> or
+// <enclosure> with the lead image of the article, which gives us thumbnails.
 const FEEDS = [
-  { url: 'https://news.google.com/rss/search?q=site:rmcsport.bfmtv.com+football&hl=fr&gl=FR&ceid=FR:fr', source: 'RMC Sport' },
-  { url: 'https://news.google.com/rss/search?q=site:90min.com+football&hl=fr&gl=FR&ceid=FR:fr', source: '90min' },
-  { url: 'https://news.google.com/rss/search?q=site:lequipe.fr+football&hl=fr&gl=FR&ceid=FR:fr', source: "L'Équipe" },
-  { url: 'https://news.google.com/rss/search?q=site:maxifoot.fr&hl=fr&gl=FR&ceid=FR:fr', source: 'Maxifoot' },
-  { url: 'https://news.google.com/rss/search?q=site:footmercato.net&hl=fr&gl=FR&ceid=FR:fr', source: 'Foot Mercato' },
+  { url: 'https://www.lequipe.fr/rss/actu_rss_Football.xml', source: "L'Équipe" },
+  { url: 'https://www.footmercato.net/rss', source: 'Foot Mercato' },
+  { url: 'https://www.eurosport.fr/football/rss.xml', source: 'Eurosport' },
+  { url: 'https://www.francefootball.fr/rss/a-la-une.xml', source: 'France Football' },
+  { url: 'https://www.maxifoot.fr/rss/info-foot.xml', source: 'Maxifoot' },
+  { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
 ];
 
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
 function extractImage(item) {
   const mediaNS = 'http://search.yahoo.com/mrss/';
-  const mc = item.getElementsByTagNameNS(mediaNS, 'content')[0]
-    || item.getElementsByTagNameNS(mediaNS, 'thumbnail')[0];
-  if (mc?.getAttribute('url')) return mc.getAttribute('url');
+  // Try every media:* element (some feeds put image in thumbnail, others in
+  // content, and some include multiple — pick the first with a url).
+  const mediaTags = ['content', 'thumbnail', 'group'];
+  for (const tag of mediaTags) {
+    const elems = item.getElementsByTagNameNS(mediaNS, tag);
+    for (const el of elems) {
+      const url = el.getAttribute('url');
+      if (url && /^https?:\/\//.test(url)) return url;
+      // media:group can wrap nested media:content
+      const inner = el.getElementsByTagNameNS(mediaNS, 'content')[0]
+        || el.getElementsByTagNameNS(mediaNS, 'thumbnail')[0];
+      if (inner?.getAttribute('url')) return inner.getAttribute('url');
+    }
+  }
+  // <enclosure type="image/..." url="...">
   const enc = item.querySelector('enclosure');
   if (enc) {
     const t = enc.getAttribute('type') || '';
     const u = enc.getAttribute('url') || '';
-    if (t.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(u)) return u;
+    if ((t.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(u)) && /^https?:\/\//.test(u)) {
+      return u;
+    }
+  }
+  // Fallback: parse <description> CDATA for an <img src="..."> tag
+  const desc = item.querySelector('description')?.textContent || '';
+  const m = desc.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (m && /^https?:\/\//.test(m[1])) return m[1];
+  // Last resort: <content:encoded> often carries the full HTML
+  const contentNS = 'http://purl.org/rss/1.0/modules/content/';
+  const enc2 = item.getElementsByTagNameNS(contentNS, 'encoded')[0];
+  if (enc2) {
+    const m2 = enc2.textContent.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (m2 && /^https?:\/\//.test(m2[1])) return m2[1];
   }
   return null;
 }
