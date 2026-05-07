@@ -482,8 +482,45 @@ function StandingsGroup({ group, leagueId, viewMode = 'all' }) {
 
 function StandingsPicker({ onPick }) {
   const [showAll, setShowAll] = useState(false);
-  const others = STANDINGS_LEAGUES.filter(
-    (l) => !TOP5_EU_LEAGUES.some((t) => t.id === l.id),
+  const [allLeagues, setAllLeagues] = useState(null);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [search, setSearch] = useState('');
+
+  // Fetch the full leagues list from the API the first time the user expands
+  // 'Voir toutes les compétitions' so the standings picker covers every
+  // competition the API supports — not just the 13 we'd hardcoded.
+  useEffect(() => {
+    if (!showAll || allLeagues) return;
+    setLoadingAll(true);
+    leaguesApi.getAll({ current: 'true', type: 'league' })
+      .then((data) => {
+        const list = (data?.response || [])
+          .map((l) => {
+            const currentSeason = l.seasons?.find((s) => s.current);
+            if (!currentSeason || !currentSeason.coverage?.standings) return null;
+            return {
+              id: l.league?.id,
+              name: l.league?.name,
+              logo: l.league?.logo,
+              countryName: l.country?.name,
+              countryFlag: l.country?.flag,
+              flag: l.country?.flag ? null : '🌍',
+              season: currentSeason.year,
+            };
+          })
+          .filter(Boolean)
+          // Drop top-5 since they're already shown in the featured section
+          .filter((l) => !TOP5_EU_LEAGUES.some((t) => t.id === l.id));
+        setAllLeagues(list);
+      })
+      .catch(() => setAllLeagues([]))
+      .finally(() => setLoadingAll(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAll]);
+
+  const filtered = !search ? (allLeagues || []) : (allLeagues || []).filter(
+    (l) => l.name?.toLowerCase().includes(search.toLowerCase())
+        || l.countryName?.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -511,8 +548,8 @@ function StandingsPicker({ onPick }) {
           <ChevronRight className="w-4 h-4" />
         </button>
       ) : (
-        <div>
-          <div className="flex items-center justify-between mb-3">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-white/60">Autres compétitions</h2>
             <button
               onClick={() => setShowAll(false)}
@@ -521,11 +558,29 @@ function StandingsPicker({ onPick }) {
               Réduire
             </button>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {others.map((league) => (
-              <StandingsLeagueCard key={league.id} league={league} onPick={() => onPick(league)} />
-            ))}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher une ligue ou un pays..."
+              className="w-full bg-dark-800 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-brand-500/50"
+            />
           </div>
+          {loadingAll ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {[...Array(9)].map((_, i) => <div key={i} className="glass-card p-4 h-16 skeleton" />)}
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-white/30 font-heading">{filtered.length} compétitions</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {filtered.map((league) => (
+                  <StandingsLeagueCard key={league.id} league={league} onPick={() => onPick(league)} />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -533,9 +588,9 @@ function StandingsPicker({ onPick }) {
 }
 
 function StandingsLeagueCard({ league, onPick, featured = false }) {
-  // Card-grid picker for the Classement sub-tab — visually mirrors the
-  // Compétitions LeagueCard but instead of linking to /matchs?league=…,
-  // calls onPick to swap the StandingsTab into the league-specific view.
+  // Mirrors the Compétitions LeagueCard. Uses the API-Football logo + country
+  // flag image when available (dynamic leagues from the API), falls back to
+  // the emoji flag for the hardcoded Top 5 cards.
   return (
     <motion.button
       whileHover={{ y: -2 }}
@@ -545,14 +600,27 @@ function StandingsLeagueCard({ league, onPick, featured = false }) {
         featured ? 'border-brand-500/15' : ''
       }`}
     >
-      <div className="w-11 h-11 rounded-xl bg-dark-700 flex items-center justify-center flex-shrink-0 text-2xl">
-        {league.flag}
+      <div className="w-11 h-11 rounded-xl bg-dark-700 flex items-center justify-center p-1.5 flex-shrink-0 text-2xl">
+        {league.logo ? (
+          <img src={league.logo} alt={league.name} className="w-full h-full object-contain"
+            onError={(e) => e.target.style.display = 'none'} />
+        ) : (
+          <span>{league.flag}</span>
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <p className={`font-semibold truncate ${featured ? 'text-white' : 'text-white/80'}`}>
           {league.name}
         </p>
-        <p className="text-xs text-white/30 mt-0.5">Saison {league.season}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          {league.countryFlag && (
+            <img src={league.countryFlag} alt="" className="w-3.5 h-2.5 object-cover rounded-sm" />
+          )}
+          {league.countryName && (
+            <span className="text-xs text-white/30">{league.countryName}</span>
+          )}
+          <span className="text-xs text-white/20">Saison {league.season}</span>
+        </div>
       </div>
       <ChevronRight className="w-4 h-4 text-white/20 flex-shrink-0" />
     </motion.button>
