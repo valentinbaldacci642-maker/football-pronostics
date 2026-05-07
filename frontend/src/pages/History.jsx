@@ -240,9 +240,9 @@ export default function History() {
       <div className="space-y-2">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {[
-            { label: 'Total', value: stats.total, color: 'text-white', icon: BarChart3 },
             { label: 'Réussite', value: stats.rate !== null ? `${stats.rate}%` : '—', color: stats.rate >= 55 ? 'text-brand-400' : stats.rate !== null ? 'text-gold-400' : 'text-white/30', icon: Target },
             { label: 'Gagnés', value: stats.wins, color: 'text-brand-400', icon: Check },
+            { label: 'Perdus', value: stats.losses, color: 'text-danger', icon: X },
             { label: 'ROI', value: stats.roi !== null ? `${stats.roi > 0 ? '+' : ''}${stats.roi}%` : '—', color: stats.roi > 0 ? 'text-brand-400' : stats.roi !== null ? 'text-danger' : 'text-white/30', icon: TrendingUp },
           ].map(({ label, value, color, icon: Icon }) => (
             <div key={label} className="glass-card px-3.5 py-3 flex items-center gap-3">
@@ -254,7 +254,7 @@ export default function History() {
             </div>
           ))}
         </div>
-        {stats.total > 0 && (
+        {(stats.wins > 0 || stats.losses > 0 || stats.settled > 0) && (
           <div className="flex justify-end">
             <button
               onClick={handleResetStatsOnly}
