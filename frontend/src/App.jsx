@@ -14,7 +14,6 @@ import Matchs from './pages/Matchs';
 import MatchDetail from './pages/MatchDetail';
 import Leagues from './pages/Leagues';
 import Favorites from './pages/Favorites';
-import Analytics from './pages/Analytics';
 import WorldCup from './pages/WorldCup';
 import Team from './pages/Team';
 import History from './pages/History';
@@ -90,7 +89,6 @@ export default function App() {
               <Route path="/match/:id" element={<PageTransition><MatchDetail /></PageTransition>} />
               <Route path="/leagues" element={<PageTransition><Leagues /></PageTransition>} />
               <Route path="/favorites" element={<PageTransition><Favorites /></PageTransition>} />
-              <Route path="/analytics" element={<PageTransition><Analytics /></PageTransition>} />
               <Route path="/worldcup" element={<PageTransition><WorldCup /></PageTransition>} />
               <Route path="/team/:id" element={<PageTransition><Team /></PageTransition>} />
               <Route path="/history" element={<PageTransition><History /></PageTransition>} />

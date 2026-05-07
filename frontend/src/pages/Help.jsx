@@ -564,9 +564,6 @@ export default function Help() {
         <Definition term="⭐ Favoris">
           Tes équipes et matchs favoris. Suivi rapide.
         </Definition>
-        <Definition term="📊 Analytics">
-          Statistiques avancées globales sur les pronostics.
-        </Definition>
         <Definition term="❓ Aide">
           Cette page que tu lis maintenant.
         </Definition>

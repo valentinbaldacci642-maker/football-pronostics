@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Flame, Star, Trophy, BarChart3,
+  Flame, Star, Trophy,
   Calendar, Settings, ChevronRight, Globe2, BookOpen, Newspaper, HelpCircle, Target,
 } from 'lucide-react';
 import { useUIStore } from '../../store';
@@ -16,7 +16,6 @@ const NAV_ITEMS = [
   { to: '/news', icon: Newspaper, label: 'Actu Football' },
   { to: '/history', icon: BookOpen, label: 'Historique' },
   { to: '/favorites', icon: Star, label: 'Favoris' },
-  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/help', icon: HelpCircle, label: 'Aide' },
 ];
 
