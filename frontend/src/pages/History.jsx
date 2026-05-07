@@ -227,8 +227,7 @@ export default function History() {
     <div className="max-w-3xl xl:max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="font-display text-4xl text-white tracking-wide leading-none">Historique <span className="text-brand-400">Pronos</span></h1>
-        <p className="text-sm text-white/35 font-heading font-medium mt-1">Tous les pronostics générés par le site</p>
+        <h1 className="font-display text-4xl text-white tracking-wide leading-none">Historique <span className="text-brand-400">pronos</span></h1>
       </div>
 
       {/* Stats globales */}
