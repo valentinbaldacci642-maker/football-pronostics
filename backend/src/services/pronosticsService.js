@@ -84,8 +84,8 @@ class PronosticsService {
     const reliable = unique.filter((p) => p.confidence >= 45);
     const pronostics = reliable.length > 0 ? reliable : unique.slice(0, 3);
 
-    cache.set(cacheKey, pronostics, 3600);              // 1h cache
-    cache.set(lastScanKey, Date.now(), 3600);           // mark last scan time
+    cache.set(cacheKey, pronostics, 6 * 3600);          // 6h cache
+    cache.set(lastScanKey, Date.now(), 6 * 3600);       // mark last scan time
     logger.info(`Pronostics: ${pronostics.length} returned (top10=${top10.length}, lite-scanned=${remaining.length}, VB candidates=${cappedCandidates.length})`);
     return pronostics;
   }
