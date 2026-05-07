@@ -7,15 +7,26 @@ import { fr } from 'date-fns/locale';
 
 // Google News RSS feeds — most other publishers' direct RSS endpoints have
 // either disappeared or are CORS-blocked. Google News is the most reliable
-// aggregator. RSS items don't carry images, so we lazily fetch each article's
-// og:image (see hydrateImages below).
+// aggregator. RSS items don't carry images and the article URLs redirect via
+// JS so og:image extraction is unreliable; instead each source provides a
+// branded fallback logo so cards have visual identity.
 const FEEDS = [
-  { url: 'https://news.google.com/rss/search?q=site:rmcsport.bfmtv.com+football&hl=fr&gl=FR&ceid=FR:fr', source: 'RMC Sport' },
-  { url: 'https://news.google.com/rss/search?q=site:90min.com+football&hl=fr&gl=FR&ceid=FR:fr', source: '90min' },
-  { url: 'https://news.google.com/rss/search?q=site:lequipe.fr+football&hl=fr&gl=FR&ceid=FR:fr', source: "L'Équipe" },
-  { url: 'https://news.google.com/rss/search?q=site:maxifoot.fr&hl=fr&gl=FR&ceid=FR:fr', source: 'Maxifoot' },
-  { url: 'https://news.google.com/rss/search?q=site:footmercato.net&hl=fr&gl=FR&ceid=FR:fr', source: 'Foot Mercato' },
+  { url: 'https://news.google.com/rss/search?q=site:rmcsport.bfmtv.com+football&hl=fr&gl=FR&ceid=FR:fr', source: 'RMC Sport',  domain: 'rmcsport.bfmtv.com' },
+  { url: 'https://news.google.com/rss/search?q=site:90min.com+football&hl=fr&gl=FR&ceid=FR:fr',           source: '90min',       domain: '90min.com' },
+  { url: 'https://news.google.com/rss/search?q=site:lequipe.fr+football&hl=fr&gl=FR&ceid=FR:fr',          source: "L'Équipe",    domain: 'lequipe.fr' },
+  { url: 'https://news.google.com/rss/search?q=site:maxifoot.fr&hl=fr&gl=FR&ceid=FR:fr',                   source: 'Maxifoot',    domain: 'maxifoot.fr' },
+  { url: 'https://news.google.com/rss/search?q=site:footmercato.net&hl=fr&gl=FR&ceid=FR:fr',               source: 'Foot Mercato', domain: 'footmercato.net' },
 ];
+
+// Hi-res favicon URL via Google's S2 service. Returns a real PNG (~120px) of
+// the site's branding — works for every domain in FEEDS. Used as the visible
+// thumbnail when the article doesn't carry its own image.
+const SOURCE_DOMAIN = Object.fromEntries(FEEDS.map((f) => [f.source, f.domain]));
+function sourceLogo(source) {
+  const domain = SOURCE_DOMAIN[source];
+  if (!domain) return null;
+  return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+}
 
 // Extract og:image / twitter:image from an article URL. Cached in sessionStorage
 // so we don't re-fetch the same article on a later page reload during the
@@ -166,6 +177,9 @@ function timeAgo(dateStr) {
 
 function ArticleCard({ article, index }) {
   const src = SOURCE_COLORS[article.source] || { bg: 'bg-white/10 text-white/50', dot: 'bg-white/40' };
+  // Show the article's own image when available; otherwise fall back to the
+  // source's hi-res favicon so cards always have visual identity.
+  const thumb = article.image || sourceLogo(article.source);
 
   return (
     <motion.a
@@ -177,14 +191,16 @@ function ArticleCard({ article, index }) {
       transition={{ delay: Math.min(index * 0.03, 0.3) }}
       className="football-card flex gap-4 p-4 cursor-pointer group"
     >
-      {/* Thumbnail */}
-      {article.image ? (
-        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden flex-shrink-0 bg-dark-700">
+      {/* Thumbnail — article image when available, else the source logo */}
+      {thumb ? (
+        <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden flex-shrink-0 bg-dark-700 flex items-center justify-center ${article.image ? '' : 'p-4'}`}>
           <img
-            src={article.image}
+            src={thumb}
             alt=""
-            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-            onError={(e) => { e.target.parentElement.style.display = 'none'; }}
+            className={article.image
+              ? "w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+              : "w-full h-full object-contain opacity-90 group-hover:opacity-100 transition-opacity"}
+            onError={(e) => { e.target.style.display = 'none'; }}
           />
         </div>
       ) : (
