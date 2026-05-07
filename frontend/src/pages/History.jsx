@@ -69,8 +69,10 @@ function flattenBets(entries) {
         market, selection,
         rawSelection: selection,
         mise: bet.mise,
-        odd: bet.actualOdd || null,
-        modelOdd: null,
+        // Fall back to the system-suggested odd captured at save time so
+        // gains potentiels stay visible when the user didn't enter "Ma cote".
+        odd: bet.actualOdd || bet.modelOdd || null,
+        modelOdd: bet.modelOdd || null,
         result: bet.result || null,
         finalScore: e.finalScore || null,
         source: 'value-bet',

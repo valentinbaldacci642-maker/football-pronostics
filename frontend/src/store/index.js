@@ -285,7 +285,7 @@ export const useHistoryStore = create(
       // live under entries[i].bets[betKey] where betKey = "market::selection".
       // Optional `sources` arg captures the detection sources of the VB at
       // save time (shin / poisson / lineup) so the historique can show them.
-      setBetMise: (fixtureId, betKey, amount, sources) => set((s) => ({
+      setBetMise: (fixtureId, betKey, amount, sources, modelOdd) => set((s) => ({
         entries: s.entries.map((e) => {
           if (e.fixtureId !== fixtureId) return e;
           const next = parseFloat(amount);
@@ -296,6 +296,11 @@ export const useHistoryStore = create(
             mise: amount === '' || !Number.isFinite(next) ? null : next,
             // Only overwrite sources if a non-empty array was supplied
             ...(Array.isArray(sources) && sources.length ? { sources } : {}),
+            // Capture the system-suggested odd at save time so the historique
+            // can show @cote + gains potentiels even when the user skipped
+            // entering "Ma cote". Only overwrite if a positive number was
+            // supplied — never wipe a previously stored value.
+            ...(Number.isFinite(modelOdd) && modelOdd > 0 ? { modelOdd } : {}),
           };
           return { ...e, bets };
         }),

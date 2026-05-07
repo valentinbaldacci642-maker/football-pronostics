@@ -44,7 +44,7 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
   const usingCustomOdd = parseFloat(oddInput) > 0 && parseFloat(oddInput) !== vb.odd;
 
   const saveMise = () => {
-    if (miseDirty) setBetMise(fixtureId, betKey, miseInput, vb.sources);
+    if (miseDirty) setBetMise(fixtureId, betKey, miseInput, vb.sources, vb.odd);
   };
   const saveOdd = () => { if (oddDirty) setBetActualOdd(fixtureId, betKey, oddInput); };
 
