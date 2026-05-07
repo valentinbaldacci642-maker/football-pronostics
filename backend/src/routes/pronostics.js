@@ -11,7 +11,14 @@ router.get('/today', async (req, res, next) => {
       ? req.query.date
       : null;
     const data = await pronosticsService.getBestPronostics(force, date);
-    res.json({ data, count: data.length, date: date || new Date().toISOString().split('T')[0] });
+    // Marker so we can verify which backend version is live by inspecting
+    // the response. Increment when changing the scan algorithm.
+    res.json({
+      data,
+      count: data.length,
+      date: date || new Date().toISOString().split('T')[0],
+      engine: 'lite-scan-v2',
+    });
   } catch (err) {
     next(err);
   }
