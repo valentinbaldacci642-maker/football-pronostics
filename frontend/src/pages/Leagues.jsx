@@ -493,12 +493,19 @@ function StandingsPicker({ onPick }) {
   useEffect(() => {
     if (!showAll || allLeagues) return;
     setLoadingAll(true);
+    // Minimum acceptable 'current' season year. API-Football marks the
+    // latest season they cover as 'current=true' even if it's 2018-2022 for
+    // dead / abandoned leagues — surface only ones updated in the last 2 yr.
+    const minSeason = new Date().getFullYear() - 1;
+
     leaguesApi.getAll({ current: 'true', type: 'league' })
       .then((data) => {
         const list = (data?.response || [])
           .map((l) => {
             const currentSeason = l.seasons?.find((s) => s.current);
             if (!currentSeason || !currentSeason.coverage?.standings) return null;
+            // Drop dead leagues whose 'current' season is too old to be useful.
+            if (typeof currentSeason.year === 'number' && currentSeason.year < minSeason) return null;
             return {
               id: l.league?.id,
               name: l.league?.name,
