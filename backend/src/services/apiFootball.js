@@ -75,9 +75,12 @@ class ApiFootballService {
     // so we can short-circuit subsequent calls instead of hammering and burning
     // through the per-minute window. Window is API-Football's 60s rolling.
     this.rateLimitedUntil = 0;
-    // Outbound throttle: 280 req/min cap + 240ms minimum gap between calls.
-    // Cache hits skip this entirely so normal browsing stays fast.
-    this.limiter = new OutboundRateLimiter(280, 240);
+    // Outbound throttle: 180 req/min cap + 350ms minimum gap = ~3 req/s
+    // sustained. API-Football documents 300/min on Pro but in practice
+    // sustained bursts at >5 req/s trigger their internal limiter and we
+    // get cascading 429s. Cache hits skip this entirely so normal browsing
+    // stays fast — only cold-cache scans pay the throttle.
+    this.limiter = new OutboundRateLimiter(180, 350);
 
     this.client = axios.create({
       baseURL: config.api.baseUrl,
