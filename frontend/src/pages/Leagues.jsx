@@ -14,6 +14,13 @@ const STANDINGS_LEAGUES = [
   { id: 135, name: 'Serie A',           flag: '🇮🇹', season: 2025 },
   { id: 61,  name: 'Ligue 1',           flag: '🇫🇷', season: 2025 },
   { id: 2,   name: 'Champions League',  flag: '🏆', season: 2025 },
+  { id: 3,   name: 'Europa League',     flag: '🇪🇺', season: 2025 },
+  { id: 94,  name: 'Primeira Liga',     flag: '🇵🇹', season: 2025 },
+  { id: 88,  name: 'Eredivisie',        flag: '🇳🇱', season: 2025 },
+  { id: 144, name: 'Jupiler Pro',       flag: '🇧🇪', season: 2025 },
+  { id: 71,  name: 'Brasileirão',       flag: '🇧🇷', season: 2026 },
+  { id: 253, name: 'MLS',               flag: '🇺🇸', season: 2026 },
+  { id: 128, name: 'Liga Profesional',  flag: '🇦🇷', season: 2026 },
 ];
 
 export default function Leagues() {
@@ -159,9 +166,12 @@ function CompetitionsTab() {
 }
 
 function StandingsTab() {
+  // selected = null means "Toutes" — fetch every league in STANDINGS_LEAGUES
+  // and render them stacked.
   const [selected, setSelected] = useState(STANDINGS_LEAGUES[0]);
   const [subTab, setSubTab] = useState('classement'); // 'classement' | 'buteurs'
   const [standings, setStandings] = useState(null);
+  const [allStandings, setAllStandings] = useState(null); // [{ league, groups }]
   const [scorers, setScorers] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -169,28 +179,58 @@ function StandingsTab() {
 
   useEffect(() => {
     if (subTab === 'classement') {
-      const load = async () => {
-        setLoading(true);
-        setError(null);
-        setStandings(null);
-        try {
-          const data = await leaguesApi.getStandings(selected.id, selected.season);
-          const groups = data?.response?.[0]?.league?.standings;
-          setStandings(groups || []);
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setLoading(false);
-        }
-      };
-      load();
+      if (selected === null) {
+        // 'Toutes' mode: fetch every league's standings in parallel
+        const loadAll = async () => {
+          setLoading(true);
+          setError(null);
+          setAllStandings(null);
+          try {
+            const results = await Promise.allSettled(
+              STANDINGS_LEAGUES.map((l) =>
+                leaguesApi.getStandings(l.id, l.season).then((d) => ({
+                  league: l,
+                  groups: d?.response?.[0]?.league?.standings || [],
+                })),
+              ),
+            );
+            setAllStandings(
+              results
+                .filter((r) => r.status === 'fulfilled' && r.value.groups.length > 0)
+                .map((r) => r.value),
+            );
+          } catch (err) {
+            setError(err.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+        loadAll();
+      } else {
+        const load = async () => {
+          setLoading(true);
+          setError(null);
+          setStandings(null);
+          try {
+            const data = await leaguesApi.getStandings(selected.id, selected.season);
+            const groups = data?.response?.[0]?.league?.standings;
+            setStandings(groups || []);
+          } catch (err) {
+            setError(err.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+        load();
+      }
     } else {
+      const lg = selected || STANDINGS_LEAGUES[0]; // buteurs: fall back to first if 'Toutes' picked
       const load = async () => {
         setLoading(true);
         setError(null);
         setScorers(null);
         try {
-          const data = await playersApi.getTopScorers(selected.id, selected.season);
+          const data = await playersApi.getTopScorers(lg.id, lg.season);
           setScorers(data?.response || []);
         } catch (err) {
           setError(err.message);
@@ -206,12 +246,23 @@ function StandingsTab() {
     <div className="space-y-4">
       {/* League selector */}
       <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setSelected(null)}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-heading font-semibold border transition-all ${
+            selected === null
+              ? 'bg-brand-500/15 border-brand-500/35 text-brand-400'
+              : 'border-white/[0.08] text-white/35 hover:text-white/60'
+          }`}
+        >
+          🌍
+          <span className="hidden sm:inline">Toutes</span>
+        </button>
         {STANDINGS_LEAGUES.map((league) => (
           <button
             key={league.id}
             onClick={() => setSelected(league)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-heading font-semibold border transition-all ${
-              selected.id === league.id
+              selected?.id === league.id
                 ? 'bg-brand-500/15 border-brand-500/35 text-brand-400'
                 : 'border-white/[0.08] text-white/35 hover:text-white/60'
             }`}
@@ -267,6 +318,27 @@ function StandingsTab() {
             </div>
           ) : error ? (
             <ErrorState message={error} />
+          ) : selected === null ? (
+            // 'Toutes' mode: stack each league's standings with a header
+            allStandings && allStandings.length > 0 ? (
+              <div className="space-y-8">
+                {allStandings.map(({ league, groups }) => (
+                  <div key={league.id} className="space-y-3">
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-lg">{league.flag}</span>
+                      <h2 className="text-base font-heading font-bold text-white">{league.name}</h2>
+                    </div>
+                    <div className="space-y-4">
+                      {groups.map((group, gi) => (
+                        <StandingsGroup key={gi} group={group} leagueId={league.id} viewMode={viewMode} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : allStandings && allStandings.length === 0 ? (
+              <EmptyState title="Aucun classement disponible" icon="📊" />
+            ) : null
           ) : standings && standings.length > 0 ? (
             <div className="space-y-6">
               {standings.map((group, gi) => (
