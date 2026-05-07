@@ -769,9 +769,17 @@ function EntryCard({ entry, setMise, showMise = false }) {
         {entry.finalScore && (
           <span className="font-display text-base text-white tabular-nums flex-shrink-0">{entry.finalScore}</span>
         )}
-        {entry.odd && (
-          <span className="text-sm font-display text-gold-400 flex-shrink-0">@{parseFloat(entry.odd).toFixed(2)}</span>
-        )}
+        {entry.odd && (() => {
+          // Gold tint reserved for actual value bets — neutral white for plain
+          // pronos so the color stops misleading users in the Équipe history.
+          const isVB = (entry.pickSources && entry.pickSources.length > 0)
+            || entry.pickIsValue;
+          return (
+            <span className={`text-sm font-display flex-shrink-0 ${isVB ? 'text-gold-400' : 'text-white/55'}`}>
+              @{parseFloat(entry.odd).toFixed(2)}
+            </span>
+          );
+        })()}
       </div>
 
       <div className="flex items-center justify-between mt-2 ml-11 flex-wrap gap-2">
