@@ -269,7 +269,11 @@ export default function News() {
     setLoading(true);
     setError(null);
     try {
-      const base = import.meta.env.VITE_VERCEL_URL || '';
+      // Backend is on Render (VITE_API_URL), NOT on Vercel. Hitting the
+      // Vercel URL was 404'ing and falling back to direct Google News fetch
+      // which has no images. The Render backend exposes /api/news with
+      // server-side RSS parsing + image extraction.
+      const base = import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${base}/api/news`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
