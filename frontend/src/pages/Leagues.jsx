@@ -166,71 +166,41 @@ function CompetitionsTab() {
 }
 
 function StandingsTab() {
-  // selected = null means "Toutes" — fetch every league in STANDINGS_LEAGUES
-  // and render them stacked.
-  const [selected, setSelected] = useState(STANDINGS_LEAGUES[0]);
-  const [subTab, setSubTab] = useState('classement'); // 'classement' | 'buteurs'
+  // selected = null means: show the card-grid league picker (like /Compétitions).
+  // Pick a card → standings of that league appear.
+  const [selected, setSelected] = useState(null);
+  const [subTab, setSubTab] = useState('classement');
   const [standings, setStandings] = useState(null);
-  const [allStandings, setAllStandings] = useState(null); // [{ league, groups }]
   const [scorers, setScorers] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('all');
 
   useEffect(() => {
+    if (!selected) return;
     if (subTab === 'classement') {
-      if (selected === null) {
-        // 'Toutes' mode: fetch every league's standings in parallel
-        const loadAll = async () => {
-          setLoading(true);
-          setError(null);
-          setAllStandings(null);
-          try {
-            const results = await Promise.allSettled(
-              STANDINGS_LEAGUES.map((l) =>
-                leaguesApi.getStandings(l.id, l.season).then((d) => ({
-                  league: l,
-                  groups: d?.response?.[0]?.league?.standings || [],
-                })),
-              ),
-            );
-            setAllStandings(
-              results
-                .filter((r) => r.status === 'fulfilled' && r.value.groups.length > 0)
-                .map((r) => r.value),
-            );
-          } catch (err) {
-            setError(err.message);
-          } finally {
-            setLoading(false);
-          }
-        };
-        loadAll();
-      } else {
-        const load = async () => {
-          setLoading(true);
-          setError(null);
-          setStandings(null);
-          try {
-            const data = await leaguesApi.getStandings(selected.id, selected.season);
-            const groups = data?.response?.[0]?.league?.standings;
-            setStandings(groups || []);
-          } catch (err) {
-            setError(err.message);
-          } finally {
-            setLoading(false);
-          }
-        };
-        load();
-      }
+      const load = async () => {
+        setLoading(true);
+        setError(null);
+        setStandings(null);
+        try {
+          const data = await leaguesApi.getStandings(selected.id, selected.season);
+          const groups = data?.response?.[0]?.league?.standings;
+          setStandings(groups || []);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+      load();
     } else {
-      const lg = selected || STANDINGS_LEAGUES[0]; // buteurs: fall back to first if 'Toutes' picked
       const load = async () => {
         setLoading(true);
         setError(null);
         setScorers(null);
         try {
-          const data = await playersApi.getTopScorers(lg.id, lg.season);
+          const data = await playersApi.getTopScorers(selected.id, selected.season);
           setScorers(data?.response || []);
         } catch (err) {
           setError(err.message);
@@ -242,35 +212,38 @@ function StandingsTab() {
     }
   }, [selected, subTab]);
 
+  // Card grid picker — same visual as Compétitions tab
+  if (!selected) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Trophy className="w-4 h-4 text-gold-400" />
+          <h2 className="text-sm font-bold text-white/80">Choisis une compétition pour voir son classement</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {STANDINGS_LEAGUES.map((league) => (
+            <StandingsLeagueCard key={league.id} league={league} onPick={() => setSelected(league)} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {/* League selector */}
-      <div className="flex gap-2 flex-wrap">
+      {/* Back to grid + current league title */}
+      <div className="flex items-center justify-between gap-2">
         <button
           onClick={() => setSelected(null)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-heading font-semibold border transition-all ${
-            selected === null
-              ? 'bg-brand-500/15 border-brand-500/35 text-brand-400'
-              : 'border-white/[0.08] text-white/35 hover:text-white/60'
-          }`}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-heading font-semibold border border-white/[0.08] text-white/50 hover:text-white/80 hover:border-white/20 transition-all"
         >
-          🌍
-          <span className="hidden sm:inline">Toutes</span>
+          <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+          Toutes les compétitions
         </button>
-        {STANDINGS_LEAGUES.map((league) => (
-          <button
-            key={league.id}
-            onClick={() => setSelected(league)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-heading font-semibold border transition-all ${
-              selected?.id === league.id
-                ? 'bg-brand-500/15 border-brand-500/35 text-brand-400'
-                : 'border-white/[0.08] text-white/35 hover:text-white/60'
-            }`}
-          >
-            <span>{league.flag}</span>
-            <span className="hidden sm:inline">{league.name}</span>
-          </button>
-        ))}
+        <div className="flex items-center gap-2">
+          <span className="text-lg">{selected.flag}</span>
+          <span className="text-sm font-heading font-bold text-white">{selected.name}</span>
+        </div>
       </div>
 
       {/* Sub-tab: Classement / Buteurs */}
@@ -318,27 +291,6 @@ function StandingsTab() {
             </div>
           ) : error ? (
             <ErrorState message={error} />
-          ) : selected === null ? (
-            // 'Toutes' mode: stack each league's standings with a header
-            allStandings && allStandings.length > 0 ? (
-              <div className="space-y-8">
-                {allStandings.map(({ league, groups }) => (
-                  <div key={league.id} className="space-y-3">
-                    <div className="flex items-center gap-2 px-1">
-                      <span className="text-lg">{league.flag}</span>
-                      <h2 className="text-base font-heading font-bold text-white">{league.name}</h2>
-                    </div>
-                    <div className="space-y-4">
-                      {groups.map((group, gi) => (
-                        <StandingsGroup key={gi} group={group} leagueId={league.id} viewMode={viewMode} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : allStandings && allStandings.length === 0 ? (
-              <EmptyState title="Aucun classement disponible" icon="📊" />
-            ) : null
           ) : standings && standings.length > 0 ? (
             <div className="space-y-6">
               {standings.map((group, gi) => (
@@ -529,6 +481,29 @@ function StandingsGroup({ group, leagueId, viewMode = 'all' }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function StandingsLeagueCard({ league, onPick }) {
+  // Card-grid picker for the Classement sub-tab — visually mirrors the
+  // Compétitions LeagueCard but instead of linking to /matchs?league=…,
+  // calls onPick to swap the StandingsTab into the league-specific view.
+  return (
+    <motion.button
+      whileHover={{ y: -2 }}
+      onClick={onPick}
+      type="button"
+      className="glass-card p-4 flex items-center gap-3 cursor-pointer hover:border-brand-500/30 transition-all text-left w-full"
+    >
+      <div className="w-11 h-11 rounded-xl bg-dark-700 flex items-center justify-center flex-shrink-0 text-2xl">
+        {league.flag}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-white truncate">{league.name}</p>
+        <p className="text-xs text-white/30 mt-0.5">Saison {league.season}</p>
+      </div>
+      <ChevronRight className="w-4 h-4 text-white/20 flex-shrink-0" />
+    </motion.button>
   );
 }
 

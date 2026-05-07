@@ -5,17 +5,57 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 
-// Direct site RSS feeds — Google News RSS strips article images so we'd
-// always render placeholders. Native feeds expose <media:content> or
-// <enclosure> with the lead image of the article, which gives us thumbnails.
+// Google News RSS feeds — most other publishers' direct RSS endpoints have
+// either disappeared or are CORS-blocked. Google News is the most reliable
+// aggregator. RSS items don't carry images, so we lazily fetch each article's
+// og:image (see hydrateImages below).
 const FEEDS = [
-  { url: 'https://www.lequipe.fr/rss/actu_rss_Football.xml', source: "L'Équipe" },
-  { url: 'https://www.footmercato.net/rss', source: 'Foot Mercato' },
-  { url: 'https://www.eurosport.fr/football/rss.xml', source: 'Eurosport' },
-  { url: 'https://www.francefootball.fr/rss/a-la-une.xml', source: 'France Football' },
-  { url: 'https://www.maxifoot.fr/rss/info-foot.xml', source: 'Maxifoot' },
-  { url: 'https://rmcsport.bfmtv.com/rss/football/', source: 'RMC Sport' },
+  { url: 'https://news.google.com/rss/search?q=site:rmcsport.bfmtv.com+football&hl=fr&gl=FR&ceid=FR:fr', source: 'RMC Sport' },
+  { url: 'https://news.google.com/rss/search?q=site:90min.com+football&hl=fr&gl=FR&ceid=FR:fr', source: '90min' },
+  { url: 'https://news.google.com/rss/search?q=site:lequipe.fr+football&hl=fr&gl=FR&ceid=FR:fr', source: "L'Équipe" },
+  { url: 'https://news.google.com/rss/search?q=site:maxifoot.fr&hl=fr&gl=FR&ceid=FR:fr', source: 'Maxifoot' },
+  { url: 'https://news.google.com/rss/search?q=site:footmercato.net&hl=fr&gl=FR&ceid=FR:fr', source: 'Foot Mercato' },
 ];
+
+// Extract og:image / twitter:image from an article URL. Cached in sessionStorage
+// so we don't re-fetch the same article on a later page reload during the
+// session. Returns the image URL or null.
+async function fetchArticleImage(url) {
+  if (!url) return null;
+  const cacheKey = `pdf-news-img:${url}`;
+  try {
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached !== null) return cached || null;
+  } catch (e) {}
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(`${PROXY}${encodeURIComponent(url)}`, { signal: ctrl.signal })
+      .finally(() => clearTimeout(timer));
+    if (!res.ok) {
+      try { sessionStorage.setItem(cacheKey, ''); } catch (e) {}
+      return null;
+    }
+    const html = await res.text();
+    // Match og:image or twitter:image meta tags (any attribute order)
+    const patterns = [
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    ];
+    for (const re of patterns) {
+      const m = html.match(re);
+      if (m && /^https?:\/\//.test(m[1])) {
+        try { sessionStorage.setItem(cacheKey, m[1]); } catch (e) {}
+        return m[1];
+      }
+    }
+    try { sessionStorage.setItem(cacheKey, ''); } catch (e) {}
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
 
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
@@ -229,6 +269,28 @@ export default function News() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // After articles load, lazily hydrate missing images by extracting og:image
+  // from each article URL. Done sequentially with a tiny gap so we don't
+  // hammer the proxy. Updates the article in place when an image arrives.
+  useEffect(() => {
+    if (articles.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < articles.length; i++) {
+        if (cancelled) return;
+        const a = articles[i];
+        if (a.image) continue;
+        const img = await fetchArticleImage(a.link);
+        if (cancelled) return;
+        if (img) {
+          setArticles((prev) => prev.map((x, idx) => idx === i && !x.image ? { ...x, image: img } : x));
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [articles.length]);
 
   const sources = [...new Set(articles.map((a) => a.source))];
   const filtered = sourceFilter ? articles.filter((a) => a.source === sourceFilter) : articles;
