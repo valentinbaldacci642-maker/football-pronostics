@@ -4,7 +4,19 @@ const cache = require('../utils/cache');
 const logger = require('../utils/logger');
 
 // Leagues ranked by prestige/data quality
-const PRIORITY_LEAGUES = [2, 3, 848, 39, 140, 135, 61, 78, 88, 94, 253, 307, 45, 48, 71, 128];
+//   2=UCL · 3=UEL · 848=Conf · 39=PL · 140=LaLiga · 135=SerieA · 61=L1 · 78=Bundesliga
+//   40=Championship · 62=L2 (FR) · 79=Bundesliga 2 · 136=Serie B · 141=La Liga 2
+//   88=Eredivisie · 94=Primeira Liga · 253=MLS · 307=Saudi Pro · 45=FA Cup · 48=EFL Cup
+//   71=Brasileirão · 128=Liga Profesional Argentina
+const PRIORITY_LEAGUES = [
+  2, 3, 848,                    // UEFA
+  39, 140, 135, 61, 78,         // Top 5 first divisions
+  40, 62, 79, 136, 141,         // Top 5 second divisions (Championship, Ligue 2, Bundesliga 2, Serie B, La Liga 2)
+  88, 94,                       // Eredivisie, Primeira Liga
+  253, 307,                     // MLS, Saudi Pro
+  45, 48,                       // FA Cup, EFL Cup
+  71, 128,                      // Brasileirão, Liga Argentina
+];
 
 class PronosticsService {
   async getBestPronostics(forceRefresh = false, date = null) {
@@ -50,15 +62,15 @@ class PronosticsService {
     const top10 = upcoming.slice(0, 10);
     const top10Analyses = await this._analyzeBatch(top10, { full: true });
 
-    // Step 2 — LITE SCAN the next 90 priority fixtures (odds-only, 1 call
-    // each). On Ultra plan we have generous quota so we can cover a much
-    // larger slice of the day's matches than under Pro.
-    const remaining = upcoming.slice(10, 100);
+    // Step 2 — LITE SCAN the next 140 priority fixtures (odds-only, 1 call
+    // each). Ultra quota covers this comfortably; covers Top 5 1st + 2nd
+    // divisions, UEFA, Eredivisie, Primeira, MLS, Saudi, Brazilian, etc.
+    const remaining = upcoming.slice(10, 150);
     const liteScanCandidates = await this._liteScanForValueBets(remaining);
 
     // Step 3 — full analysis on the lite-scan candidates that DID find a VB.
-    // Cap at 40 to bound cost on exceptionally rich days.
-    const cappedCandidates = liteScanCandidates.slice(0, 40);
+    // Cap at 50 to bound cost on exceptionally rich days.
+    const cappedCandidates = liteScanCandidates.slice(0, 50);
     const candidateAnalyses = await this._analyzeBatch(cappedCandidates, { full: true });
 
     // Combine
