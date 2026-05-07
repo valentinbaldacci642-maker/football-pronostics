@@ -199,24 +199,35 @@ export const useHistoryStore = create(
         const existing = get().entries.map((e) => e.fixtureId);
         const newEntries = pronostics
           .filter((p) => !existing.includes(p.fixture?.fixture?.id))
-          .map((p) => ({
-            fixtureId: p.fixture?.fixture?.id,
-            date: today,
-            savedAt: new Date().toISOString(),
-            homeTeam: p.fixture?.teams?.home?.name,
-            awayTeam: p.fixture?.teams?.away?.name,
-            homeLogo: p.fixture?.teams?.home?.logo,
-            awayLogo: p.fixture?.teams?.away?.logo,
-            league: p.fixture?.league?.name,
-            leagueLogo: p.fixture?.league?.logo,
-            pick: p.pick?.selection,
-            pickLabel: p.pick?.selectionLabel,
-            odd: p.pick?.odd,
-            confidence: p.confidence,
-            result: null,
-            finalScore: null,
-            mise: null,
-          }));
+          .map((p) => {
+            // Find the value bet that matches the pick (if pick is a VB) so we
+            // can preserve its detection sources (shin / poisson / lineup) for
+            // display in the historique. Lookup by market + selection.
+            const allVBs = p.analysis?.odds?.valueBets || [];
+            const matchingVB = allVBs.find(
+              (v) => v.market === p.pick?.market && v.selection === p.pick?.selection,
+            );
+            return {
+              fixtureId: p.fixture?.fixture?.id,
+              date: today,
+              savedAt: new Date().toISOString(),
+              homeTeam: p.fixture?.teams?.home?.name,
+              awayTeam: p.fixture?.teams?.away?.name,
+              homeLogo: p.fixture?.teams?.home?.logo,
+              awayLogo: p.fixture?.teams?.away?.logo,
+              league: p.fixture?.league?.name,
+              leagueLogo: p.fixture?.league?.logo,
+              pick: p.pick?.selection,
+              pickLabel: p.pick?.selectionLabel,
+              pickMarket: p.pick?.market,
+              pickSources: matchingVB?.sources || (p.pick?.isValue ? ['shin'] : []),
+              odd: p.pick?.odd,
+              confidence: p.confidence,
+              result: null,
+              finalScore: null,
+              mise: null,
+            };
+          });
         if (newEntries.length > 0) {
           set((s) => ({ entries: [...newEntries, ...s.entries].slice(0, 500) }));
         }
@@ -272,13 +283,20 @@ export const useHistoryStore = create(
       // Per-value-bet tracking: a single match can have multiple distinct VBs
       // (e.g. Under 2.5 + BTTS No on the same fixture). Stakes for each VB
       // live under entries[i].bets[betKey] where betKey = "market::selection".
-      setBetMise: (fixtureId, betKey, amount) => set((s) => ({
+      // Optional `sources` arg captures the detection sources of the VB at
+      // save time (shin / poisson / lineup) so the historique can show them.
+      setBetMise: (fixtureId, betKey, amount, sources) => set((s) => ({
         entries: s.entries.map((e) => {
           if (e.fixtureId !== fixtureId) return e;
           const next = parseFloat(amount);
           const bets = { ...(e.bets || {}) };
           const cur = bets[betKey] || {};
-          bets[betKey] = { ...cur, mise: amount === '' || !Number.isFinite(next) ? null : next };
+          bets[betKey] = {
+            ...cur,
+            mise: amount === '' || !Number.isFinite(next) ? null : next,
+            // Only overwrite sources if a non-empty array was supplied
+            ...(Array.isArray(sources) && sources.length ? { sources } : {}),
+          };
           return { ...e, bets };
         }),
       })),

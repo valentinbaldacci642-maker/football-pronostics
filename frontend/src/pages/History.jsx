@@ -8,6 +8,7 @@ import { exportBankrollCsv } from '../utils/exportCsv';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
+import ValueBetSources from '../components/match/ValueBetSources';
 
 const RESULT_CONFIG = {
   win:  { label: 'Gagné',    color: 'text-brand-400', bg: 'bg-brand-500/15 border-brand-500/30', icon: Check },
@@ -35,7 +36,7 @@ function flattenBets(entries) {
         homeLogo: e.homeLogo, awayLogo: e.awayLogo,
         league: e.league, leagueLogo: e.leagueLogo,
         date: e.date, savedAt: e.savedAt,
-        market: '1X2',
+        market: e.pickMarket || '1X2',
         selection: e.pickLabel || e.pick,
         rawSelection: e.pick,
         mise: e.mise,
@@ -44,6 +45,7 @@ function flattenBets(entries) {
         result: e.result || null,
         finalScore: e.finalScore || null,
         source: 'pronos',
+        detectionSources: e.pickSources || [],
       });
     }
     for (const [betKey, bet] of Object.entries(e.bets || {})) {
@@ -64,6 +66,7 @@ function flattenBets(entries) {
         result: bet.result || null,
         finalScore: e.finalScore || null,
         source: 'value-bet',
+        detectionSources: bet.sources || [],
       });
     }
   }
@@ -645,6 +648,9 @@ function BetCard({ bet }) {
         <span className={clsx('text-xs font-heading font-semibold px-2 py-0.5 rounded', sourceClass)}>
           {sourceLabel}
         </span>
+        {bet.detectionSources && bet.detectionSources.length > 0 && (
+          <ValueBetSources sources={bet.detectionSources} />
+        )}
         <span className={clsx('inline-flex items-center gap-1 text-xs font-heading font-semibold px-2 py-0.5 rounded border', res.bg, res.color)}>
           <ResIcon className="w-3.5 h-3.5" />
           {res.label}

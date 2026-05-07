@@ -380,21 +380,25 @@ export default function Help() {
           le détecte pas.
         </Definition>
 
-        <Definition term={<><span className="inline-block px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[9px] font-bold uppercase tracking-wider">Poisson</span> — Modèle xG indépendant</>}>
+        <Definition term={<><span className="inline-block px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[9px] font-bold uppercase tracking-wider">Poisson</span> — Modèle xG (confirmation seulement)</>}>
           <strong className="text-white">Mécanique :</strong> calcule la proba de chaque
           issue à partir des Expected Goals (xG) saison venant des stats /teams/statistics.
-          C'est <em>notre</em> modèle, indépendant des cotes.
           <Formula>O/U 2.5  : P(total &gt; 2) avec λ = home_xG + away_xG</Formula>
           <Formula>BTTS Oui : (1 − e^−home_xG) × (1 − e^−away_xG)</Formula>
-          <strong className="text-white">Marchés :</strong> O/U 2.5, BTTS uniquement
-          (Poisson n'est pas adapté au 1X2).
+          <strong className="text-white">Rôle :</strong>{' '}
+          <strong className="text-purple-300">utilisé uniquement comme confirmation de Shin</strong>,
+          jamais en source unique. Quand Shin ET Poisson détectent le même value bet → badge
+          double + ligne "Poisson confirme à +X%" → signal renforcé.
           <br />
-          <strong className="text-white">Force :</strong> 2ème opinion vraiment
-          indépendante. Si Poisson dit "value bet" sur Under 2.5 et Shin aussi,
-          c'est du consensus fort.
+          <strong className="text-white">Pourquoi pas en source seule :</strong>{' '}
+          Poisson naïf assume que les buts des 2 équipes sont indépendants — c'est faux dans
+          la réalité (effet game state : l'équipe qui mène défend, l'autre attaque, les buts
+          arrivent en grappes). Conséquence : Poisson sur-estime systématiquement
+          <strong> BTTS Oui</strong> et <strong>Over 2.5</strong>, créant des faux positifs
+          que les bookies ont déjà filtrés. Études académiques (Constantinou-Fenton,
+          Goddard) confirment ROI Poisson seul ≈ 0 sur 1X2, négatif sur BTTS/O.U.
           <br />
-          <strong className="text-white">Limite :</strong> nécessite stats saison
-          (uniquement disponible sur la page détail d'un match, pas dans la liste home).
+          <strong className="text-white">Limite :</strong> nécessite stats saison.
         </Definition>
 
         <Definition term={<><span className="inline-block px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-300 border border-orange-500/30 text-[9px] font-bold uppercase tracking-wider">Compo</span> — Compositions ajustées</>}>

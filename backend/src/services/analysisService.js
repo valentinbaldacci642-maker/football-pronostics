@@ -546,21 +546,22 @@ class AnalysisService {
     const shinVBs = oddsAnalysis.valueBets || [];
     const poissonVBs = this._detectPoissonValueBets(oddsAnalysis, predAnalysis);
 
+    // Poisson is used as a CONFIRMATION layer only, never as a standalone
+    // value-bet detector. Naive Poisson over-estimates BTTS Yes and Over
+    // probabilities (assumes independence between team goals; ignores game
+    // state), producing too many false-positive edges. Only when Shin
+    // (margin-removed bookmaker odds) ALSO flags the same selection do we
+    // trust the signal — and Poisson's estimate enriches the existing VB
+    // for the UI's 'Poisson confirme à +X%' line.
     poissonVBs.forEach((pvb) => {
       const existing = shinVBs.find((s) => s.market === pvb.market && s.selection === pvb.selection);
-      if (existing) {
-        if (!existing.sources.includes('poisson')) existing.sources.push('poisson');
-        if (pvb.sources.includes('lineup') && !existing.sources.includes('lineup')) {
-          existing.sources.push('lineup');
-        }
-        // Always expose the Poisson estimate so the UI can show "Poisson
-        // confirme à +X%" — useful even when Shin's edge is higher (a
-        // double confirmation strengthens the signal).
-        existing.edgePoisson = pvb.edge;
-        existing.trueProbPoisson = pvb.trueProb;
-      } else {
-        shinVBs.push(pvb);
+      if (!existing) return; // skip Poisson-only VBs entirely
+      if (!existing.sources.includes('poisson')) existing.sources.push('poisson');
+      if (pvb.sources.includes('lineup') && !existing.sources.includes('lineup')) {
+        existing.sources.push('lineup');
       }
+      existing.edgePoisson = pvb.edge;
+      existing.trueProbPoisson = pvb.trueProb;
     });
 
     oddsAnalysis.valueBets = shinVBs.sort((a, b) => (b.edge || 0) - (a.edge || 0));
