@@ -243,7 +243,6 @@ export default function History() {
           { id: 'pending',   label: 'Paris en cours',    icon: Clock },
           { id: 'pronos',    label: 'Historique pronos', icon: ListChecks },
           { id: 'bankroll',  label: 'Bankroll',          icon: Wallet },
-          { id: 'recherche', label: 'Équipe',            icon: Search },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -464,40 +463,6 @@ export default function History() {
       )}
 
       {/* ── RECHERCHE TAB ── */}
-      {tab === 'recherche' && (
-        <>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Chercher une équipe..."
-              className="w-full bg-dark-800 border border-white/[0.07] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-brand-500/40 font-heading"
-              autoFocus
-            />
-          </div>
-          {teamStats && search.trim() && (
-            <div className="glass-card px-4 py-3 flex items-center gap-4 flex-wrap">
-              <span className="text-sm text-white/40 font-heading">"{search}" :</span>
-              <span className="text-sm text-white/60 font-heading font-semibold">{teamStats.total} pronos</span>
-              {teamStats.settled > 0 && (
-                <>
-                  <span className={`stat-number text-lg ${teamStats.rate >= 55 ? 'text-brand-400' : 'text-gold-400'}`}>{teamStats.rate}%</span>
-                  <span className="text-sm text-brand-400 font-heading font-semibold">{teamStats.wins}W</span>
-                  <span className="text-sm text-danger font-heading font-semibold">{teamStats.settled - teamStats.wins}L</span>
-                </>
-              )}
-            </div>
-          )}
-          <div className="space-y-2">
-            {filtered.map((entry) => (
-              <EntryCard key={entry.fixtureId || entry.savedAt} entry={entry} setMise={setMise} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* ── HISTORIQUE MATCHS TAB ── (matchs terminés, ou pronos d'une date passée) */}
       {/* ── PARIS EN COURS TAB ── (every staked bet without a result yet) */}
       {tab === 'pending' && (() => {
         const allBets = flattenBets(entries);
