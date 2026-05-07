@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
 
-const PRIORITY_LEAGUE_IDS = [39, 140, 78, 135, 61, 2, 3, 88, 94, 253, 71, 128];
+const PRIORITY_LEAGUE_IDS = [39, 140, 78, 135, 61, 2, 3, 848, 88, 94, 253, 71, 128];
 
 // Format helper: compare ISO date strings ('YYYY-MM-DD') directly to avoid
 // any local-vs-UTC offset issues from new Date()/.toISOString() round-trips.
