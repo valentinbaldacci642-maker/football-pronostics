@@ -46,8 +46,15 @@ class PronosticsService {
       return [];
     }
 
+    // Include pre-match (NS/TBD) AND live matches. Excluding only finished
+    // / cancelled / abandoned states means VBs on a match in progress still
+    // show up — useful for live betting and matches the per-fixture analysis
+    // already shows. Bookmaker odds for live matches are typically the
+    // pre-match snapshot from API-Football's /odds endpoint, which is fine
+    // since our analysis was computed pre-kickoff.
+    const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'CANC', 'ABD', 'AWD', 'WO']);
     const upcoming = fixtures
-      .filter((f) => ['NS', 'TBD'].includes(f.fixture?.status?.short))
+      .filter((f) => !FINISHED_STATUSES.has(f.fixture?.status?.short))
       .sort((a, b) => {
         const pa = PRIORITY_LEAGUES.indexOf(a.league?.id);
         const pb = PRIORITY_LEAGUES.indexOf(b.league?.id);
