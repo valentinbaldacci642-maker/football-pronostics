@@ -4,6 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useHistoryStore } from './store';
 import { resolveFinishedMatches } from './utils/resolveResults';
+import { initCloudSync } from './services/cloudSync';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
 import BottomNav from './components/common/BottomNav';
@@ -26,6 +27,10 @@ export default function App() {
   const location = useLocation();
   const entries = useHistoryStore((s) => s.entries);
   const resolveResult = useHistoryStore((s) => s.resolveResult);
+
+  // Initialize cloud sync (Supabase). No-op if env vars are missing —
+  // app keeps working in localStorage-only mode.
+  useEffect(() => { initCloudSync(); }, []);
 
   // Hardware back button on Android: navigate back in WebView history rather
   // than exiting the app or always returning to home. Only exits when there
