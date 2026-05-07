@@ -326,6 +326,20 @@ export const useHistoryStore = create(
 
       clearAll: () => set({ entries: [] }),
 
+      // Surgical reset: keeps every entry the user has actually staked on
+      // (top-level mise OR any per-bet mise) so the bankroll P&L remains
+      // intact. Used by the 'Réinitialiser ces stats' button so the
+      // Total/Réussite/Gagnés/ROI counters reset without touching real bets.
+      clearUnstakedEntries: () => set((s) => ({
+        entries: s.entries.filter((e) => {
+          if (Number.isFinite(e.mise) && e.mise > 0) return true;
+          const perBetStaked = Object.values(e.bets || {}).some(
+            (b) => Number.isFinite(b.mise) && b.mise > 0,
+          );
+          return perBetStaked;
+        }),
+      })),
+
       getStats: () => {
         const settled = get().entries.filter((e) => e.result === 'win' || e.result === 'loss');
         const wins = settled.filter((e) => e.result === 'win').length;

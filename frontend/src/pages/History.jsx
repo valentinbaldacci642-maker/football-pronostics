@@ -102,7 +102,7 @@ const CustomTooltip = ({ active, payload }) => {
 };
 
 export default function History() {
-  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll, resolveResult } = useHistoryStore();
+  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll, clearUnstakedEntries, resolveResult } = useHistoryStore();
   const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode, reset: resetBankroll } = useBankrollStore();
 
   // Local input state so the bankroll input has a Save button (no save-on-keystroke)
@@ -176,12 +176,13 @@ export default function History() {
   const handleResetStatsOnly = () => {
     const ok = window.confirm(
       'Réinitialiser les stats Total / Réussite / Gagnés / ROI ?\n\n' +
-      'Tout l\'historique des pronos sera supprimé (les paris en cours et terminés).\n' +
-      'La bankroll initiale + Kelly + mode edge sont conservés.\n\n' +
+      'Seules les entrées non-pariées (pronos auto-trackés par l\'app) sont supprimées.\n' +
+      'Tes paris réels (avec mise saisie) restent en place.\n' +
+      'Bankroll, P&L et Paris en cours conservés.\n\n' +
       'Action irréversible.'
     );
     if (!ok) return;
-    clearAll();
+    clearUnstakedEntries();
   };
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('pending');
