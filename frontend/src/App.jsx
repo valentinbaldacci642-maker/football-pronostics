@@ -32,6 +32,16 @@ export default function App() {
   // app keeps working in localStorage-only mode.
   useEffect(() => { initCloudSync(); }, []);
 
+  // Backfill matchDate for old historique entries that pre-date the field.
+  // Runs once at startup, throttled, no-op if nothing's missing. Wrapped in
+  // a small delay so it doesn't compete with the initial page render.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      useHistoryStore.getState().backfillMatchDates().catch(() => {});
+    }, 3000);
+    return () => clearTimeout(id);
+  }, []);
+
   // Hardware back button on Android: navigate back in WebView history rather
   // than exiting the app or always returning to home. Only exits when there
   // is no history left (i.e. on the entry page).

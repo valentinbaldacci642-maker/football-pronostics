@@ -240,6 +240,33 @@ export const useHistoryStore = create(
         }
       },
 
+      // One-shot patch: fill `matchDate` on existing entries that don't have
+      // it (i.e. saved before that field was added). Triggered once at app
+      // startup so the historique can show real kickoff dates for old bets.
+      // Self-throttled (4/sec) to stay well under the backend rate limiter
+      // and silently skips fixtures the API no longer knows.
+      backfillMatchDates: async () => {
+        const targets = get().entries.filter((e) => !e.matchDate && e.fixtureId);
+        if (targets.length === 0) return;
+        const { fixturesApi } = await import('../services/api');
+        for (const e of targets) {
+          try {
+            const res = await fixturesApi.getById(e.fixtureId);
+            const matchDate = res?.response?.[0]?.fixture?.date;
+            if (matchDate) {
+              set((s) => ({
+                entries: s.entries.map((x) => (x.fixtureId === e.fixtureId ? { ...x, matchDate } : x)),
+              }));
+            }
+          } catch {
+            // Fixture no longer in API (purged after season ends, etc.) —
+            // leave matchDate null, the row simply won't show a date.
+          }
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      },
+
       resolveResult: (fixtureId, homeGoals, awayGoals) => set((s) => ({
         entries: s.entries.map((e) => {
           if (e.fixtureId !== fixtureId) return e;
