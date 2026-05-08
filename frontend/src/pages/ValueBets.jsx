@@ -9,7 +9,7 @@ import { pronosticsApi, getRateLimitedUntil } from '../services/api';
 import { useBankrollStore, useHistoryStore, useFavoritesStore } from '../store';
 import { kellyStake } from '../utils/kelly';
 import { formatStake } from '../utils/formatStake';
-import { formatTime } from '../utils/format';
+import { formatMatchDate } from '../utils/format';
 import { isUnibetLeague } from '../utils/unibetLeagues';
 import ValueBetSources from '../components/match/ValueBetSources';
 
@@ -517,8 +517,8 @@ export default function ValueBets() {
                     {m.valueBets.length} value bet{m.valueBets.length > 1 ? 's' : ''}
                   </span>
                   {m.date && (
-                    <span className="text-sm font-mono text-white/40">
-                      {formatTime(m.date)}
+                    <span className="text-sm font-mono text-white/40 whitespace-nowrap">
+                      {formatMatchDate(m.date)}
                     </span>
                   )}
                   <button

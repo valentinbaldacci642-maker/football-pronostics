@@ -7,6 +7,7 @@ import { resolveFinishedMatches } from '../utils/resolveResults';
 import { exportBankrollCsv } from '../utils/exportCsv';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { formatMatchDate } from '../utils/format';
 import clsx from 'clsx';
 import ValueBetSources from '../components/match/ValueBetSources';
 
@@ -661,6 +662,12 @@ function BetCard({ bet }) {
           {res.label}
         </span>
       </div>
+
+      {bet.date && (
+        <div className="text-xs text-white/40 font-mono">
+          {formatMatchDate(bet.date)}
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         {bet.homeLogo && <img src={bet.homeLogo} alt="" className="w-6 h-6 object-contain flex-shrink-0" />}
