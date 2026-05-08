@@ -66,11 +66,17 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
             </span>
           ) : (
             <span className="text-sm text-white/35 font-heading">
-              {liveBankroll <= 0
-                ? 'Définir bankroll pour voir Kelly'
-                : usingCustomOdd
-                  ? `Pas d'edge à @${effectiveOdd.toFixed(2)}`
-                  : 'Kelly inactif'}
+              {liveBankroll <= 0 ? (
+                'Définir bankroll pour voir Kelly'
+              ) : usingCustomOdd && liveEdge != null ? (
+                <>
+                  Edge <span className={liveEdge >= 0 ? 'text-gold-400' : 'text-danger'}>
+                    {liveEdge >= 0 ? '+' : ''}{liveEdge.toFixed(1)}%
+                  </span>{' '}à @{effectiveOdd.toFixed(2)}
+                </>
+              ) : (
+                'Kelly inactif'
+              )}
             </span>
           )}
         </div>
