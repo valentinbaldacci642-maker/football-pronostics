@@ -6,7 +6,6 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
 import { pronosticsApi, getRateLimitedUntil } from '../services/api';
-import { useLivePolling, isLiveStatus } from '../hooks/useLivePolling';
 import { useBankrollStore, useHistoryStore, useFavoritesStore } from '../store';
 import { kellyStake } from '../utils/kelly';
 import { formatStake } from '../utils/formatStake';
@@ -242,19 +241,6 @@ export default function ValueBets() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDay]);
-
-  // Auto-refresh selected day every 30s when at least one of its pronostics
-  // is on a live fixture. Skips polling during a bulk loadAllDays so we don't
-  // double-trigger backend force-refreshes.
-  const hasLiveFixture = pronostics.some(
-    (p) => isLiveStatus(p?.fixture?.fixture?.status?.short),
-  );
-  const isBulkLoading = progress.total > 0;
-  useLivePolling(
-    hasLiveFixture && !isBulkLoading,
-    () => loadDay(selectedDay, { force: true }),
-    30000,
-  );
 
   // Auto-retry once rate-limit lockout expires (capped at 3)
   const [rateLimitRetries, setRateLimitRetries] = useState(0);
