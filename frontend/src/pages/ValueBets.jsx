@@ -10,6 +10,7 @@ import { useBankrollStore, useHistoryStore, useFavoritesStore } from '../store';
 import { kellyStake } from '../utils/kelly';
 import { formatStake } from '../utils/formatStake';
 import { formatTime } from '../utils/format';
+import { isUnibetLeague } from '../utils/unibetLeagues';
 import ValueBetSources from '../components/match/ValueBetSources';
 
 function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
@@ -175,7 +176,7 @@ export default function ValueBets() {
   const pronostics = pronosticsByDay[selectedDay] || [];
   const loading = !!loadingDays[selectedDay];
 
-  const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
+  const { initialBankroll, kellyFraction: kFrac, unibetOnly, setUnibetOnly } = useBankrollStore();
   const entries = useHistoryStore((s) => s.entries);
   const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
   const savePronostics = useHistoryStore((s) => s.savePronostics);
@@ -305,8 +306,14 @@ export default function ValueBets() {
     return groups.sort((a, b) => b.bestEdge - a.bestEdge);
   }, [pronostics, liveBankroll, kFrac]);
 
-  const totalValueBetsCount = matchesWithValueBets.reduce((s, m) => s + m.valueBets.length, 0);
-  const totalSuggestedStake = matchesWithValueBets.reduce((s, m) => s + m.totalStake, 0);
+  const filteredMatches = useMemo(
+    () => unibetOnly ? matchesWithValueBets.filter((m) => isUnibetLeague(m.league?.id)) : matchesWithValueBets,
+    [matchesWithValueBets, unibetOnly],
+  );
+  const hiddenByFilter = matchesWithValueBets.length - filteredMatches.length;
+
+  const totalValueBetsCount = filteredMatches.reduce((s, m) => s + m.valueBets.length, 0);
+  const totalSuggestedStake = filteredMatches.reduce((s, m) => s + m.totalStake, 0);
 
   return (
     <div className="space-y-6 max-w-4xl xl:max-w-6xl mx-auto">
@@ -380,16 +387,44 @@ export default function ValueBets() {
         ))}
       </div>
 
+      {/* Unibet-only filter toggle */}
+      <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-dark-800/40 border border-white/[0.06]">
+        <div className="flex flex-col">
+          <span className="text-sm text-white/70 font-heading font-semibold">
+            Filtre Unibet
+          </span>
+          <span className="text-[11px] text-white/35 font-heading">
+            {unibetOnly
+              ? `Uniquement ligues Unibet · ${hiddenByFilter} match${hiddenByFilter > 1 ? 's' : ''} masqué${hiddenByFilter > 1 ? 's' : ''}`
+              : 'Toutes les ligues'}
+          </span>
+        </div>
+        <button
+          onClick={() => setUnibetOnly(!unibetOnly)}
+          role="switch"
+          aria-checked={unibetOnly}
+          className={clsx(
+            'relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0',
+            unibetOnly ? 'bg-brand-500' : 'bg-white/10'
+          )}
+        >
+          <span className={clsx(
+            'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+            unibetOnly ? 'translate-x-6' : 'translate-x-1'
+          )} />
+        </button>
+      </div>
+
       {/* Summary */}
-      {!loading && matchesWithValueBets.length > 0 && (
+      {!loading && filteredMatches.length > 0 && (
         <div className="grid grid-cols-3 gap-2.5">
           <div className="glass-card px-3.5 py-3">
             <p className="stat-number text-xl leading-none text-gold-400">{totalValueBetsCount}</p>
-            <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">Value bets · {matchesWithValueBets.length} matchs</p>
+            <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">Value bets · {filteredMatches.length} matchs</p>
           </div>
           <div className="glass-card px-3.5 py-3">
             <p className="stat-number text-xl leading-none text-white">
-              {matchesWithValueBets[0]?.bestEdge?.toFixed(1)}%
+              {filteredMatches[0]?.bestEdge?.toFixed(1)}%
             </p>
             <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">Meilleur edge</p>
           </div>
@@ -424,7 +459,7 @@ export default function ValueBets() {
         </div>
       )}
 
-      {!loading && !error && matchesWithValueBets.length === 0 && (
+      {!loading && !error && filteredMatches.length === 0 && (
         <div className="glass-card p-12 text-center space-y-4">
           <Flame className="w-12 h-12 text-white/10 mx-auto" />
           <div>
@@ -441,7 +476,7 @@ export default function ValueBets() {
       )}
 
       {/* Match cards — one per match, with all its value bets stacked inside */}
-      {!loading && !error && matchesWithValueBets.length > 0 && (
+      {!loading && !error && filteredMatches.length > 0 && (
         <div className="space-y-3">
           {liveBankroll <= 0 && (
             <div className="px-3.5 py-2.5 rounded-xl bg-brand-500/[0.08] border border-brand-500/25">
@@ -455,7 +490,7 @@ export default function ValueBets() {
             </div>
           )}
 
-          {matchesWithValueBets.map((m, mi) => (
+          {filteredMatches.map((m, mi) => (
             <Link
               key={m.fixtureId}
               to={`/match/${m.fixtureId}`}
