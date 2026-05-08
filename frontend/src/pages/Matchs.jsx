@@ -132,8 +132,17 @@ function LeagueGroup({ league, matches, defaultExpanded = false }) {
 }
 
 export default function Matchs() {
-  const [searchParams] = useSearchParams();
-  const [mode, setMode] = useState('date'); // 'date' or 'live'
+  // Mode is held in the URL (?mode=live) so it survives a navigation to a
+  // match detail and back — without this, hitting "back" from a match
+  // dropped the user out of live view onto today's scheduled list.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mode = searchParams.get('mode') === 'live' ? 'live' : 'date';
+  const setMode = (next) => {
+    const sp = new URLSearchParams(searchParams);
+    if (next === 'live') sp.set('mode', 'live');
+    else sp.delete('mode');
+    setSearchParams(sp, { replace: true });
+  };
   // Use the user's local date for the initial selection — toISOString() would
   // give UTC date which may be off by 1 day (e.g. 23:30 Paris time = next day UTC).
   const [selectedDate, setSelectedDate] = useState(() => localIso(new Date()));
