@@ -73,7 +73,7 @@ export const getMatchStatus = (fixture) => {
 export const getScoreDisplay = (fixture) => {
   const goals = fixture?.goals;
   const status = fixture?.fixture?.status?.short;
-  const finishedOrLive = ['FT', 'AET', 'PEN', '1H', '2H', 'ET', 'BT', 'P'].includes(status);
+  const finishedOrLive = ['FT', 'AET', 'PEN', '1H', 'HT', '2H', 'ET', 'BT', 'P'].includes(status);
 
   if (!finishedOrLive || goals?.home === null) return null;
   return { home: goals.home ?? 0, away: goals.away ?? 0 };
