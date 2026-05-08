@@ -51,12 +51,17 @@ export const getMatchStatus = (fixture) => {
   if (!status) return { label: '—', type: 'unknown' };
 
   const { short, elapsed } = status;
-  const liveStatuses = ['1H', '2H', 'ET', 'BT', 'P', 'LIVE'];
+  // HT and INT/SUSP are still 'live' for display purposes — the match is
+  // ongoing, the score is current, and we want the red indicator + score
+  // to stay visible. Without HT here, halftime would render as "unknown"
+  // and the live score block would disappear.
+  const liveStatuses = ['1H', '2H', 'HT', 'ET', 'BT', 'P', 'LIVE'];
   const finishedStatuses = ['FT', 'AET', 'PEN'];
   const scheduledStatuses = ['NS', 'TBD'];
   const cancelledStatuses = ['CANC', 'ABD', 'AWD', 'WO'];
   const postponedStatuses = ['PST', 'SUSP', 'INT'];
 
+  if (short === 'HT') return { label: 'Mi-temps', type: 'live' };
   if (liveStatuses.includes(short)) return { label: elapsed ? `${elapsed}'` : 'LIVE', type: 'live' };
   if (finishedStatuses.includes(short)) return { label: 'Terminé', type: 'finished' };
   if (scheduledStatuses.includes(short)) return { label: 'Programmé', type: 'scheduled' };
