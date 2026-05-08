@@ -466,7 +466,12 @@ export default function ValueBets() {
                   {m.league?.logo && (
                     <img src={m.league.logo} alt="" className="w-4 h-4 object-contain opacity-60 flex-shrink-0" />
                   )}
-                  <span className="text-sm text-white/45 font-heading truncate">{m.league?.name}</span>
+                  <span className="text-sm text-white/45 font-heading truncate">
+                    {m.league?.name}
+                    {m.league?.country && (
+                      <span className="text-white/25 ml-1.5">· {m.league.country}</span>
+                    )}
+                  </span>
                   <span className="text-xs text-gold-400/80 font-mono ml-auto">
                     {m.valueBets.length} value bet{m.valueBets.length > 1 ? 's' : ''}
                   </span>
