@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import MatchCard from '../components/match/MatchCard';
 import { SkeletonCard, EmptyState, ErrorState } from '../components/ui/Loading';
 import { fixturesApi } from '../services/api';
+import { useLivePolling, isLiveStatus } from '../hooks/useLivePolling';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -173,19 +174,15 @@ export default function Matchs() {
     fetchFixtures();
   }, [fetchFixtures]);
 
-  useEffect(() => {
-    if (mode !== 'live') return;
-    const interval = setInterval(fetchFixtures, 90000);
-    return () => clearInterval(interval);
-  }, [mode, fetchFixtures]);
+  // Auto-refresh every 30s when at least one displayed fixture is live —
+  // covers both live mode and a date that happens to include live games.
+  // No live games → no polling.
+  const liveMatches = fixtures.filter((f) => isLiveStatus(f.fixture?.status?.short)).length;
+  useLivePolling(liveMatches > 0, fetchFixtures, 30000);
 
   const grouped = groupByLeague(fixtures);
 
   const totalMatches = fixtures.length;
-  const liveMatches = fixtures.filter((f) => {
-    const s = f.fixture?.status?.short;
-    return ['1H', '2H', 'ET', 'BT', 'P'].includes(s);
-  }).length;
   const scheduledMatches = fixtures.filter((f) => f.fixture?.status?.short === 'NS').length;
   const finishedMatches = fixtures.filter((f) => ['FT', 'AET', 'PEN'].includes(f.fixture?.status?.short)).length;
 

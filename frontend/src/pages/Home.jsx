@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Save, Flame } from 'lucide-react';
 import { pronosticsApi, getRateLimitedUntil } from '../services/api';
+import { useLivePolling, isLiveStatus } from '../hooks/useLivePolling';
 import { formatTime } from '../utils/format';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -479,6 +480,14 @@ export default function Home() {
   };
 
   useEffect(() => { load({ date: selectedDay }); }, [selectedDay]);
+
+  // Auto-refresh every 30s while at least one displayed pronostic is on a
+  // live fixture. Hook tears down the interval on unmount/no-live so other
+  // pages don't keep polling in the background.
+  const hasLiveFixture = pronostics.some(
+    (p) => isLiveStatus(p?.fixture?.fixture?.status?.short),
+  );
+  useLivePolling(hasLiveFixture, () => load({ date: selectedDay, force: true }), 30000);
 
   // Auto-retry once the rate-limit lockout expires. Capped at 3 attempts
   // total — beyond that the API is presumably saturated for real (daily
