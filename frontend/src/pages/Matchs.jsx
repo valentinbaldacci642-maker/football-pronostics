@@ -279,7 +279,7 @@ export default function Matchs() {
 
         {/* En direct toggle, on its own line below the date row */}
         <button
-          onClick={() => setMode('live')}
+          onClick={() => setMode(mode === 'live' ? 'date' : 'live')}
           className={clsx(
             'flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-heading font-semibold border transition-all',
             mode === 'live'
