@@ -212,6 +212,11 @@ export const useHistoryStore = create(
             return {
               fixtureId: p.fixture?.fixture?.id,
               date: today,
+              // Full kickoff ISO datetime — used for display (formatMatchDate
+              // shows 'Aujourd'hui 19:00' / 'Demain 19:00' / '12 mai · 19:00').
+              // `date` stays a YYYY-MM-DD save-day stamp because resolveResults
+              // and the export CSV depend on that string format.
+              matchDate: p.fixture?.fixture?.date || null,
               savedAt: new Date().toISOString(),
               homeTeam: p.fixture?.teams?.home?.name,
               awayTeam: p.fixture?.teams?.away?.name,

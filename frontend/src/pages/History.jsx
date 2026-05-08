@@ -41,7 +41,7 @@ function flattenBets(entries) {
         homeTeam: e.homeTeam, awayTeam: e.awayTeam,
         homeLogo: e.homeLogo, awayLogo: e.awayLogo,
         league: e.league, leagueLogo: e.leagueLogo,
-        date: e.date, savedAt: e.savedAt,
+        date: e.date, matchDate: e.matchDate || null, savedAt: e.savedAt,
         market: e.pickMarket || '1X2',
         selection: e.pickLabel || e.pick,
         rawSelection: e.pick,
@@ -66,7 +66,7 @@ function flattenBets(entries) {
         homeTeam: e.homeTeam, awayTeam: e.awayTeam,
         homeLogo: e.homeLogo, awayLogo: e.awayLogo,
         league: e.league, leagueLogo: e.leagueLogo,
-        date: e.date, savedAt: e.savedAt,
+        date: e.date, matchDate: e.matchDate || null, savedAt: e.savedAt,
         market, selection,
         rawSelection: selection,
         mise: bet.mise,
@@ -663,9 +663,9 @@ function BetCard({ bet }) {
         </span>
       </div>
 
-      {bet.date && (
+      {bet.matchDate && (
         <div className="text-xs text-white/40 font-mono">
-          {formatMatchDate(bet.date)}
+          {formatMatchDate(bet.matchDate)}
         </div>
       )}
 
