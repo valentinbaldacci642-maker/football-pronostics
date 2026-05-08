@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fixturesApi } from '../services/api';
+import { useLivePolling, isLiveStatus } from './useLivePolling';
 
 export function useFixtures({ date, league, mode = 'today' } = {}) {
   const [data, setData] = useState([]);
@@ -44,9 +45,15 @@ export function useFixtureDetail(id) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  // refresh re-runs the fetch sequence without flipping `loading` so the
+  // 30s live-polling tick doesn't blank the UI on each refresh. The initial
+  // load (effect below) does set loading=true.
+  const refresh = useCallback(async ({ withLoading = false } = {}) => {
     if (!id) return;
-    let cancelled = false;
+    if (withLoading) {
+      setLoading(true);
+      setError(null);
+    }
 
     // Fetch the main fixture with one automatic retry. If the backend is
     // momentarily rate-limited we'd otherwise show "Match introuvable" while
@@ -69,38 +76,43 @@ export function useFixtureDetail(id) {
       }
     };
 
-    const run = async () => {
-      setLoading(true);
-      setError(null);
-      const fixResult = await fetchFixture();
-      if (cancelled) return;
-
-      if (!fixResult.ok) {
-        setError(fixResult.error);
-        setFixture(null);
-      } else if (!fixResult.data) {
-        setError('Match introuvable côté API');
-        setFixture(null);
-      } else {
-        setFixture(fixResult.data);
-        // Secondary calls — failures here are non-fatal, just leave the
-        // panels empty rather than blocking the whole page.
-        const [st, ev, lu] = await Promise.allSettled([
-          fixturesApi.getStatistics(id),
-          fixturesApi.getEvents(id),
-          fixturesApi.getLineups(id),
-        ]);
-        if (cancelled) return;
-        if (st.status === 'fulfilled') setStats(st.value?.response);
-        if (ev.status === 'fulfilled') setEvents(ev.value?.response || []);
-        if (lu.status === 'fulfilled') setLineups(lu.value?.response);
-      }
-      setLoading(false);
-    };
-
-    run();
-    return () => { cancelled = true; };
+    const fixResult = await fetchFixture();
+    if (!fixResult.ok) {
+      setError(fixResult.error);
+      setFixture(null);
+    } else if (!fixResult.data) {
+      setError('Match introuvable côté API');
+      setFixture(null);
+    } else {
+      setFixture(fixResult.data);
+      // Secondary calls — failures here are non-fatal, just leave the
+      // panels empty rather than blocking the whole page.
+      const [st, ev, lu] = await Promise.allSettled([
+        fixturesApi.getStatistics(id),
+        fixturesApi.getEvents(id),
+        fixturesApi.getLineups(id),
+      ]);
+      if (st.status === 'fulfilled') setStats(st.value?.response);
+      if (ev.status === 'fulfilled') setEvents(ev.value?.response || []);
+      if (lu.status === 'fulfilled') setLineups(lu.value?.response);
+    }
+    if (withLoading) setLoading(false);
   }, [id]);
 
-  return { fixture, stats, events, lineups, loading, error };
+  useEffect(() => {
+    if (!id) return undefined;
+    let cancelled = false;
+    (async () => {
+      await refresh({ withLoading: true });
+      if (cancelled) return;
+    })();
+    return () => { cancelled = true; };
+  }, [id, refresh]);
+
+  // Auto-refresh every 30s while this match is live so score / events /
+  // stats stay fresh without the user manually reloading the page.
+  const isLive = isLiveStatus(fixture?.fixture?.status?.short);
+  useLivePolling(isLive, refresh, 30000);
+
+  return { fixture, stats, events, lineups, loading, error, refresh };
 }
