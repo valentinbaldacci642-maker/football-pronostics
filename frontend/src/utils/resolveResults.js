@@ -1,10 +1,10 @@
 import { fixturesApi } from '../services/api';
 
 const FINISHED_STATUSES = ['FT', 'AET', 'PEN'];
-const MAX_LOOKUPS = 20;
+const MAX_LOOKUPS = 100;
 const MAX_AGE_DAYS = 14;
 const MIN_AGE_MINUTES = 90; // matches need ~90 min of play before finishing
-const REQUEST_GAP_MS = 250;
+const REQUEST_GAP_MS = 200;
 
 /**
  * Resolve unresolved bets from the past N days by querying each fixture's
@@ -39,7 +39,10 @@ export async function resolveFinishedMatches(entries, onResolve) {
   // 295-req/min ceiling even if other parts of the app are also calling.
   for (const entry of candidates) {
     try {
-      const raw = await fixturesApi.getById(entry.fixtureId);
+      // fresh=1 bypasses the 20min backend cache — needed because a fixture
+      // pulled mid-match (e.g. live polling on Matchs page) could otherwise
+      // sit in cache as still-live for up to 20 min after the real FT.
+      const raw = await fixturesApi.getById(entry.fixtureId, { fresh: true });
       const fixture = raw?.response?.[0] || raw?.data?.response?.[0];
       const status = fixture?.fixture?.status?.short;
       const hg = fixture?.goals?.home;

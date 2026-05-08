@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const api = require('../services/apiFootball');
+const cache = require('../utils/cache');
 const logger = require('../utils/logger');
 
 router.get('/', async (req, res, next) => {
@@ -61,6 +62,13 @@ router.get('/tomorrow', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
+    // ?fresh=1 bypasses the 20min cache — used by the bet resolver when it
+    // needs an authoritative finished/not status. Without it, a stale 'live'
+    // entry from earlier in the match could block resolution for up to 20min
+    // after the match has actually concluded.
+    if (req.query.fresh === '1') {
+      cache.del(cache.buildKey('api', '/fixtures', JSON.stringify({ id: req.params.id })));
+    }
     res.json(await api.getFixtureById(req.params.id));
   } catch (err) {
     next(err);
