@@ -59,7 +59,9 @@ export default function MatchCard({ fixture, compact = false, prediction }) {
           {isLive ? (
             <div className="live-indicator">
               <span className="w-1.5 h-1.5 rounded-full bg-danger animate-live-dot" />
-              {fix?.status?.elapsed ? `${fix.status.elapsed}'` : 'LIVE'}
+              {fix?.status?.short === 'HT'
+                ? 'MT'
+                : fix?.status?.elapsed ? `${fix.status.elapsed}'` : 'LIVE'}
             </div>
           ) : (
             <span className={clsx(
