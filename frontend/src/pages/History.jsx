@@ -225,7 +225,10 @@ export default function History() {
   })() : null;
 
   const grouped = filtered.reduce((acc, e) => {
-    const day = e.date || e.savedAt?.split('T')[0] || 'unknown';
+    // Group by match kickoff day, falling back to save day for legacy
+    // entries without matchDate. Avoids the 'Jeudi 7 mai' header showing
+    // for a match actually played on Vendredi 8 mai.
+    const day = e.matchDate?.split('T')[0] || e.date || e.savedAt?.split('T')[0] || 'unknown';
     if (!acc[day]) acc[day] = [];
     acc[day].push(e);
     return acc;
@@ -574,7 +577,10 @@ export default function History() {
           return true;
         });
         const grouped = filtered.reduce((acc, b) => {
-          const day = b.date || b.savedAt?.split('T')[0] || 'unknown';
+          // Group by match kickoff day (matchDate) instead of save day so
+          // the 'JEUDI 7 MAI' header reflects when the match was played,
+          // not when the user pressed Save.
+          const day = b.matchDate?.split('T')[0] || b.date || b.savedAt?.split('T')[0] || 'unknown';
           (acc[day] = acc[day] || []).push(b);
           return acc;
         }, {});
