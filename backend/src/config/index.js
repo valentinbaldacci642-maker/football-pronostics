@@ -15,7 +15,11 @@ module.exports = {
     ttlLeagues: 86400,                                    // 24 h
   },
   valueBet: {
-    minEdge: 5,
+    // 7% min edge sur le consensus Shin → laisse de la marge pour la perte
+    // d'edge sur Unibet.fr (cote ~7% plus tight que le consensus mondial à
+    // cause de la marge ANJ + taxes). Avec 7% Shin, ~3-4% reste à Unibet,
+    // donc le pari reste +EV.
+    minEdge: 7,
     minProb: 25,
     minOdds: 1.4,
     maxOdds: 10.0,
