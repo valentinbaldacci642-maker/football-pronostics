@@ -461,8 +461,12 @@ export const useHistoryStore = create(
           for (const bet of Object.values(e.bets || {})) {
             if (!Number.isFinite(bet.mise) || bet.mise <= 0) continue;
             if (bet.result === 'win') {
+              // Fallback: actualOdd (user-entered "Ma cote") OR modelOdd
+              // (system-suggested at save time). Without modelOdd fallback,
+              // a winning per-VB bet where user skipped "Ma cote" was counted
+              // as push (return = stake, profit = 0) → bankroll sous-évaluée.
               totalMise += bet.mise;
-              totalReturn += bet.mise * parseFloat(bet.actualOdd || 1);
+              totalReturn += bet.mise * parseFloat(bet.actualOdd || bet.modelOdd || 1);
               settledCount++;
             } else if (bet.result === 'loss') {
               totalMise += bet.mise;

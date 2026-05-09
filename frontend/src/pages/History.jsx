@@ -119,6 +119,27 @@ export default function History() {
     setInitialBankroll(v);
   };
 
+  // Bookmaker sync: user types real bookmaker balance, system computes
+  // the delta with currentBankroll and patches initialBankroll so live
+  // bankroll matches reality. Used for small reconciliations (un pari mal
+  // résolu, bonus, cashout partiel) sans avoir à recalculer manuellement.
+  const [syncInput, setSyncInput] = useState('');
+  const [syncMsg, setSyncMsg] = useState(null);
+  const handleSyncBankroll = () => {
+    const target = parseFloat(syncInput);
+    if (!Number.isFinite(target) || target < 0) return;
+    const _bk = getBankrollStats();
+    const live = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
+    const delta = target - live;
+    if (Math.abs(delta) < 0.005) {
+      setSyncMsg('Déjà synchro');
+      return;
+    }
+    setInitialBankroll(parseFloat((initialBankroll + delta).toFixed(2)));
+    setSyncMsg(`${delta >= 0 ? '+' : ''}${delta.toFixed(2)} € appliqué`);
+    setSyncInput('');
+  };
+
   // Manual resolve trigger for the "Vérifier les résultats" button
   const [resolving, setResolving] = useState(false);
   const [resolveMsg, setResolveMsg] = useState(null);
@@ -349,6 +370,49 @@ export default function History() {
                   Enregistrer
                 </button>
               </div>
+            </label>
+
+            {/* Sync with bookmaker — quick reconciliation when the live
+                bankroll drifts from the real bookmaker balance (mal résolu,
+                bonus, cashout, etc). User types real balance, we compute
+                delta and bump initialBankroll. */}
+            <label className="flex flex-col gap-1 pt-2 border-t border-white/[0.05]">
+              <span className="text-xs text-white/40 font-heading">
+                Synchroniser avec le bookmaker
+              </span>
+              <span className="text-[11px] text-white/25 font-heading leading-relaxed -mt-0.5">
+                Tape ta vraie balance Unibet/Winamax/Betclic → le système ajuste
+                la bankroll initiale pour matcher.
+              </span>
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Ex: 8.55"
+                  value={syncInput}
+                  onChange={(e) => { setSyncInput(e.target.value); setSyncMsg(null); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSyncBankroll(); }}
+                  className="flex-1 bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
+                />
+                <button
+                  onClick={handleSyncBankroll}
+                  disabled={!syncInput || parseFloat(syncInput) < 0}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-4 py-2 rounded-lg border text-xs font-heading font-semibold transition-all whitespace-nowrap',
+                    syncInput && parseFloat(syncInput) >= 0
+                      ? 'bg-gold-500/15 border-gold-500/40 text-gold-400 hover:bg-gold-500/25'
+                      : 'border-white/[0.05] text-white/20 cursor-not-allowed'
+                  )}
+                  title="Synchroniser la bankroll avec ta vraie balance bookmaker"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Synchroniser
+                </button>
+              </div>
+              {syncMsg && (
+                <span className="text-xs text-gold-400/80 font-heading mt-1">{syncMsg}</span>
+              )}
             </label>
 
             <label className="flex flex-col gap-1">
