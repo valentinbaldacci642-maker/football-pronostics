@@ -105,7 +105,7 @@ const CustomTooltip = ({ active, payload }) => {
 };
 
 export default function History() {
-  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll, clearUnstakedEntries, resolveResult, seedUnibetBets } = useHistoryStore();
+  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll, clearUnstakedEntries, resolveResult } = useHistoryStore();
   const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode, reset: resetBankroll } = useBankrollStore();
 
   // Local input state so the bankroll input has a Save button (no save-on-keystroke)
@@ -414,26 +414,6 @@ export default function History() {
                 <span className="text-xs text-gold-400/80 font-heading mt-1">{syncMsg}</span>
               )}
             </label>
-
-            {/* One-shot import of bookmaker history (current user's Unibet
-                bets, hardcoded in the store seedUnibetBets action). */}
-            <div className="pt-2 border-t border-white/[0.05]">
-              <button
-                onClick={() => {
-                  const ok = window.confirm(
-                    'Import paris Unibet : remplace tous les paris terminés par les 20 paris du bookmaker, garde les paris en cours, et fixe la bankroll de départ à 10 €. Continuer ?'
-                  );
-                  if (!ok) return;
-                  setInitialBankroll(10);
-                  seedUnibetBets();
-                  setResolveMsg('Historique remplacé · bankroll 10€');
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-orange-500/40 text-xs font-heading font-semibold text-orange-300 hover:bg-orange-500/10 transition-all"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Importer historique Unibet (one-shot)
-              </button>
-            </div>
 
             <label className="flex flex-col gap-1">
               <span className="text-xs text-white/40 font-heading">Fraction Kelly</span>
