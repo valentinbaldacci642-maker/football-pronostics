@@ -8,13 +8,12 @@ const BASE = import.meta.env.VITE_API_URL
 
 const api = axios.create({
   baseURL: BASE,
-  // Long timeout to accommodate /pronostics/today: a cold-cache scan
-  // covers top 10 + lite scan on next 30 fixtures (~40 calls in lite +
-  // 60 in top-10 enrich = 100 calls × 240ms = 25-40s typical, but slow
-  // upstream + some retries can push past 60s on busy days. 180s gives
-  // comfortable margin without UX consequences (the spinner + info
-  // banner inform the user it can take a while).
-  timeout: 180000,
+  // Long timeout to accommodate /pronostics/today on busy days. A cold
+  // scan covers top 10 + lite scan 140 + enrich cap 50 ≈ 500 API calls.
+  // At the throttler's 420/min, that's ~75s minimum — but slow upstream
+  // responses on a busy match day (300+ fixtures, many odds requests)
+  // push it past 3 min. 300s gives safe margin.
+  timeout: 300000,
   headers: { 'Content-Type': 'application/json' },
 });
 
