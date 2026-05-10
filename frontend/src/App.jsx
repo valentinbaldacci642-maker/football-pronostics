@@ -38,6 +38,10 @@ export default function App() {
   useEffect(() => {
     const id = setTimeout(() => {
       useHistoryStore.getState().backfillMatchDates().catch(() => {});
+      // Same idea: re-link entries with synthetic (negative) fixtureIds —
+      // typically from the manual Unibet import — to their real API id so
+      // the resolver can grade them when the match ends.
+      useHistoryStore.getState().backfillSyntheticFixtureIds().catch(() => {});
     }, 3000);
     return () => clearTimeout(id);
   }, []);

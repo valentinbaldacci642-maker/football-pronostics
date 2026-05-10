@@ -241,6 +241,64 @@ export const useHistoryStore = create(
         }
       },
 
+      // One-shot patch: re-link entries with synthetic / negative fixtureId
+      // to a real API fixture by matching team names against /fixtures?date=.
+      // Used after a manual seed (the import-Unibet button) so the resolver
+      // can actually grade the seeded pending bets when their match ends.
+      // Settled entries with synthetic IDs are left alone — no point re-
+      // linking them, their result is already known.
+      backfillSyntheticFixtureIds: async () => {
+        const targets = get().entries.filter((e) => {
+          if (e.fixtureId > 0) return false;
+          // Only re-link entries that still have at least one unresolved
+          // staked bet — otherwise it's a settled seed, leave it alone.
+          const hasUnresolvedStake = (Number.isFinite(e.mise) && e.mise > 0 && !e.result)
+            || Object.values(e.bets || {}).some((b) => Number.isFinite(b.mise) && b.mise > 0 && !b.result);
+          if (!hasUnresolvedStake) return false;
+          if (!e.matchDate) return false;
+          return true;
+        });
+        if (targets.length === 0) return;
+        const { fixturesApi } = await import('../services/api');
+
+        // Cache of fixtures-by-date queries so multiple targets on the same
+        // day only cost one API hit.
+        const fixturesByDate = new Map();
+        const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+        const teamMatches = (a, b) => {
+          const na = norm(a); const nb = norm(b);
+          return na === nb || (na.length >= 3 && (na.includes(nb) || nb.includes(na)));
+        };
+
+        for (const e of targets) {
+          const day = e.matchDate.split('T')[0];
+          try {
+            if (!fixturesByDate.has(day)) {
+              const res = await fixturesApi.getByDate(day);
+              fixturesByDate.set(day, res?.response || []);
+            }
+            const list = fixturesByDate.get(day);
+            const real = list.find(
+              (f) => teamMatches(f.teams?.home?.name, e.homeTeam) && teamMatches(f.teams?.away?.name, e.awayTeam),
+            );
+            if (real) {
+              const realId = real.fixture?.id;
+              const realDate = real.fixture?.date;
+              const oldId = e.fixtureId;
+              set((s) => ({
+                entries: s.entries.map((x) => (x.fixtureId === oldId
+                  ? { ...x, fixtureId: realId, matchDate: realDate || x.matchDate }
+                  : x)),
+              }));
+            }
+          } catch {
+            // ignore — try the next one
+          }
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      },
+
       // One-shot patch: fill `matchDate` on existing entries that don't have
       // it (i.e. saved before that field was added). Triggered once at app
       // startup so the historique can show real kickoff dates for old bets.
