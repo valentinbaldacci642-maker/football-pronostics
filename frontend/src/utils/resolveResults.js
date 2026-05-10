@@ -23,11 +23,26 @@ export async function resolveFinishedMatches(entries, onResolve) {
 
   const candidates = entries
     .filter((e) => {
-      if (e.result || !e.fixtureId || !e.date) return false;
+      // Synthetic IDs (seeded manual imports) start from negative so we don't
+      // waste API calls trying to resolve them.
+      if (!e.fixtureId || e.fixtureId <= 0) return false;
+      if (!e.date) return false;
       if (e.date < cutoffStr || e.date > todayStr) return false;
-      // Skip bets too fresh — match not over yet, no point hitting the API
-      const saved = e.savedAt ? new Date(e.savedAt).getTime() : 0;
-      if (saved && now - saved < minAgeMs) return false;
+
+      // Need at least one *staked* bet that isn't yet resolved. Without this
+      // check we'd hit the API for entries whose only purpose is showing a
+      // prono on the home page (no money committed).
+      const entryUnresolvedStake = Number.isFinite(e.mise) && e.mise > 0 && !e.result;
+      const perBetUnresolvedStake = Object.values(e.bets || {}).some(
+        (b) => Number.isFinite(b.mise) && b.mise > 0 && !b.result,
+      );
+      if (!entryUnresolvedStake && !perBetUnresolvedStake) return false;
+
+      // Use kickoff time when available — much more accurate than savedAt for
+      // bets placed days in advance. A bet saved 5 days ago for a match
+      // tonight should be checked tonight, not 5 days ago.
+      const reference = e.matchDate ? new Date(e.matchDate).getTime() : (e.savedAt ? new Date(e.savedAt).getTime() : 0);
+      if (reference && now - reference < minAgeMs) return false;
       return true;
     })
     .slice(0, MAX_LOOKUPS);
