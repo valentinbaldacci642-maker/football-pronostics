@@ -635,6 +635,52 @@ export const useHistoryStore = create(
         }),
       })),
 
+      // Closing odd for a per-VB bet — the odd available just before kickoff.
+      // Comparing actualOdd to closingOdd gives Closing Line Value (CLV) which
+      // is the gold-standard proof of edge: positive CLV on average means the
+      // user systematically gets better-than-market prices, i.e. has a real
+      // edge regardless of short-term win/loss variance.
+      setBetClosingOdd: (fixtureId, betKey, value) => set((s) => ({
+        entries: s.entries.map((e) => {
+          if (e.fixtureId !== fixtureId) return e;
+          const next = parseFloat(value);
+          const bets = { ...(e.bets || {}) };
+          const cur = bets[betKey] || {};
+          bets[betKey] = {
+            ...cur,
+            closingOdd: value === '' || !Number.isFinite(next) || next <= 0 ? null : next,
+          };
+          return { ...e, bets };
+        }),
+      })),
+
+      // Aggregate CLV stats — average CLV across all per-VB bets that have
+      // BOTH an actualOdd (or fallback modelOdd) AND a closingOdd. Result is
+      // in % (e.g. +2.4 means user got 2.4% better odds than the closing line
+      // on average, which is consistent with a +EV strategy).
+      getCLVStats: () => {
+        let totalClv = 0;
+        let count = 0;
+        let positive = 0;
+        for (const e of get().entries) {
+          for (const bet of Object.values(e.bets || {})) {
+            if (!Number.isFinite(bet.mise) || bet.mise <= 0) continue;
+            const got = parseFloat(bet.actualOdd || bet.modelOdd || 0);
+            const close = parseFloat(bet.closingOdd || 0);
+            if (!got || !close) continue;
+            const clv = ((got / close) - 1) * 100;
+            totalClv += clv;
+            count += 1;
+            if (clv >= 0) positive += 1;
+          }
+        }
+        return {
+          count,
+          positive,
+          avg: count > 0 ? totalClv / count : null,
+        };
+      },
+
       // Mark a per-VB bet as cashed out. `cashoutReturn` is the actual amount
       // returned by the bookmaker (in €). The PnL is then cashoutReturn - mise
       // and may be positive or negative.

@@ -76,6 +76,7 @@ function flattenBets(entries) {
         // gains potentiels stay visible when the user didn't enter "Ma cote".
         odd: bet.actualOdd || bet.modelOdd || null,
         modelOdd: bet.modelOdd || null,
+        closingOdd: bet.closingOdd ?? null,
         result: bet.result || null,
         cashoutReturn: bet.cashoutReturn ?? null,
         finalScore: e.finalScore || null,
@@ -108,7 +109,7 @@ const CustomTooltip = ({ active, payload }) => {
 };
 
 export default function History() {
-  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll, clearUnstakedEntries, resolveResult, seedUnibetBets } = useHistoryStore();
+  const { entries, getStats, getBankrollStats, getBankrollCurve, getCLVStats, setMise, clearAll, clearUnstakedEntries, resolveResult, seedUnibetBets } = useHistoryStore();
   const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode, reset: resetBankroll } = useBankrollStore();
 
   // Local input state so the bankroll input has a Save button (no save-on-keystroke)
@@ -223,6 +224,7 @@ export default function History() {
   const stats = getStats();
   const bkStats = getBankrollStats();
   const curve = getBankrollCurve();
+  const clvStats = getCLVStats();
   // Live bankroll = initial + settled P&L − pending stakes (cash committed at bookie).
   // This makes the bankroll react the moment a stake is entered, not only after
   // auto-resolve marks the bet as W/L.
@@ -550,6 +552,33 @@ export default function History() {
             ))}
           </div>
 
+          {/* CLV agrégé — preuve d'edge avant que le ROI ait convergé. */}
+          {clvStats.count > 0 && (() => {
+            const c = clvStats.avg;
+            const color = c >= 2 ? 'text-brand-400' : c >= 0 ? 'text-gold-400' : 'text-danger';
+            const verdict = c >= 2
+              ? 'Edge confirmé long terme'
+              : c >= 0
+                ? 'Marginal · garde un échantillon plus grand'
+                : 'Cotes Unibet en-dessous du marché · vérifie ton bookmaker';
+            return (
+              <div className="glass-card px-4 py-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] text-white/25 font-heading font-medium uppercase tracking-wider">CLV moyen</p>
+                  <p className={`stat-number text-2xl leading-none mt-0.5 ${color}`}>
+                    {c >= 0 ? '+' : ''}{c.toFixed(2)}%
+                  </p>
+                  <p className="text-[11px] text-white/40 font-heading mt-1">
+                    {clvStats.positive}/{clvStats.count} paris avec cote de clôture · {verdict}
+                  </p>
+                </div>
+                <div className="text-[10px] text-white/25 font-heading text-right max-w-[180px] leading-relaxed">
+                  Le CLV mesure si tu as parié à une meilleure cote que celle juste avant le kickoff. Positif sur 30+ paris = stratégie +EV prouvée.
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Courbe */}
           {curve.length >= 2 ? (
             <div className="glass-card p-4">
@@ -729,8 +758,23 @@ export default function History() {
 function BetCard({ bet }) {
   const setBetCashout = useHistoryStore((s) => s.setBetCashout);
   const clearBetResult = useHistoryStore((s) => s.clearBetResult);
+  const setBetClosingOdd = useHistoryStore((s) => s.setBetClosingOdd);
   const [cashoutInput, setCashoutInput] = useState('');
   const [showCashoutInput, setShowCashoutInput] = useState(false);
+  const [closingInput, setClosingInput] = useState(bet.closingOdd != null ? String(bet.closingOdd) : '');
+
+  // CLV: (got / closing - 1) × 100. Positive = got better than closing line
+  // = standard proof of edge. Updates live as user types closingInput so
+  // they see the impact immediately.
+  const liveClosing = parseFloat(closingInput);
+  const clv = (bet.odd && Number.isFinite(liveClosing) && liveClosing > 0)
+    ? ((parseFloat(bet.odd) / liveClosing) - 1) * 100
+    : null;
+  const closingDirty = closingInput !== (bet.closingOdd != null ? String(bet.closingOdd) : '');
+  const saveClosing = () => {
+    if (!bet.betKey) return;
+    setBetClosingOdd(bet.fixtureId, bet.betKey, closingInput);
+  };
 
   const res = RESULT_CONFIG[bet.result] || RESULT_CONFIG[null];
   const ResIcon = res.icon;
@@ -887,6 +931,35 @@ function BetCard({ bet }) {
             >
               Annuler le cash out
             </button>
+          )}
+
+          {/* Closing odd input — kept compact so it doesn't dominate. CLV
+              displayed as a colored chip the moment a valid closingOdd is
+              entered. The "got" odd used is bet.odd (actualOdd → modelOdd
+              fallback), which is the price the user effectively played at. */}
+          {bet.betKey && bet.odd && (
+            <div className="flex items-center gap-1.5 pt-1 border-t border-white/5">
+              <span className="text-[11px] text-white/35 font-heading">Cote clôture :</span>
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                placeholder="@—"
+                value={closingInput}
+                onChange={(e) => setClosingInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveClosing(); }}
+                onBlur={() => { if (closingDirty) saveClosing(); }}
+                className="w-16 bg-dark-800 border border-white/10 rounded-md px-1.5 py-0.5 text-[11px] text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+              />
+              {clv != null && (
+                <span className={clsx(
+                  'text-[11px] font-display tracking-wider px-1.5 py-0.5 rounded-md',
+                  clv >= 0 ? 'bg-brand-500/15 text-brand-400' : 'bg-red-500/15 text-red-400'
+                )}>
+                  CLV {clv >= 0 ? '+' : ''}{clv.toFixed(1)}%
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
