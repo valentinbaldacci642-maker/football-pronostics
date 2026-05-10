@@ -241,6 +241,231 @@ export const useHistoryStore = create(
         }
       },
 
+      // One-shot manual import (v2): replace the entire historique by the
+      // current bookmaker snapshot. Cashouts are stored as result='cashout'
+      // with cashoutReturn = actual payout, so PnL math is exact and the
+      // History page can show them in a dedicated category.
+      seedUnibetBets: () => {
+        const SEED = [
+          // ── SETTLED ─────────────────────────────────────────────────────
+
+          // Paris SG 1-0 Brest — Ligue 1 — 10/05
+          { home: 'Paris Saint Germain', away: 'Brest', league: 'Ligue 1',
+            matchDate: '2026-05-10T20:45:00+02:00', finalScore: '1-0',
+            bets: [
+              { market: 'O/U 2.5', selection: 'Under 2.5', odd: 3.00, mise: 0.13, result: 'win' },
+            ] },
+
+          // FC Barcelona vs Real Madrid — LaLiga — 10/05
+          { home: 'FC Barcelona', away: 'Real Madrid', league: 'LaLiga',
+            matchDate: '2026-05-10T21:00:00+02:00',
+            bets: [
+              { market: 'O/U 2.5', selection: 'Under 2.5', odd: 3.40, mise: 0.16, result: 'win' },
+            ] },
+
+          // Rennes 2-1 Paris FC — Ligue 1 — 10/05 — 1 cashout + 1 loss
+          { home: 'Rennes', away: 'Paris FC', league: 'Ligue 1',
+            matchDate: '2026-05-10T21:00:00+02:00', finalScore: '2-1',
+            bets: [
+              { market: '1X2',      selection: '2', odd: 5.20, mise: 0.16, result: 'cashout', cashoutReturn: 0.12 },
+              { market: '1X2 Live', selection: '2', odd: 5.20, mise: 0.16, result: 'loss' },
+            ] },
+
+          // Real Oviedo vs Getafe — LaLiga — 10/05
+          { home: 'Real Oviedo', away: 'Getafe', league: 'LaLiga',
+            matchDate: '2026-05-10T18:30:00+02:00',
+            bets: [
+              { market: 'O/U 2.5', selection: 'Over 2.5', odd: 3.25, mise: 0.29, result: 'loss' },
+            ] },
+
+          // Twente vs Sparta Rotterdam — Eredivisie — 10/05
+          { home: 'Twente', away: 'Sparta Rotterdam', league: 'Eredivisie',
+            matchDate: '2026-05-10T16:45:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 4.95, mise: 0.14, result: 'loss' },
+            ] },
+
+          // GO Ahead Eagles vs PSV — Eredivisie — 10/05
+          { home: 'GOAhead Eagles', away: 'PSV Eindhoven', league: 'Eredivisie',
+            matchDate: '2026-05-10T16:45:00+02:00',
+            bets: [
+              { market: 'O/U 2.5', selection: 'Under 2.5', odd: 3.00, mise: 0.10, result: 'loss' },
+            ] },
+
+          // Hellas Verona vs Como — Serie A — 10/05
+          { home: 'Hellas Verona', away: 'Como', league: 'Serie A',
+            matchDate: '2026-05-10T12:30:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 4.50, mise: 0.14, result: 'loss' },
+            ] },
+
+          // Lecce vs Juventus Turin — Serie A — 09/05
+          { home: 'Lecce', away: 'Juventus', league: 'Serie A',
+            matchDate: '2026-05-09T20:45:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 4.50, mise: 0.15, result: 'loss' },
+            ] },
+
+          // Chicago Fire vs NY Red Bulls — MLS — 09/05
+          { home: 'Chicago Fire', away: 'NY Red Bulls', league: 'MLS',
+            matchDate: '2026-05-09T20:30:00+02:00',
+            bets: [
+              { market: '1X2', selection: '2', odd: 4.75, mise: 0.11, result: 'win' },
+            ] },
+
+          // Reims vs Pau — Ligue 2 — 09/05
+          { home: 'Reims', away: 'Pau', league: 'Ligue 2',
+            matchDate: '2026-05-09T20:00:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 4.90, mise: 0.14, result: 'loss' },
+            ] },
+
+          // St Etienne vs Amiens — Ligue 2 — 09/05
+          { home: 'Saint Etienne', away: 'Amiens', league: 'Ligue 2',
+            matchDate: '2026-05-09T20:00:00+02:00',
+            bets: [
+              { market: 'O/U 2.5', selection: 'Under 2.5', odd: 2.90, mise: 0.10, result: 'loss' },
+            ] },
+
+          // Wolfsburg vs Bayern Munich — Bundesliga — 09/05
+          { home: 'VfL Wolfsburg', away: 'Bayern München', league: 'Bundesliga',
+            matchDate: '2026-05-09T18:30:00+02:00',
+            bets: [
+              { market: '1X2',      selection: '1',         odd: 4.80, mise: 0.14, result: 'loss' },
+              { market: 'O/U 2.5', selection: 'Under 2.5', odd: 3.20, mise: 0.11, result: 'win' },
+              { market: '1X2',      selection: 'X',         odd: 4.90, mise: 0.15, result: 'loss' },
+            ] },
+
+          // Manchester City vs Brentford — Premier League — 09/05
+          { home: 'Manchester City', away: 'Brentford', league: 'Premier League',
+            matchDate: '2026-05-09T18:30:00+02:00',
+            bets: [
+              { market: 'O/U 2.5', selection: 'Under 2.5', odd: 2.80, mise: 0.14, result: 'loss' },
+            ] },
+
+          // Hoffenheim vs Werder Bremen — Bundesliga — 09/05
+          { home: 'Hoffenheim', away: 'Werder Bremen', league: 'Bundesliga',
+            matchDate: '2026-05-09T15:30:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 4.90, mise: 0.13, result: 'loss' },
+            ] },
+
+          // RB Leipzig vs FC St. Pauli — Bundesliga — 09/05
+          { home: 'RB Leipzig', away: 'FC St. Pauli', league: 'Bundesliga',
+            matchDate: '2026-05-09T15:30:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 5.80, mise: 0.20, result: 'loss' },
+            ] },
+
+          // Stuttgart vs Leverkusen — Bundesliga — 09/05
+          { home: 'Stuttgart', away: 'Bayer Leverkusen', league: 'Bundesliga',
+            matchDate: '2026-05-09T15:30:00+02:00',
+            bets: [
+              { market: 'O/U 2.5', selection: 'Under 2.5', odd: 2.90, mise: 0.10, result: 'loss' },
+            ] },
+
+          // Gwangju FC vs Gangwon FC — K League — 09/05
+          { home: 'Gwangju FC', away: 'Gangwon FC', league: 'K League 1',
+            matchDate: '2026-05-09T09:30:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 4.15, mise: 0.10, result: 'win' },
+            ] },
+
+          // Lens vs Nantes — Ligue 1 — 08/05
+          { home: 'Lens', away: 'Nantes', league: 'Ligue 1',
+            matchDate: '2026-05-08T20:45:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 5.10, mise: 0.20, result: 'loss' },
+            ] },
+
+          // Dortmund vs Eintracht Frankfurt — Bundesliga — 08/05
+          { home: 'Borussia Dortmund', away: 'Eintracht Frankfurt', league: 'Bundesliga',
+            matchDate: '2026-05-08T20:30:00+02:00',
+            bets: [
+              { market: '1X2',      selection: 'X',         odd: 4.80, mise: 0.16, result: 'loss' },
+              { market: 'O/U 2.5', selection: 'Under 2.5', odd: 2.80, mise: 0.11, result: 'loss' },
+            ] },
+
+          // Paderborn vs Karlsruhe — Bundesliga 2 — 08/05
+          { home: 'SC Paderborn 07', away: 'Karlsruher SC', league: '2. Bundesliga',
+            matchDate: '2026-05-08T18:30:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 4.90, mise: 0.13, result: 'win' },
+            ] },
+
+          // FK RFS vs FK Liepaja — Virsliga — 08/05
+          { home: 'FK RFS', away: 'FK Liepaja', league: 'Virsliga',
+            matchDate: '2026-05-08T18:00:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 5.10, mise: 0.14, result: 'loss' },
+            ] },
+
+          // CA Platense vs CA Penarol — Libertadores — 08/05
+          { home: 'CA Platense', away: 'CA Penarol', league: 'CONMEBOL Libertadores',
+            matchDate: '2026-05-08T02:00:00+02:00',
+            bets: [
+              { market: 'O/U 2.5',     selection: 'Over 2.5', odd: 2.80, mise: 0.10, result: 'loss' },
+              { market: 'O/U Platense', selection: 'Over 2.5', odd: 4.80, mise: 0.54, result: 'cashout', cashoutReturn: 0.49 },
+            ] },
+
+          // Bayern Munich vs Paris SG — UCL — 06/05
+          { home: 'Bayern München', away: 'Paris Saint Germain', league: 'UEFA Champions League',
+            matchDate: '2026-05-06T21:00:00+02:00',
+            bets: [
+              { market: 'O/U 2.5', selection: 'Under 2.5', odd: 3.75, mise: 0.17, result: 'win' },
+              { market: 'BTTS',     selection: 'Non',         odd: 3.25, mise: 0.18, result: 'loss' },
+            ] },
+
+          // Al Ahli SC vs Al Fateh — Saudi Pro — 06/05
+          { home: 'Al Ahli SC', away: 'Al Fateh', league: 'Saudi Pro League',
+            matchDate: '2026-05-06T20:00:00+02:00',
+            bets: [
+              { market: '1X2',      selection: 'X',         odd: 6.10, mise: 0.24, result: 'loss' },
+              { market: 'O/U 2.5', selection: 'Over 2.5', odd: 1.38, mise: 0.30, result: 'win' },
+              { market: '1X2 (cashout)', selection: 'X', odd: 5.50, mise: 0.22, result: 'cashout', cashoutReturn: 0.20 },
+            ] },
+
+          // ── PENDING ─────────────────────────────────────────────────────
+
+          // Benfica vs Braga — Liga Portugal — 11/05 21:15
+          { home: 'Benfica', away: 'Braga', league: 'Liga Portugal',
+            matchDate: '2026-05-11T21:15:00+02:00',
+            bets: [
+              { market: '1X2', selection: 'X', odd: 4.45, mise: 0.13 },
+            ] },
+        ];
+
+        let synthFid = -2_000_000;
+        const seeded = SEED.map((m) => {
+          const entryBets = {};
+          m.bets.forEach((b) => {
+            entryBets[`${b.market}::${b.selection}`] = {
+              mise: b.mise,
+              actualOdd: b.odd,
+              modelOdd: b.odd,
+              sources: ['shin'],
+              ...(b.result ? { result: b.result } : {}),
+              ...(b.cashoutReturn !== undefined ? { cashoutReturn: b.cashoutReturn } : {}),
+            };
+          });
+          return {
+            fixtureId: synthFid--,
+            date: m.matchDate.split('T')[0],
+            matchDate: m.matchDate,
+            savedAt: m.matchDate,
+            homeTeam: m.home,
+            awayTeam: m.away,
+            league: m.league,
+            bets: entryBets,
+            result: null,
+            finalScore: m.finalScore || null,
+            mise: null,
+          };
+        });
+
+        set({ entries: seeded });
+      },
+
       // One-shot patch: re-link entries with synthetic / negative fixtureId
       // to a real API fixture by matching team names against /fixtures?date=.
       // Used after a manual seed (the import-Unibet button) so the resolver
@@ -410,6 +635,34 @@ export const useHistoryStore = create(
         }),
       })),
 
+      // Mark a per-VB bet as cashed out. `cashoutReturn` is the actual amount
+      // returned by the bookmaker (in €). The PnL is then cashoutReturn - mise
+      // and may be positive or negative.
+      setBetCashout: (fixtureId, betKey, cashoutReturn) => set((s) => ({
+        entries: s.entries.map((e) => {
+          if (e.fixtureId !== fixtureId) return e;
+          const v = parseFloat(cashoutReturn);
+          if (!Number.isFinite(v) || v < 0) return e;
+          const bets = { ...(e.bets || {}) };
+          const cur = bets[betKey] || {};
+          bets[betKey] = { ...cur, result: 'cashout', cashoutReturn: v };
+          return { ...e, bets };
+        }),
+      })),
+
+      // Undo a cashout (or any result) on a per-VB bet, putting it back into
+      // the pending pool. Used when the user clicked the wrong button.
+      clearBetResult: (fixtureId, betKey) => set((s) => ({
+        entries: s.entries.map((e) => {
+          if (e.fixtureId !== fixtureId) return e;
+          const bets = { ...(e.bets || {}) };
+          const cur = bets[betKey] || {};
+          const { result, cashoutReturn, ...rest } = cur;
+          bets[betKey] = rest;
+          return { ...e, bets };
+        }),
+      })),
+
       setNote: (fixtureId, note) => set((s) => ({
         entries: s.entries.map((e) =>
           e.fixtureId === fixtureId ? { ...e, note: note || null } : e
@@ -532,6 +785,13 @@ export const useHistoryStore = create(
             } else if (bet.result === 'push') {
               totalMise += bet.mise;
               totalReturn += bet.mise;
+              settledCount++;
+            } else if (bet.result === 'cashout') {
+              // Cashout: l'utilisateur a cash-out à un montant donné.
+              // totalReturn = cashoutReturn (ce que le bookmaker a payé).
+              // Le PnL = cashoutReturn - mise, peut être positif ou négatif.
+              totalMise += bet.mise;
+              totalReturn += Number.isFinite(bet.cashoutReturn) ? bet.cashoutReturn : 0;
               settledCount++;
             } else {
               pendingCommitted += bet.mise;

@@ -12,10 +12,11 @@ import clsx from 'clsx';
 import ValueBetSources from '../components/match/ValueBetSources';
 
 const RESULT_CONFIG = {
-  win:  { label: 'Gagné',    color: 'text-brand-400', bg: 'bg-brand-500/15 border-brand-500/30', icon: Check },
-  loss: { label: 'Perdu',    color: 'text-danger',    bg: 'bg-danger/15 border-danger/30',       icon: X },
-  push: { label: 'Remboursé',color: 'text-white/50',  bg: 'bg-white/[0.06] border-white/15',     icon: Clock },
-  null: { label: 'En cours', color: 'text-white/30',  bg: 'bg-white/5 border-white/10',          icon: Clock },
+  win:     { label: 'Gagné',    color: 'text-brand-400', bg: 'bg-brand-500/15 border-brand-500/30', icon: Check },
+  loss:    { label: 'Perdu',    color: 'text-danger',    bg: 'bg-danger/15 border-danger/30',       icon: X },
+  push:    { label: 'Remboursé',color: 'text-white/50',  bg: 'bg-white/[0.06] border-white/15',     icon: Clock },
+  cashout: { label: 'Cash Out', color: 'text-info',      bg: 'bg-info/15 border-info/30',           icon: RefreshCw },
+  null:    { label: 'En cours', color: 'text-white/30',  bg: 'bg-white/5 border-white/10',          icon: Clock },
 };
 
 /**
@@ -63,6 +64,7 @@ function flattenBets(entries) {
       list.push({
         key: `${e.fixtureId}::${betKey}`,
         fixtureId: e.fixtureId,
+        betKey,
         homeTeam: e.homeTeam, awayTeam: e.awayTeam,
         homeLogo: e.homeLogo, awayLogo: e.awayLogo,
         league: e.league, leagueLogo: e.leagueLogo,
@@ -75,6 +77,7 @@ function flattenBets(entries) {
         odd: bet.actualOdd || bet.modelOdd || null,
         modelOdd: bet.modelOdd || null,
         result: bet.result || null,
+        cashoutReturn: bet.cashoutReturn ?? null,
         finalScore: e.finalScore || null,
         source: 'value-bet',
         detectionSources: fallbackSources,
@@ -105,7 +108,7 @@ const CustomTooltip = ({ active, payload }) => {
 };
 
 export default function History() {
-  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll, clearUnstakedEntries, resolveResult } = useHistoryStore();
+  const { entries, getStats, getBankrollStats, getBankrollCurve, setMise, clearAll, clearUnstakedEntries, resolveResult, seedUnibetBets } = useHistoryStore();
   const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode, reset: resetBankroll } = useBankrollStore();
 
   // Local input state so the bankroll input has a Save button (no save-on-keystroke)
@@ -415,6 +418,24 @@ export default function History() {
               )}
             </label>
 
+            <div className="pt-2 border-t border-white/[0.05]">
+              <button
+                onClick={() => {
+                  const ok = window.confirm(
+                    'Importer historique Unibet : remplace TOUT par 32 paris terminés (dont 3 cashouts) + 1 pari en cours (Benfica), bankroll initiale 10 €. Live attendu 9.25 €. Continuer ?'
+                  );
+                  if (!ok) return;
+                  setInitialBankroll(10);
+                  seedUnibetBets();
+                  setResolveMsg('Historique Unibet importé · bankroll 10€');
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-orange-500/40 text-xs font-heading font-semibold text-orange-300 hover:bg-orange-500/10 transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Importer historique Unibet (one-shot)
+              </button>
+            </div>
+
             <label className="flex flex-col gap-1">
               <span className="text-xs text-white/40 font-heading">Fraction Kelly</span>
               <select
@@ -706,13 +727,34 @@ export default function History() {
  * 'Paris en cours' tab and the 'Historique pronos' (settled) tab.
  */
 function BetCard({ bet }) {
+  const setBetCashout = useHistoryStore((s) => s.setBetCashout);
+  const clearBetResult = useHistoryStore((s) => s.clearBetResult);
+  const [cashoutInput, setCashoutInput] = useState('');
+  const [showCashoutInput, setShowCashoutInput] = useState(false);
+
   const res = RESULT_CONFIG[bet.result] || RESULT_CONFIG[null];
   const ResIcon = res.icon;
   const pnl = bet.result === 'win' && bet.odd
     ? bet.mise * (parseFloat(bet.odd) - 1)
     : bet.result === 'loss'
       ? -bet.mise
-      : 0;
+      : bet.result === 'cashout' && Number.isFinite(bet.cashoutReturn)
+        ? bet.cashoutReturn - bet.mise
+        : 0;
+
+  const handleCashout = () => {
+    const v = parseFloat(cashoutInput);
+    if (!Number.isFinite(v) || v < 0) return;
+    if (!bet.betKey) return; // entry-level not supported here
+    setBetCashout(bet.fixtureId, bet.betKey, v);
+    setShowCashoutInput(false);
+    setCashoutInput('');
+  };
+
+  const handleUndoCashout = () => {
+    if (!bet.betKey) return;
+    clearBetResult(bet.fixtureId, bet.betKey);
+  };
   const sourceLabel = bet.source === 'value-bet' ? 'Value bet' : 'Pronos';
   const sourceClass = bet.source === 'value-bet' ? 'text-gold-400 bg-gold-500/[0.08]' : 'text-brand-400 bg-brand-500/[0.08]';
 
@@ -786,6 +828,66 @@ function BetCard({ bet }) {
               </div>
             );
           })()}
+
+          {/* Cashout marking — pending per-VB bets get an inline 'Cash Out'
+              action so the user can record a manual cashout from the
+              bookmaker without waiting for FT auto-resolution. */}
+          {!bet.result && bet.betKey && bet.mise > 0 && (
+            <div className="flex items-center gap-1.5">
+              {!showCashoutInput ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCashoutInput(true)}
+                  className="flex items-center gap-1 text-xs text-info/70 hover:text-info font-heading font-semibold px-2 py-1 rounded-md border border-info/30 hover:bg-info/10 transition-all"
+                  title="Marquer comme cash out"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Cash Out
+                </button>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Retour €"
+                    value={cashoutInput}
+                    onChange={(e) => setCashoutInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleCashout(); }}
+                    className="w-20 bg-dark-800 border border-info/40 rounded-md px-2 py-1 text-xs text-white font-mono text-right focus:outline-none focus:border-info"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCashout}
+                    disabled={!cashoutInput || parseFloat(cashoutInput) < 0}
+                    className="text-xs px-2 py-1 rounded-md border border-info/40 text-info hover:bg-info/10 transition-all disabled:opacity-30"
+                  >
+                    OK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowCashoutInput(false); setCashoutInput(''); }}
+                    className="text-xs px-2 py-1 rounded-md border border-white/10 text-white/40 hover:text-white/70 transition-all"
+                  >
+                    Annuler
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Cashout: undo button so the user can fix a mis-clicked cashout */}
+          {bet.result === 'cashout' && bet.betKey && (
+            <button
+              type="button"
+              onClick={handleUndoCashout}
+              className="text-[11px] text-white/30 hover:text-white/60 font-heading underline-offset-2 hover:underline transition-colors"
+              title="Réinitialiser ce pari (le repasse en cours)"
+            >
+              Annuler le cash out
+            </button>
+          )}
         </div>
       </div>
     </div>
