@@ -424,12 +424,11 @@ export default function History() {
               <button
                 onClick={() => {
                   const ok = window.confirm(
-                    'Importer historique Unibet : remplace TOUT par 32 paris terminés (dont 3 cashouts) + 1 pari en cours (Benfica), bankroll initiale 10 €. Live attendu 9.25 €. Continuer ?'
+                    'Importer historique Unibet v3 : remplace TOUT par 33 paris terminés (dont 3 cashouts), aucun pari en cours. Mise totale 5.47 € · returns 5.30 € · PnL -0.17 €. Pense à régler bankroll initiale à 10 € après pour avoir 9.83 € live. Continuer ?'
                   );
                   if (!ok) return;
-                  setInitialBankroll(10);
                   seedUnibetBets();
-                  setResolveMsg('Historique Unibet importé · bankroll 10€');
+                  setResolveMsg("Historique Unibet importé · règle bankroll à 10€");
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-orange-500/40 text-xs font-heading font-semibold text-orange-300 hover:bg-orange-500/10 transition-all"
               >
