@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import clsx from 'clsx';
 import { teamsApi } from '../../services/api';
-import { useBankrollStore, useHistoryStore } from '../../store';
 
 export default function Navbar() {
   const [query, setQuery] = useState('');
@@ -11,21 +10,6 @@ export default function Navbar() {
   const [searching, setSearching] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const navigate = useNavigate();
-
-  // Live bankroll: only displayed when the user has explicitly set an initial
-  // bankroll (> 0). After a reset, it's hidden everywhere. Also hidden on the
-  // Help page where it would compete with the explanatory content.
-  const location = useLocation();
-  const initialBankroll = useBankrollStore((s) => s.initialBankroll);
-  const entries = useHistoryStore((s) => s.entries);
-  const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
-  const showBankroll = initialBankroll > 0 && location.pathname !== '/help';
-  let liveBankroll = 0, pendingCommitted = 0;
-  if (showBankroll) {
-    const _bk = getBankrollStats();
-    liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
-    pendingCommitted = _bk.pendingCommitted || 0;
-  }
 
   const handleSearch = async (e) => {
     const val = e.target.value;
@@ -107,30 +91,6 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Live bankroll pill — only when an initial bankroll is set (> 0).
-          Hidden during search focus on mobile so the input gets full row. */}
-      {showBankroll && (
-        <Link
-          to="/history"
-          className={clsx(
-            'ml-auto items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all flex-shrink-0',
-            searchFocused ? 'hidden lg:flex' : 'flex'
-          )}
-          title={`Bankroll dispo${pendingCommitted > 0 ? ` · ${pendingCommitted.toFixed(2)} € en jeu` : ''}`}
-        >
-          <span className={clsx(
-            'font-display text-base leading-none tracking-wider tabular-nums',
-            liveBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
-          )}>
-            {liveBankroll.toFixed(2)} €
-          </span>
-          {pendingCommitted > 0 && (
-            <span className="hidden sm:inline text-xs text-gold-400/80 font-mono leading-none whitespace-nowrap">
-              · {pendingCommitted.toFixed(2)} € en jeu
-            </span>
-          )}
-        </Link>
-      )}
     </header>
   );
 }

@@ -1,149 +1,59 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Flame, RefreshCw, ChevronRight, AlertTriangle, Star, Save, Target } from 'lucide-react';
+import { Flame, RefreshCw, ChevronRight, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
 import { pronosticsApi, getRateLimitedUntil } from '../services/api';
-import { useBankrollStore, useHistoryStore, useFavoritesStore } from '../store';
-import { kellyStake } from '../utils/kelly';
-import { formatStake } from '../utils/formatStake';
+import { useBankrollStore, useFavoritesStore } from '../store';
 import { formatMatchDate } from '../utils/format';
 import { isUnibetLeague } from '../utils/unibetLeagues';
 import ValueBetSources from '../components/match/ValueBetSources';
 
-function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
-  const betKey = `${vb.market}::${vb.selection}`;
-  const setBetMise = useHistoryStore((s) => s.setBetMise);
-  const setBetActualOdd = useHistoryStore((s) => s.setBetActualOdd);
-  const entries = useHistoryStore((s) => s.entries);
-  const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
-  const saved = existingEntry?.bets?.[betKey] || {};
-  const savedMise = saved.mise != null ? String(saved.mise) : '';
-  const savedOdd = saved.actualOdd != null ? String(saved.actualOdd) : '';
-  const [miseInput, setMiseInput] = useState(savedMise);
-  const [oddInput, setOddInput] = useState(savedOdd);
-
-  const miseDirty = miseInput !== savedMise;
-  const oddDirty = oddInput !== savedOdd;
-
-  // Kelly is recomputed live against the user-entered bookmaker odd. The
-  // odd shown on the site is just an indicative average — the user's actual
-  // bookmaker (Unibet, Betclic, Winamax…) often differs by ±0.05-0.10, which
-  // shifts both the edge AND the Kelly stake materially. Falling back to
-  // vb.odd while the input is empty keeps the suggestion meaningful from
-  // the start.
-  const effectiveOdd = parseFloat(oddInput) || vb.odd;
+// Compact input to check whether a given bookmaker odd still yields an edge.
+// Pure UX helper: no persistence, no bankroll dependency. Edge sign flips
+// to red the moment the user-entered odd implies probabilities at or above
+// the model's true probability — i.e. the value bet has evaporated.
+function EdgeCheckInput({ vb }) {
+  const [oddInput, setOddInput] = useState('');
   const trueProb = vb.prob ?? vb.trueProb;
-  const liveKellyStake = (effectiveOdd && trueProb)
-    ? kellyStake(trueProb, effectiveOdd, liveBankroll, kFrac)
-    : 0;
-  const liveEdge = (effectiveOdd && trueProb)
+  const effectiveOdd = parseFloat(oddInput);
+  const liveEdge = (Number.isFinite(effectiveOdd) && effectiveOdd > 0 && trueProb)
     ? trueProb - (100 / effectiveOdd)
     : null;
-  const usingCustomOdd = parseFloat(oddInput) > 0 && parseFloat(oddInput) !== vb.odd;
-
-  const saveMise = () => {
-    if (miseDirty) setBetMise(fixtureId, betKey, miseInput, vb.sources, vb.odd);
-  };
-  const saveOdd = () => { if (oddDirty) setBetActualOdd(fixtureId, betKey, oddInput); };
 
   return (
-    <div className="flex flex-col gap-2 pt-2.5 mt-1 border-t border-gold-500/15">
-      {/* Step 1 — bookmaker odd (always visible, recomputes Kelly on change) */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {liveKellyStake > 0 ? (
-            <span className="text-sm text-gold-400/80 font-heading truncate">
-              <span className="font-display tracking-wider text-gold-400">
-                Mise Kelly: {formatStake(liveKellyStake)}
-              </span>
-              {usingCustomOdd && liveEdge != null && (
-                <span className="text-white/45 ml-1.5">
-                  · edge {liveEdge >= 0 ? '+' : ''}{liveEdge.toFixed(1)}% à @{effectiveOdd.toFixed(2)}
-                </span>
-              )}
+    <div className="flex items-center justify-between gap-2 flex-wrap pt-2.5 mt-1 border-t border-gold-500/15">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        {liveEdge != null ? (
+          <span className="text-sm font-heading">
+            <span className="text-white/45">Edge à @{effectiveOdd.toFixed(2)} : </span>
+            <span className={clsx(
+              'font-display tracking-wider',
+              liveEdge >= 0 ? 'text-gold-400' : 'text-danger'
+            )}>
+              {liveEdge >= 0 ? '+' : ''}{liveEdge.toFixed(1)}%
             </span>
-          ) : (
-            <span className="text-sm text-white/35 font-heading">
-              {liveBankroll <= 0 ? (
-                'Définir bankroll pour voir Kelly'
-              ) : usingCustomOdd && liveEdge != null ? (
-                <>
-                  Edge <span className={liveEdge >= 0 ? 'text-gold-400' : 'text-danger'}>
-                    {liveEdge >= 0 ? '+' : ''}{liveEdge.toFixed(1)}%
-                  </span>{' '}à @{effectiveOdd.toFixed(2)}
-                </>
-              ) : (
-                'Kelly inactif'
-              )}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 ml-auto flex-shrink-0">
-          <span className="text-sm text-white/45 font-heading">Ma cote:</span>
-          <input
-            type="number"
-            min="1"
-            step="0.01"
-            placeholder={vb.odd?.toFixed(2)}
-            value={oddInput}
-            onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveOdd(); } }}
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            className="w-20 bg-dark-800 border border-white/10 rounded-md px-2 py-1 text-sm text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
-          />
-          <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveOdd(); }}
-            disabled={!oddDirty}
-            className={clsx(
-              'flex items-center justify-center w-7 h-7 rounded-md border transition-all',
-              oddDirty
-                ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
-                : 'border-white/[0.05] text-white/15 cursor-not-allowed'
-            )}
-            title="Enregistrer la cote"
-          >
-            <Save className="w-3.5 h-3.5" />
-          </button>
-        </div>
+          </span>
+        ) : (
+          <span className="text-sm text-white/35 font-heading">
+            Tape la cote de ton bookmaker pour voir si l'edge tient
+          </span>
+        )}
       </div>
-
-      {/* Step 2 — actual stake */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="flex items-center gap-1.5 text-sm font-heading text-brand-400/90">
-          <Target className="w-3.5 h-3.5" />
-          {parseFloat(miseInput) > 0 || parseFloat(savedMise) > 0 ? 'Pari enregistré' : 'Saisis ta mise'}
-        </span>
-        <div className="flex items-center gap-2 ml-auto flex-shrink-0">
-          <span className="text-sm text-white/45 font-heading">Ma mise:</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            placeholder={liveKellyStake > 0 ? liveKellyStake.toFixed(2) : '—'}
-            value={miseInput}
-            onChange={(e) => { e.stopPropagation(); setMiseInput(e.target.value); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveMise(); } }}
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            className="w-20 bg-dark-800 border border-white/10 rounded-md px-2 py-1 text-sm text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
-          />
-          <span className="text-sm text-white/45">€</span>
-          <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveMise(); }}
-            disabled={!miseDirty}
-            className={clsx(
-              'flex items-center justify-center w-7 h-7 rounded-md border transition-all',
-              miseDirty
-                ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
-                : 'border-white/[0.05] text-white/15 cursor-not-allowed'
-            )}
-            title="Enregistrer la mise"
-          >
-            <Save className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+        <span className="text-sm text-white/45 font-heading">Ma cote :</span>
+        <input
+          type="number"
+          min="1"
+          step="0.01"
+          placeholder={vb.odd?.toFixed(2)}
+          value={oddInput}
+          onChange={(e) => { e.stopPropagation(); setOddInput(e.target.value); }}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          className="w-20 bg-dark-800 border border-white/10 rounded-md px-2 py-1 text-sm text-white font-mono text-right focus:outline-none focus:border-brand-500/50"
+        />
       </div>
     </div>
   );
@@ -176,13 +86,8 @@ export default function ValueBets() {
   const pronostics = pronosticsByDay[selectedDay] || [];
   const loading = !!loadingDays[selectedDay];
 
-  const { initialBankroll, kellyFraction: kFrac, unibetOnly, setUnibetOnly } = useBankrollStore();
-  const entries = useHistoryStore((s) => s.entries);
-  const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
-  const savePronostics = useHistoryStore((s) => s.savePronostics);
+  const { unibetOnly, setUnibetOnly } = useBankrollStore();
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
-  const _bk = getBankrollStats();
-  const liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
 
   // Fetch one day, populate pronosticsByDay
   const loadDay = async (date, { force = false } = {}) => {
@@ -194,7 +99,6 @@ export default function ValueBets() {
       });
       const data = res?.data || [];
       setPronosticsByDay((prev) => ({ ...prev, [date]: data }));
-      if (data.length > 0) savePronostics(data);
       return data;
     } catch (err) {
       setError({ message: err.message, code: err.code });
@@ -287,7 +191,6 @@ export default function ValueBets() {
           sources: vb.sources || [],
           edgePoisson: vb.edgePoisson,
           trueProbPoisson: vb.trueProbPoisson,
-          stake: (vb.odd && prob) ? kellyStake(prob, vb.odd, liveBankroll, kFrac) : 0,
         };
       }).sort((a, b) => (b.edge || 0) - (a.edge || 0));
 
@@ -300,11 +203,10 @@ export default function ValueBets() {
         confidence: p.confidence,
         valueBets,
         bestEdge: valueBets[0]?.edge || 0,
-        totalStake: valueBets.reduce((s, vb) => s + (vb.stake || 0), 0),
       });
     });
     return groups.sort((a, b) => b.bestEdge - a.bestEdge);
-  }, [pronostics, liveBankroll, kFrac]);
+  }, [pronostics]);
 
   const filteredMatches = useMemo(
     () => unibetOnly ? matchesWithValueBets.filter((m) => isUnibetLeague(m.league?.id)) : matchesWithValueBets,
@@ -313,7 +215,6 @@ export default function ValueBets() {
   const hiddenByFilter = matchesWithValueBets.length - filteredMatches.length;
 
   const totalValueBetsCount = filteredMatches.reduce((s, m) => s + m.valueBets.length, 0);
-  const totalSuggestedStake = filteredMatches.reduce((s, m) => s + m.totalStake, 0);
 
   return (
     <div className="space-y-6 max-w-4xl xl:max-w-6xl mx-auto">
@@ -417,7 +318,7 @@ export default function ValueBets() {
 
       {/* Summary */}
       {!loading && filteredMatches.length > 0 && (
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
           <div className="glass-card px-3.5 py-3">
             <p className="stat-number text-xl leading-none text-gold-400">{totalValueBetsCount}</p>
             <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">Value bets · {filteredMatches.length} matchs</p>
@@ -427,12 +328,6 @@ export default function ValueBets() {
               {filteredMatches[0]?.bestEdge?.toFixed(1)}%
             </p>
             <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">Meilleur edge</p>
-          </div>
-          <div className="glass-card px-3.5 py-3">
-            <p className="stat-number text-xl leading-none text-brand-400">
-              {formatStake(totalSuggestedStake)}
-            </p>
-            <p className="text-[11px] text-white/25 font-heading font-medium mt-0.5">Total suggéré</p>
           </div>
         </div>
       )}
@@ -478,18 +373,6 @@ export default function ValueBets() {
       {/* Match cards — one per match, with all its value bets stacked inside */}
       {!loading && !error && filteredMatches.length > 0 && (
         <div className="space-y-3">
-          {liveBankroll <= 0 && (
-            <div className="px-3.5 py-2.5 rounded-xl bg-brand-500/[0.08] border border-brand-500/25">
-              <p className="text-xs text-brand-300 font-heading leading-relaxed flex items-center gap-2">
-                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>
-                  <strong>Bankroll non définie.</strong> Va dans Historique → Bankroll
-                  pour la régler et voir les mises Kelly suggérées.
-                </span>
-              </p>
-            </div>
-          )}
-
           {filteredMatches.map((m, mi) => (
             <Link
               key={m.fixtureId}
@@ -569,13 +452,6 @@ export default function ValueBets() {
                         </div>
                         <div className="text-right flex-shrink-0">
                           <p className="text-lg font-display tracking-wider text-gold-400">@{vb.odd?.toFixed(2)}</p>
-                          {vb.stake > 0 ? (
-                            <p className="text-sm text-gold-400/90 font-display tracking-wider mt-0.5">
-                              Mise: {formatStake(vb.stake)}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-white/30 font-heading mt-0.5">{liveBankroll <= 0 ? 'Définir bankroll' : '—'}</p>
-                          )}
                         </div>
                       </div>
                       {/* Edge explanation per source */}
@@ -589,13 +465,8 @@ export default function ValueBets() {
                           </span>
                         )}
                       </p>
-                      {/* Per-VB mise + cote inputs */}
-                      <PerBetMiseInputs
-                        fixtureId={m.fixtureId}
-                        vb={vb}
-                        liveBankroll={liveBankroll}
-                        kFrac={kFrac}
-                      />
+                      {/* Edge check — let user verify their bookmaker's odd */}
+                      <EdgeCheckInput vb={vb} />
                     </div>
                   ))}
                 </div>
