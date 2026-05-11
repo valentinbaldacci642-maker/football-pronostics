@@ -131,14 +131,14 @@ export const useUIStore = create((set) => ({
  * to dampen variance vs full Kelly which is mathematically optimal but very volatile.
  *
  * edgeMode:
- *   - 'conservative': only pick value bets with edge ≥ 9% (fewer, higher quality)
- *   - 'standard'    : only pick value bets with edge ≥ 7% (recommended — laisse
+ *   - 'conservative': only pick value bets with edge ≥ 8% (fewer, higher quality)
+ *   - 'standard'    : only pick value bets with edge ≥ 6% (recommended — laisse
  *                     marge pour la perte d'edge sur Unibet.fr vs consensus)
  *   - 'aggressive'  : show all pronostics including non-value picks (more volume)
  */
 export const EDGE_MODE_THRESHOLD = {
-  conservative: 9,
-  standard: 7,
+  conservative: 8,
+  standard: 6,
   aggressive: 0, // 0 = no edge requirement, show all pronos
 };
 

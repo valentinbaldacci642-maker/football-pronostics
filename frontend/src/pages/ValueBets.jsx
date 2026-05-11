@@ -326,7 +326,7 @@ export default function ValueBets() {
           </h1>
           <p className="text-sm text-white/35 font-heading font-medium capitalize">
             {format(new Date(selectedDay + 'T00:00:00'), "EEEE d MMMM yyyy", { locale: fr })}
-            {' · '}Tous les paris où Kelly s'active (edge ≥ 7%)
+            {' · '}Tous les paris où Kelly s'active (edge ≥ 6%)
           </p>
         </div>
         <button
