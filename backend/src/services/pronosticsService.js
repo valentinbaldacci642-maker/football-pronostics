@@ -3,19 +3,66 @@ const analysisService = require('./analysisService');
 const cache = require('../utils/cache');
 const logger = require('../utils/logger');
 
-// Leagues ranked by prestige/data quality
-//   2=UCL · 3=UEL · 848=Conf · 39=PL · 140=LaLiga · 135=SerieA · 61=L1 · 78=Bundesliga
-//   40=Championship · 62=L2 (FR) · 79=Bundesliga 2 · 136=Serie B · 141=La Liga 2
-//   88=Eredivisie · 94=Primeira Liga · 253=MLS · 307=Saudi Pro · 45=FA Cup · 48=EFL Cup
-//   71=Brasileirão · 128=Liga Profesional Argentina
+// Leagues ranked by prestige/data quality — TOP TIER (places ~1-21).
+// Ces ligues passent en deep analysis (top 10) ou en début de lite scan.
 const PRIORITY_LEAGUES = [
-  2, 3, 848,                    // UEFA
+  2, 3, 848,                    // UEFA Champions / Europa / Conference
   39, 140, 135, 61, 78,         // Top 5 first divisions
-  40, 62, 79, 136, 141,         // Top 5 second divisions (Championship, Ligue 2, Bundesliga 2, Serie B, La Liga 2)
+  40, 62, 79, 136, 141,         // Top 5 second divisions
   88, 94,                       // Eredivisie, Primeira Liga
   253, 307,                     // MLS, Saudi Pro
   45, 48,                       // FA Cup, EFL Cup
   71, 128,                      // Brasileirão, Liga Argentina
+];
+
+// Ligues secondaires couvertes par Unibet.fr — passent en lite scan APRÈS
+// les PRIORITY_LEAGUES, mais AVANT le reste du monde. Source : screenshots
+// Unibet.fr fournis par l'utilisateur. Coverage typique : 1ère division des
+// pays moyens (Pologne, Suisse, Autriche, Suède, Belgique, etc) + quelques
+// coupes nationales + ligues Amérique du Sud + Asie.
+const UNIBET_SECONDARY_LEAGUES = [
+  144,                          // Belgique D1
+  207,                          // Suisse Super League
+  218,                          // Autriche Bundesliga
+  179, 181,                     // Écosse: Premiership + Cup
+  119,                          // Danemark Superligaen
+  103,                          // Norvège Eliteserien
+  113,                          // Suède Allsvenskan
+  244,                          // Finlande Veikkausliiga
+  164,                          // Islande Úrvalsdeild
+  106,                          // Pologne Ekstraklasa
+  345,                          // Tchéquie Fortuna liga
+  283,                          // Roumanie Liga I
+  271, 273,                     // Hongrie NB I + Magyar Kupa
+  332,                          // Slovaquie Super liga
+  373,                          // Slovénie PrvaLiga
+  210,                          // Croatie HNL
+  286,                          // Serbie Super Liga
+  333,                          // Ukraine Premier League
+  172,                          // Bulgarie First League
+  315,                          // Bosnie Premijer Liga
+  197,                          // Grèce Super League
+  203,                          // Turquie Süper Lig
+  165,                          // Chypre 1. Division
+  329,                          // Géorgie Erovnuli Liga
+  327,                          // Estonie Meistriliiga
+  365,                          // Lettonie Virslīga
+  362,                          // Lituanie A Lyga
+  261,                          // Luxembourg BGL Ligue
+  357,                          // Irlande Premier Division
+  408,                          // Irlande du Nord Premiership
+  13, 11,                       // CONMEBOL Libertadores + Sudamericana
+  73, 130,                      // Copa do Brasil + Copa Argentina
+  265, 239, 242, 284,           // Chili / Colombie / Équateur / Paraguay
+  262,                          // Mexique Liga MX
+  383,                          // Israël Ligat ha'Al
+  186, 200,                     // Algérie L1 / Maroc Botola
+  98, 292,                      // Japon J1 / Corée K League 1
+  169, 188,                     // Chine Super League / Australie A-League
+  419,                          // Azerbaïdjan Premier League
+  525,                          // UEFA Women's Champions League
+  5, 1, 32, 29, 31, 30, 34, 33, // Nations League + WC + qualifs
+  81, 137, 95, 96, 66,          // Coupes : DFB-Pokal, Coppa Italia, Liga Portugal 2, Taça Portugal, Coupe de France
 ];
 
 class PronosticsService {
@@ -53,13 +100,22 @@ class PronosticsService {
     // pre-match snapshot from API-Football's /odds endpoint, which is fine
     // since our analysis was computed pre-kickoff.
     const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'CANC', 'ABD', 'AWD', 'WO']);
+    // Tri 3-niveaux : PRIORITY_LEAGUES (UEFA + top 5) → UNIBET_SECONDARY
+    // (les ~50 autres ligues couvertes par Unibet.fr) → tout le reste. Comme
+    // ça, sur une journée chargée (800+ fixtures), les 250 premiers scannés
+    // appartiennent tous à des ligues que l'utilisateur peut effectivement
+    // parier sur Unibet, au lieu de gaspiller le budget sur des ligues
+    // mineures jamais proposées par le bookmaker.
+    const tier = (id) => {
+      const top = PRIORITY_LEAGUES.indexOf(id);
+      if (top !== -1) return top;
+      const sec = UNIBET_SECONDARY_LEAGUES.indexOf(id);
+      if (sec !== -1) return 100 + sec;
+      return 9999;
+    };
     const upcoming = fixtures
       .filter((f) => !FINISHED_STATUSES.has(f.fixture?.status?.short))
-      .sort((a, b) => {
-        const pa = PRIORITY_LEAGUES.indexOf(a.league?.id);
-        const pb = PRIORITY_LEAGUES.indexOf(b.league?.id);
-        return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
-      });
+      .sort((a, b) => tier(a.league?.id) - tier(b.league?.id));
 
     if (upcoming.length === 0) return [];
 
@@ -69,10 +125,11 @@ class PronosticsService {
     const top10 = upcoming.slice(0, 10);
     const top10Analyses = await this._analyzeBatch(top10, { full: true });
 
-    // Step 2 — LITE SCAN the next 140 priority fixtures (odds-only, 1 call
-    // each). Ultra quota covers this comfortably; covers Top 5 1st + 2nd
-    // divisions, UEFA, Eredivisie, Primeira, MLS, Saudi, Brazilian, etc.
-    const remaining = upcoming.slice(10, 150);
+    // Step 2 — LITE SCAN the next 240 fixtures (odds-only, 1 call each).
+    // Avec le tri 3-niveaux, ces 240 viennent en priorité des ligues Unibet,
+    // ce qui maximise les chances de trouver des VBs effectivement jouables.
+    // Ultra quota (75k/jour) absorbe : 250 calls × 8 jours = 2k req, large.
+    const remaining = upcoming.slice(10, 250);
     const liteScanCandidates = await this._liteScanForValueBets(remaining);
 
     // Step 3 — full analysis on the lite-scan candidates that DID find a VB.
