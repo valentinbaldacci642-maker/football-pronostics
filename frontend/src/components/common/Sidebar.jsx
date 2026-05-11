@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: '/leagues', icon: Trophy, label: 'Ligues' },
   { to: '/worldcup', icon: Globe2, label: 'Coupe du Monde' },
   { to: '/news', icon: Newspaper, label: 'Actu Football' },
+  { to: '/history', icon: BookOpen, label: 'Historique' },
   { to: '/favorites', icon: Star, label: 'Favoris' },
   { to: '/help', icon: HelpCircle, label: 'Aide' },
 ];
