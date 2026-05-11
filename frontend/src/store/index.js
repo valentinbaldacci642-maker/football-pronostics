@@ -489,10 +489,29 @@ export const useHistoryStore = create(
         // Cache of fixtures-by-date queries so multiple targets on the same
         // day only cost one API hit.
         const fixturesByDate = new Map();
-        const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+        // Normalisation : enlève accents, espaces, ponctuation, ET tous les
+        // suffixes/préfixes de catégories d'âge ou réserves (U23, U21, U19,
+        // II, 'b' final…). Sans ça, 'Benfica' matche 'Benfica U23' et le
+        // résolveur grade le mauvais match (U23 fini en pénos pendant que
+        // le senior est encore au 17ᵉ — bug réel observé sur Benfica/Braga).
+        const norm = (s) => (s || '')
+          .toLowerCase()
+          .normalize('NFD').replace(/[̀-ͯ]/g, '')
+          .replace(/\bu\s?\d{2}\b/g, '')   // U23, U21, U19, U17…
+          .replace(/\b(reserve|reserves|youth|junior|jr)\b/g, '')
+          .replace(/[^a-z0-9]/g, '');
+        // Strict equality après normalisation — pas de includes() qui faisait
+        // matcher 'benfica' avec 'benficab' (B team) ou 'benficareserves'.
         const teamMatches = (a, b) => {
           const na = norm(a); const nb = norm(b);
-          return na === nb || (na.length >= 3 && (na.includes(nb) || nb.includes(na)));
+          return na.length >= 3 && na === nb;
+        };
+        // Categories à exclure quand le seed n'a pas spécifié — protège
+        // contre le matching accidentel d'un match de réserve.
+        const isReserveOrYouthLeague = (name) => {
+          const n = (name || '').toLowerCase();
+          return /\b(u23|u21|u19|u17|youth|reserve|junior|primavera|sub-?\d+|revel[aâ]?[cç][aã]o)\b/.test(n)
+            || / ii\b/.test(n) || / b\b/.test(n);
         };
 
         for (const e of targets) {
@@ -502,7 +521,9 @@ export const useHistoryStore = create(
               const res = await fixturesApi.getByDate(day);
               fixturesByDate.set(day, res?.response || []);
             }
-            const list = fixturesByDate.get(day);
+            const list = fixturesByDate.get(day).filter(
+              (f) => !isReserveOrYouthLeague(f.league?.name),
+            );
             const real = list.find(
               (f) => teamMatches(f.teams?.home?.name, e.homeTeam) && teamMatches(f.teams?.away?.name, e.awayTeam),
             );
