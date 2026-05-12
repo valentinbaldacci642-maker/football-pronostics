@@ -34,8 +34,8 @@ const UNIBET_LEAGUE_IDS = new Set([
   106, 345, 283, 271, 273, 332, 373, 210, 286, 333, 172, 315,
   // Europe sud / autres
   197, 203, 165, 329, 327, 365, 362, 261, 357, 408,
-  // Amériques
-  13, 11, 71, 73, 128, 130, 265, 239, 242, 284, 262, 253,
+  // Amériques (Copa do Brasil 73 retirée — Unibet ne propose pas tous les tours)
+  13, 11, 71, 128, 130, 265, 239, 242, 284, 262, 253,
   // Moyen-Orient / Afrique
   307, 383, 186, 200,
   // Asie / Océanie

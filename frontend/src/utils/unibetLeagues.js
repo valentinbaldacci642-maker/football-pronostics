@@ -88,7 +88,8 @@ export const UNIBET_LEAGUE_IDS = new Set([
   // Amériques
   13,                    // CONMEBOL Libertadores
   11,                    // CONMEBOL Sudamericana
-  71, 73,                // Brasileirão Série A, Copa do Brasil
+  71,                    // Brasileirão Série A (Copa do Brasil 73 retirée
+                         // — Unibet ne propose pas tous les tours)
   128, 130,              // Liga Profesional Argentina, Copa Argentina
   265,                   // Primera División (CL)
   239,                   // Primera A (CO)
