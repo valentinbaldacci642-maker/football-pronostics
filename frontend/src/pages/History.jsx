@@ -875,73 +875,64 @@ function BetCard({ bet }) {
   const sourceClass = bet.source === 'value-bet' ? 'text-gold-400 bg-gold-500/[0.08]' : 'text-brand-400 bg-brand-500/[0.08]';
 
   return (
-    <div className={clsx('p-4 rounded-xl border space-y-2.5', res.bg)}>
-      <div className="flex items-center gap-2 flex-wrap">
-        {bet.leagueLogo && <img src={bet.leagueLogo} alt="" className="w-4 h-4 object-contain opacity-60" />}
-        <span className="text-sm text-white/50 font-heading truncate flex-1 min-w-0">{bet.league}</span>
-        <span className={clsx('text-xs font-heading font-semibold px-2 py-0.5 rounded', sourceClass)}>
-          {sourceLabel}
-        </span>
-        {bet.detectionSources && bet.detectionSources.length > 0 && (
-          <ValueBetSources sources={bet.detectionSources} />
+    <div className={clsx('px-3 py-2 rounded-lg border space-y-1.5', res.bg)}>
+      {/* Ligne 1 : ligue + date + result badge */}
+      <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+        {bet.leagueLogo && <img src={bet.leagueLogo} alt="" className="w-3.5 h-3.5 object-contain opacity-60" />}
+        <span className="text-white/45 font-heading truncate flex-1 min-w-0">{bet.league}</span>
+        {bet.matchDate && (
+          <span className="text-white/30 font-mono whitespace-nowrap">
+            {formatMatchDate(bet.matchDate)}
+          </span>
         )}
-        <span className={clsx('inline-flex items-center gap-1 text-xs font-heading font-semibold px-2 py-0.5 rounded border', res.bg, res.color)}>
-          <ResIcon className="w-3.5 h-3.5" />
+        <span className={clsx('inline-flex items-center gap-0.5 font-heading font-semibold px-1.5 py-0.5 rounded border', res.bg, res.color)}>
+          <ResIcon className="w-3 h-3" />
           {res.label}
         </span>
       </div>
 
-      {bet.matchDate && (
-        <div className="text-xs text-white/40 font-mono">
-          {formatMatchDate(bet.matchDate)}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        {bet.homeLogo && <img src={bet.homeLogo} alt="" className="w-6 h-6 object-contain flex-shrink-0" />}
-        <span className="text-base font-heading font-bold text-white truncate flex-1">{bet.homeTeam}</span>
-        <span className="text-xs text-white/35 font-display">VS</span>
-        <span className="text-base font-heading font-bold text-white truncate flex-1 text-right">{bet.awayTeam}</span>
-        {bet.awayLogo && <img src={bet.awayLogo} alt="" className="w-6 h-6 object-contain flex-shrink-0" />}
+      {/* Ligne 2 : teams */}
+      <div className="flex items-center gap-1.5">
+        {bet.homeLogo && <img src={bet.homeLogo} alt="" className="w-4 h-4 object-contain flex-shrink-0" />}
+        <span className="text-sm font-heading font-semibold text-white/85 truncate flex-1 min-w-0">{bet.homeTeam}</span>
+        <span className="text-[10px] text-white/30 font-display">VS</span>
+        <span className="text-sm font-heading font-semibold text-white/85 truncate flex-1 min-w-0 text-right">{bet.awayTeam}</span>
+        {bet.awayLogo && <img src={bet.awayLogo} alt="" className="w-4 h-4 object-contain flex-shrink-0" />}
       </div>
 
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="text-sm">
-          <span className="text-white/45 font-heading">{bet.market}</span>
-          <span className="text-white/80 font-heading font-semibold ml-1.5">{bet.selection}</span>
+      {/* Ligne 3 : market+selection / odd+mise+pnl */}
+      <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+        <div>
+          <span className="text-white/40 font-heading">{bet.market}</span>
+          <span className="text-white/80 font-heading font-semibold ml-1">{bet.selection}</span>
           {bet.finalScore && (
-            <span className="text-white/50 font-mono ml-2">· {bet.finalScore}</span>
+            <span className="text-white/40 font-mono ml-1.5">· {bet.finalScore}</span>
+          )}
+          {bet.source === 'value-bet' && bet.detectionSources && bet.detectionSources.length > 0 && (
+            <span className="ml-1.5 inline-flex">
+              <ValueBetSources sources={bet.detectionSources} />
+            </span>
           )}
         </div>
-        <div className="flex flex-col items-end gap-1 text-sm">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col items-end gap-0.5">
+          <div className="flex items-center gap-2">
             {bet.odd && (
-              <span className="text-white/60 font-mono">
-                @{parseFloat(bet.odd).toFixed(2)}
-              </span>
+              <span className="text-white/55 font-mono">@{parseFloat(bet.odd).toFixed(2)}</span>
             )}
-            <span className="text-white/85 font-mono font-semibold">
-              {bet.mise.toFixed(2)} €
-            </span>
+            <span className="text-white/80 font-mono font-semibold">{bet.mise.toFixed(2)}€</span>
             {bet.result && (
-              <span className={clsx('font-display tracking-wider text-base', pnl >= 0 ? 'text-brand-400' : 'text-danger')}>
-                {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)} €
+              <span className={clsx('font-display tracking-wider', pnl >= 0 ? 'text-brand-400' : 'text-danger')}>
+                {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}€
               </span>
             )}
           </div>
           {!bet.result && bet.odd && bet.mise > 0 && (() => {
             const oddNum = parseFloat(bet.odd);
-            const potentialReturn = bet.mise * oddNum;
             const potentialGain = bet.mise * (oddNum - 1);
             return (
-              <div className="flex items-baseline gap-2 flex-wrap justify-end">
-                <span className="text-xs text-gold-400/70 font-mono">
-                  Bénéfices potentiels: <span className="text-gold-400 font-semibold">+{potentialGain.toFixed(2)} €</span>
-                </span>
-                <span className="text-base font-display tracking-wider text-gold-400 bg-gold-400/15 px-2 py-0.5 rounded border border-gold-400/30">
-                  gains potentiels {potentialReturn.toFixed(2)} €
-                </span>
-              </div>
+              <span className="text-[10px] text-gold-400/70 font-mono">
+                Gain pot. <span className="text-gold-400 font-semibold">+{potentialGain.toFixed(2)}€</span>
+              </span>
             );
           })()}
 
