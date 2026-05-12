@@ -492,35 +492,12 @@ class PronosticsService {
     const home = fixture.teams?.home;
     const away = fixture.teams?.away;
 
-    // Determine if 1X2 has a clear favourite (≥50% fair probability)
-    const fairProbs = odds?.matchWinner?.fairProbs;
-    const max1x2Prob = fairProbs
-      ? Math.max(fairProbs.home || 0, fairProbs.draw || 0, fairProbs.away || 0)
-      : 0;
-    const hasClearFavourite = max1x2Prob >= 50;
-
-    // Value bets: 1X2 value bets always shown; secondary market (BTTS/O/U) only
-    // when no clear 1X2 favourite exists — avoids "Score vierge" eclipsing Chelsea 70%
-    if (odds?.valueBets?.length > 0) {
-      const top1x2 = odds.valueBets.find((v) => v.market === '1X2');
-      const topAny = odds.valueBets[0];
-      const top = top1x2 || (!hasClearFavourite ? topAny : null);
-      if (top) {
-        return {
-          market: top.market,
-          selection: top.selection,
-          selectionLabel: this._selectionLabel(top.selection, home?.name, away?.name),
-          // detectValueBet exposes trueProb (not prob) — fall back to prob
-          // for safety if the upstream contract ever changes.
-          probability: top.trueProb ?? top.prob,
-          odd: top.odd,
-          isValue: true,
-          edge: top.edge,
-        };
-      }
-    }
-
-    // Fall back to the highest-probability bet from odds analysis
+    // Pick principal = bet le plus probable (bestBet) — un pronostic
+    // classique, indépendant des value bets. Les VBs détectés restent
+    // exposés dans analysis.odds.valueBets[] et la carte les mentionne
+    // séparément ("X value bets détectés") sans qu'ils écrasent le pick
+    // principal. Avant, un VB sur 'Score vierge' prenait le dessus sur
+    // un Chelsea 70% — confusant pour l'utilisateur.
     if (odds?.bestBet) {
       const bet = odds.bestBet;
       return {
