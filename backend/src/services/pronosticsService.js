@@ -68,6 +68,18 @@ const UNIBET_SECONDARY_LEAGUES = [
 
 class PronosticsService {
   async getBestPronostics(forceRefresh = false, date = null) {
+    // Wrapper top-level : un crash interne (analyse foireuse sur une fixture
+    // particulière, throttler désynchro, etc.) ne doit jamais renvoyer un
+    // 500 au client. On préfère un résultat vide.
+    try {
+      return await this._getBestPronostics(forceRefresh, date);
+    } catch (e) {
+      logger.error('PronosticsService crash on date=' + date + ':', e?.stack || e?.message || e);
+      return [];
+    }
+  }
+
+  async _getBestPronostics(forceRefresh = false, date = null) {
     const targetDate = date || new Date().toISOString().split('T')[0];
     const cacheKey = cache.buildKey('pronostics', targetDate);
     const lastScanKey = cache.buildKey('pronostics-lastscan', targetDate);
