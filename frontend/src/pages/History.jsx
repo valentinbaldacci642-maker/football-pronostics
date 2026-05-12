@@ -877,36 +877,36 @@ function BetCard({ bet }) {
   return (
     <div className={clsx('px-3 py-2 rounded-lg border space-y-1.5', res.bg)}>
       {/* Ligne 1 : ligue + date + result badge */}
-      <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-        {bet.leagueLogo && <img src={bet.leagueLogo} alt="" className="w-3.5 h-3.5 object-contain opacity-60" />}
-        <span className="text-white/45 font-heading truncate flex-1 min-w-0">{bet.league}</span>
+      <div className="flex items-center gap-1.5 flex-wrap text-sm">
+        {bet.leagueLogo && <img src={bet.leagueLogo} alt="" className="w-4 h-4 object-contain opacity-60" />}
+        <span className="text-white/55 font-heading truncate flex-1 min-w-0">{bet.league}</span>
         {bet.matchDate && (
-          <span className="text-white/30 font-mono whitespace-nowrap">
+          <span className="text-xs text-white/40 font-mono whitespace-nowrap">
             {formatMatchDate(bet.matchDate)}
           </span>
         )}
-        <span className={clsx('inline-flex items-center gap-0.5 font-heading font-semibold px-1.5 py-0.5 rounded border', res.bg, res.color)}>
-          <ResIcon className="w-3 h-3" />
+        <span className={clsx('inline-flex items-center gap-1 text-xs font-heading font-semibold px-2 py-0.5 rounded border', res.bg, res.color)}>
+          <ResIcon className="w-3.5 h-3.5" />
           {res.label}
         </span>
       </div>
 
       {/* Ligne 2 : teams */}
       <div className="flex items-center gap-1.5">
-        {bet.homeLogo && <img src={bet.homeLogo} alt="" className="w-4 h-4 object-contain flex-shrink-0" />}
-        <span className="text-sm font-heading font-semibold text-white/85 truncate flex-1 min-w-0">{bet.homeTeam}</span>
-        <span className="text-[10px] text-white/30 font-display">VS</span>
-        <span className="text-sm font-heading font-semibold text-white/85 truncate flex-1 min-w-0 text-right">{bet.awayTeam}</span>
-        {bet.awayLogo && <img src={bet.awayLogo} alt="" className="w-4 h-4 object-contain flex-shrink-0" />}
+        {bet.homeLogo && <img src={bet.homeLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
+        <span className="text-base font-heading font-bold text-white/90 truncate flex-1 min-w-0">{bet.homeTeam}</span>
+        <span className="text-xs text-white/35 font-display">VS</span>
+        <span className="text-base font-heading font-bold text-white/90 truncate flex-1 min-w-0 text-right">{bet.awayTeam}</span>
+        {bet.awayLogo && <img src={bet.awayLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
       </div>
 
       {/* Ligne 3 : market+selection / odd+mise+pnl */}
-      <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+      <div className="flex items-center justify-between gap-2 flex-wrap text-sm">
         <div>
-          <span className="text-white/40 font-heading">{bet.market}</span>
-          <span className="text-white/80 font-heading font-semibold ml-1">{bet.selection}</span>
+          <span className="text-white/50 font-heading">{bet.market}</span>
+          <span className="text-white/90 font-heading font-semibold ml-1.5">{bet.selection}</span>
           {bet.finalScore && (
-            <span className="text-white/40 font-mono ml-1.5">· {bet.finalScore}</span>
+            <span className="text-white/45 font-mono ml-2">· {bet.finalScore}</span>
           )}
           {bet.source === 'value-bet' && bet.detectionSources && bet.detectionSources.length > 0 && (
             <span className="ml-1.5 inline-flex">
@@ -915,13 +915,13 @@ function BetCard({ bet }) {
           )}
         </div>
         <div className="flex flex-col items-end gap-0.5">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {bet.odd && (
-              <span className="text-white/55 font-mono">@{parseFloat(bet.odd).toFixed(2)}</span>
+              <span className="text-white/65 font-mono">@{parseFloat(bet.odd).toFixed(2)}</span>
             )}
-            <span className="text-white/80 font-mono font-semibold">{bet.mise.toFixed(2)}€</span>
+            <span className="text-white/90 font-mono font-bold">{bet.mise.toFixed(2)}€</span>
             {bet.result && (
-              <span className={clsx('font-display tracking-wider', pnl >= 0 ? 'text-brand-400' : 'text-danger')}>
+              <span className={clsx('font-display tracking-wider text-base', pnl >= 0 ? 'text-brand-400' : 'text-danger')}>
                 {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}€
               </span>
             )}
@@ -930,7 +930,7 @@ function BetCard({ bet }) {
             const oddNum = parseFloat(bet.odd);
             const potentialGain = bet.mise * (oddNum - 1);
             return (
-              <span className="text-[10px] text-gold-400/70 font-mono">
+              <span className="text-xs text-gold-400/75 font-mono">
                 Gain pot. <span className="text-gold-400 font-semibold">+{potentialGain.toFixed(2)}€</span>
               </span>
             );
