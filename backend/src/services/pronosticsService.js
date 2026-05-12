@@ -119,17 +119,19 @@ class PronosticsService {
 
     if (upcoming.length === 0) return [];
 
-    // Step 1 — full analysis on the top-10 priority fixtures.
+    // Step 1 — full analysis on the top-20 priority fixtures.
     // 6 API calls each (odds, predictions, home stats, away stats, lineups,
-    // top scorers). Outbound throttler in apiFootball.js handles pacing.
-    const top10 = upcoming.slice(0, 10);
-    const top10Analyses = await this._analyzeBatch(top10, { full: true });
+    // top scorers). On scanne 20 (au lieu de 10) pour avoir l'enrichissement
+    // Poisson + lineup sur toute la première vague de ligues prioritaires :
+    // ça permet de détecter des VBs "Poisson-only" sur Bundesliga 2 /
+    // Serie B / Eredivisie etc. que le lite scan (Shin uniquement) raterait.
+    const topDeep = upcoming.slice(0, 20);
+    const topDeepAnalyses = await this._analyzeBatch(topDeep, { full: true });
 
-    // Step 2 — LITE SCAN the next 240 fixtures (odds-only, 1 call each).
-    // Avec le tri 3-niveaux, ces 240 viennent en priorité des ligues Unibet,
+    // Step 2 — LITE SCAN the next 230 fixtures (odds-only, 1 call each).
+    // Avec le tri 3-niveaux, ces 230 viennent en priorité des ligues Unibet,
     // ce qui maximise les chances de trouver des VBs effectivement jouables.
-    // Ultra quota (75k/jour) absorbe : 250 calls × 8 jours = 2k req, large.
-    const remaining = upcoming.slice(10, 250);
+    const remaining = upcoming.slice(20, 250);
     const liteScanCandidates = await this._liteScanForValueBets(remaining);
 
     // Step 3 — full analysis on the lite-scan candidates that DID find a VB.
@@ -139,11 +141,11 @@ class PronosticsService {
 
     // Combine
     const combined = [
-      ...this._buildPronostics(top10, top10Analyses),
+      ...this._buildPronostics(topDeep, topDeepAnalyses),
       ...this._buildPronostics(cappedCandidates, candidateAnalyses),
     ];
 
-    // Dedupe by fixture id (top10 vs candidates shouldn't overlap, but safety)
+    // Dedupe by fixture id (topDeep vs candidates shouldn't overlap, but safety)
     const seen = new Set();
     const unique = combined.filter((p) => {
       const id = p.fixture?.fixture?.id;
@@ -167,7 +169,7 @@ class PronosticsService {
 
     cache.set(cacheKey, pronostics, 2 * 3600);          // 2h cache (Ultra quota allows fresher data)
     cache.set(lastScanKey, Date.now(), 2 * 3600);       // mark last scan time
-    logger.info(`Pronostics: ${pronostics.length} returned (top10=${top10.length}, lite-scanned=${remaining.length}, VB candidates=${cappedCandidates.length})`);
+    logger.info(`Pronostics: ${pronostics.length} returned (topDeep=${topDeep.length}, lite-scanned=${remaining.length}, VB candidates=${cappedCandidates.length})`);
     return pronostics;
   }
 

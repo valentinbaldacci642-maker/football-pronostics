@@ -338,10 +338,10 @@ export default function Help() {
             (UCL → UEL → Conf League → Top 5 → ligues majeures) :
           </p>
           <ul className="ml-3 space-y-1 text-xs text-white/70">
-            <li>• <strong className="text-white">Top 10 prioritaires</strong> → analyse complète Shin + Poisson + lineups (toujours affichés, même sans VB)</li>
-            <li>• <strong className="text-white">90 matchs suivants</strong> → lite scan odds-only (1 appel API par match)</li>
-            <li>• Sur ces 90, les matchs avec un value bet Shin détecté passent en analyse complète, <strong className="text-white">capé à 40 max</strong></li>
-            <li>• <strong className="text-white">Total renvoyé</strong> : 10-50 matchs (10 top + jusqu'à 40 VBs trouvés sur les 90 suivants)</li>
+            <li>• <strong className="text-white">Top 20 prioritaires</strong> → analyse complète Shin + Poisson + lineups (toujours affichés, même sans VB)</li>
+            <li>• <strong className="text-white">230 matchs suivants</strong> → lite scan odds-only (1 appel API par match)</li>
+            <li>• Sur ces 230, les matchs avec un value bet Shin détecté passent en analyse complète, <strong className="text-white">capé à 50 max</strong></li>
+            <li>• <strong className="text-white">Total renvoyé</strong> : 20-70 matchs (20 top + jusqu'à 50 VBs trouvés sur les 230 suivants)</li>
           </ul>
           <p className="text-xs text-white/50 italic">
             Les matchs au-delà du 100ème par priorité (youth, reserve, ligues exotiques sans cotes bookies) ne sont pas scannés.
