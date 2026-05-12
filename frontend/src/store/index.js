@@ -763,8 +763,10 @@ export const useHistoryStore = create(
         const all = get().entries;
         const matchesBook = (b) => !bookmaker || (b?.bookmaker || 'unibet') === bookmaker;
         let total = 0;
-        let settled = 0;
+        let settled = 0;  // ne compte QUE win/loss/push, pas les cashouts
         let wins = 0;
+        let losses = 0;
+        let cashouts = 0;
         let totalMise = 0;
         let totalReturn = 0;
         for (const e of all) {
@@ -776,7 +778,7 @@ export const useHistoryStore = create(
               totalMise += e.mise;
               totalReturn += e.mise * parseFloat(e.actualOdd || e.odd || 1);
             } else if (e.result === 'loss') {
-              settled += 1;
+              settled += 1; losses += 1;
               totalMise += e.mise;
             } else if (e.result === 'push') {
               settled += 1;
@@ -794,15 +796,17 @@ export const useHistoryStore = create(
               totalMise += bet.mise;
               totalReturn += bet.mise * parseFloat(bet.actualOdd || bet.modelOdd || 1);
             } else if (bet.result === 'loss') {
-              settled += 1;
+              settled += 1; losses += 1;
               totalMise += bet.mise;
             } else if (bet.result === 'push') {
               settled += 1;
               totalMise += bet.mise;
               totalReturn += bet.mise;
             } else if (bet.result === 'cashout') {
-              settled += 1;
-              if (Number.isFinite(bet.cashoutReturn) && bet.cashoutReturn > bet.mise) wins += 1;
+              // Les cashouts ne comptent pas dans réussite / wins / losses
+              // (catégorie à part). Mais leur valeur monétaire impacte le
+              // ROI car on encaisse l'argent.
+              cashouts += 1;
               totalMise += bet.mise;
               totalReturn += Number.isFinite(bet.cashoutReturn) ? bet.cashoutReturn : 0;
             }
@@ -814,7 +818,8 @@ export const useHistoryStore = create(
           total,
           settled,
           wins,
-          losses: settled - wins,
+          losses,
+          cashouts,
           rate,
           roi: totalMise > 0 ? parseFloat((pnl / totalMise * 100).toFixed(1)) : null,
         };
