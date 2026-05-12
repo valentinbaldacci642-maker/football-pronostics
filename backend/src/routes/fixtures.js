@@ -60,18 +60,18 @@ router.get('/tomorrow', async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', async (req, res) => {
   try {
-    // ?fresh=1 bypasses the 20min cache — used by the bet resolver when it
-    // needs an authoritative finished/not status. Without it, a stale 'live'
-    // entry from earlier in the match could block resolution for up to 20min
-    // after the match has actually concluded.
     if (req.query.fresh === '1') {
       cache.del(cache.buildKey('api', '/fixtures', JSON.stringify({ id: req.params.id })));
     }
     res.json(await api.getFixtureById(req.params.id));
   } catch (err) {
-    next(err);
+    // Au lieu de renvoyer 500 (qui casse le frontend), on log et retourne
+    // une réponse vide → le frontend affiche 'match introuvable' / charge
+    // dégradé au lieu d'une page d'erreur.
+    logger.error(`getFixtureById(${req.params.id}) failed: ${err?.message}`);
+    res.json({ response: [], results: 0, paging: {}, errors: {} });
   }
 });
 
