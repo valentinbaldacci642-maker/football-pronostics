@@ -757,23 +757,31 @@ export const useHistoryStore = create(
       // bookmaker = 'unibet' | 'winamax' | undefined (= toutes confondues).
       // Filtre les paris pour ne compter que ceux attribués au book demandé.
       // Les paris legacy sans champ bookmaker comptent comme 'unibet'.
+      // ROI = P&L / total misé × 100 (basé sur l'argent réel, pas un unit
+      // ROI ; cohérent avec getBankrollStats).
       getStats: (bookmaker) => {
         const all = get().entries;
         const matchesBook = (b) => !bookmaker || (b?.bookmaker || 'unibet') === bookmaker;
         let total = 0;
         let settled = 0;
         let wins = 0;
-        let roiSum = 0;
+        let totalMise = 0;
+        let totalReturn = 0;
         for (const e of all) {
           // Entry-level pick
           if (Number.isFinite(e.mise) && e.mise > 0 && matchesBook(e)) {
             total += 1;
             if (e.result === 'win') {
               settled += 1; wins += 1;
-              roiSum += (parseFloat(e.actualOdd || e.odd || 1) - 1);
+              totalMise += e.mise;
+              totalReturn += e.mise * parseFloat(e.actualOdd || e.odd || 1);
             } else if (e.result === 'loss') {
               settled += 1;
-              roiSum -= 1;
+              totalMise += e.mise;
+            } else if (e.result === 'push') {
+              settled += 1;
+              totalMise += e.mise;
+              totalReturn += e.mise;
             }
           }
           // Per-VB stakes (each one a separate bet)
@@ -783,13 +791,24 @@ export const useHistoryStore = create(
             total += 1;
             if (bet.result === 'win') {
               settled += 1; wins += 1;
-              roiSum += (parseFloat(bet.actualOdd || bet.modelOdd || 1) - 1);
+              totalMise += bet.mise;
+              totalReturn += bet.mise * parseFloat(bet.actualOdd || bet.modelOdd || 1);
             } else if (bet.result === 'loss') {
               settled += 1;
-              roiSum -= 1;
+              totalMise += bet.mise;
+            } else if (bet.result === 'push') {
+              settled += 1;
+              totalMise += bet.mise;
+              totalReturn += bet.mise;
+            } else if (bet.result === 'cashout') {
+              settled += 1;
+              if (Number.isFinite(bet.cashoutReturn) && bet.cashoutReturn > bet.mise) wins += 1;
+              totalMise += bet.mise;
+              totalReturn += Number.isFinite(bet.cashoutReturn) ? bet.cashoutReturn : 0;
             }
           }
         }
+        const pnl = totalReturn - totalMise;
         const rate = settled > 0 ? Math.round((wins / settled) * 100) : null;
         return {
           total,
@@ -797,7 +816,7 @@ export const useHistoryStore = create(
           wins,
           losses: settled - wins,
           rate,
-          roi: settled > 0 ? parseFloat((roiSum / settled * 100).toFixed(1)) : null,
+          roi: totalMise > 0 ? parseFloat((pnl / totalMise * 100).toFixed(1)) : null,
         };
       },
 
