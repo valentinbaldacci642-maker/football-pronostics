@@ -149,13 +149,15 @@ export const useBankrollStore = create(
       kellyFraction: 0.25,
       edgeMode: 'standard',
       unibetOnly: false,
+      winamaxOnly: false,
       setInitialBankroll: (amount) => set({ initialBankroll: Math.max(0, parseFloat(amount) || 0) }),
       setKellyFraction: (frac) => set({ kellyFraction: Math.max(0, Math.min(1, parseFloat(frac) || 0)) }),
       setEdgeMode: (mode) => set({
         edgeMode: ['conservative', 'standard', 'aggressive'].includes(mode) ? mode : 'standard',
       }),
-      setUnibetOnly: (on) => set({ unibetOnly: !!on }),
-      reset: () => set({ initialBankroll: 0, kellyFraction: 0.25, edgeMode: 'standard', unibetOnly: false }),
+      setUnibetOnly: (on) => set({ unibetOnly: !!on, ...(on ? { winamaxOnly: false } : {}) }),
+      setWinamaxOnly: (on) => set({ winamaxOnly: !!on, ...(on ? { unibetOnly: false } : {}) }),
+      reset: () => set({ initialBankroll: 0, kellyFraction: 0.25, edgeMode: 'standard', unibetOnly: false, winamaxOnly: false }),
     }),
     { name: 'pronostats-bankroll-v1' }
   )

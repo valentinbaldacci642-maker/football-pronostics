@@ -11,6 +11,7 @@ import { kellyStake } from '../utils/kelly';
 import { formatStake } from '../utils/formatStake';
 import { formatMatchDate } from '../utils/format';
 import { isUnibetLeague } from '../utils/unibetLeagues';
+import { isWinamaxLeague } from '../utils/winamaxLeagues';
 import ValueBetSources from '../components/match/ValueBetSources';
 
 function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
@@ -176,7 +177,11 @@ export default function ValueBets() {
   const pronostics = pronosticsByDay[selectedDay] || [];
   const loading = !!loadingDays[selectedDay];
 
-  const { initialBankroll, kellyFraction: kFrac, unibetOnly, setUnibetOnly } = useBankrollStore();
+  const {
+    initialBankroll, kellyFraction: kFrac,
+    unibetOnly, setUnibetOnly,
+    winamaxOnly, setWinamaxOnly,
+  } = useBankrollStore();
   const entries = useHistoryStore((s) => s.entries);
   const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
   const savePronostics = useHistoryStore((s) => s.savePronostics);
@@ -306,11 +311,13 @@ export default function ValueBets() {
     return groups.sort((a, b) => b.bestEdge - a.bestEdge);
   }, [pronostics, liveBankroll, kFrac]);
 
-  const filteredMatches = useMemo(
-    () => unibetOnly ? matchesWithValueBets.filter((m) => isUnibetLeague(m.league?.id)) : matchesWithValueBets,
-    [matchesWithValueBets, unibetOnly],
-  );
+  const filteredMatches = useMemo(() => {
+    if (unibetOnly) return matchesWithValueBets.filter((m) => isUnibetLeague(m.league?.id));
+    if (winamaxOnly) return matchesWithValueBets.filter((m) => isWinamaxLeague(m.league?.id));
+    return matchesWithValueBets;
+  }, [matchesWithValueBets, unibetOnly, winamaxOnly]);
   const hiddenByFilter = matchesWithValueBets.length - filteredMatches.length;
+  const activeBookmaker = unibetOnly ? 'Unibet' : winamaxOnly ? 'Winamax' : null;
 
   const totalValueBetsCount = filteredMatches.reduce((s, m) => s + m.valueBets.length, 0);
   const totalSuggestedStake = filteredMatches.reduce((s, m) => s + m.totalStake, 0);
@@ -387,32 +394,38 @@ export default function ValueBets() {
         ))}
       </div>
 
-      {/* Unibet-only filter toggle */}
-      <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-dark-800/40 border border-white/[0.06]">
-        <div className="flex flex-col">
+      {/* Filtre bookmaker — segmented pill, 3 options exclusives */}
+      <div className="flex flex-col gap-2 px-3.5 py-2.5 rounded-xl bg-dark-800/40 border border-white/[0.06]">
+        <div className="flex items-center justify-between gap-2">
           <span className="text-sm text-white/70 font-heading font-semibold">
-            Filtre Unibet
+            Filtre bookmaker
           </span>
           <span className="text-[11px] text-white/35 font-heading">
-            {unibetOnly
-              ? `Uniquement ligues Unibet · ${hiddenByFilter} match${hiddenByFilter > 1 ? 's' : ''} masqué${hiddenByFilter > 1 ? 's' : ''}`
+            {activeBookmaker
+              ? `Uniquement ligues ${activeBookmaker} · ${hiddenByFilter} masqué${hiddenByFilter > 1 ? 's' : ''}`
               : 'Toutes les ligues'}
           </span>
         </div>
-        <button
-          onClick={() => setUnibetOnly(!unibetOnly)}
-          role="switch"
-          aria-checked={unibetOnly}
-          className={clsx(
-            'relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0',
-            unibetOnly ? 'bg-brand-500' : 'bg-white/10'
-          )}
-        >
-          <span className={clsx(
-            'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-            unibetOnly ? 'translate-x-6' : 'translate-x-1'
-          )} />
-        </button>
+        <div className="grid grid-cols-3 gap-1.5">
+          {[
+            { id: 'none',    label: 'Tout',    active: !unibetOnly && !winamaxOnly, onClick: () => { setUnibetOnly(false); setWinamaxOnly(false); } },
+            { id: 'unibet',  label: 'Unibet',  active: unibetOnly,  onClick: () => setUnibetOnly(true) },
+            { id: 'winamax', label: 'Winamax', active: winamaxOnly, onClick: () => setWinamaxOnly(true) },
+          ].map((opt) => (
+            <button
+              key={opt.id}
+              onClick={opt.onClick}
+              className={clsx(
+                'px-3 py-1.5 rounded-lg text-xs font-heading font-semibold border transition-all',
+                opt.active
+                  ? 'bg-brand-500/15 border-brand-500/40 text-brand-400'
+                  : 'border-white/[0.08] text-white/40 hover:text-white/70'
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Summary */}
