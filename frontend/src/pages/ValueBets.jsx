@@ -14,7 +14,7 @@ import { isUnibetLeague } from '../utils/unibetLeagues';
 import { isWinamaxLeague } from '../utils/winamaxLeagues';
 import ValueBetSources from '../components/match/ValueBetSources';
 
-function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
+function PerBetMiseInputs({ fixtureId, vb, leagueId, liveBankrollUnibet, liveBankrollWinamax, kFrac, defaultBookmaker }) {
   const betKey = `${vb.market}::${vb.selection}`;
   const setBetMise = useHistoryStore((s) => s.setBetMise);
   const setBetActualOdd = useHistoryStore((s) => s.setBetActualOdd);
@@ -23,18 +23,32 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
   const saved = existingEntry?.bets?.[betKey] || {};
   const savedMise = saved.mise != null ? String(saved.mise) : '';
   const savedOdd = saved.actualOdd != null ? String(saved.actualOdd) : '';
+
+  // Which bookmakers can actually be used for this VB (based on league
+  // coverage). Disable picker buttons for non-covered books.
+  const unibetAvailable = isUnibetLeague(leagueId);
+  const winamaxAvailable = isWinamaxLeague(leagueId);
+  const initialBookmaker = saved.bookmaker
+    || (defaultBookmaker === 'winamax' && winamaxAvailable ? 'winamax'
+      : unibetAvailable ? 'unibet'
+      : winamaxAvailable ? 'winamax'
+      : 'unibet');
+  const [selectedBookmaker, setSelectedBookmaker] = useState(initialBookmaker);
   const [miseInput, setMiseInput] = useState(savedMise);
   const [oddInput, setOddInput] = useState(savedOdd);
 
   const miseDirty = miseInput !== savedMise;
   const oddDirty = oddInput !== savedOdd;
 
+  // The "live bankroll" used for Kelly depends on which bookmaker the user
+  // is about to play this bet at — the bet pulls from that book's capital.
+  const liveBankroll = selectedBookmaker === 'winamax' ? liveBankrollWinamax : liveBankrollUnibet;
+
   // Kelly is recomputed live against the user-entered bookmaker odd. The
   // odd shown on the site is just an indicative average — the user's actual
-  // bookmaker (Unibet, Betclic, Winamax…) often differs by ±0.05-0.10, which
-  // shifts both the edge AND the Kelly stake materially. Falling back to
-  // vb.odd while the input is empty keeps the suggestion meaningful from
-  // the start.
+  // bookmaker (Unibet, Winamax) often differs by ±0.05-0.10, which shifts
+  // both the edge AND the Kelly stake materially. Falling back to vb.odd
+  // while the input is empty keeps the suggestion meaningful from the start.
   const effectiveOdd = parseFloat(oddInput) || vb.odd;
   const trueProb = vb.prob ?? vb.trueProb;
   const liveKellyStake = (effectiveOdd && trueProb)
@@ -46,12 +60,48 @@ function PerBetMiseInputs({ fixtureId, vb, liveBankroll, kFrac }) {
   const usingCustomOdd = parseFloat(oddInput) > 0 && parseFloat(oddInput) !== vb.odd;
 
   const saveMise = () => {
-    if (miseDirty) setBetMise(fixtureId, betKey, miseInput, vb.sources, vb.odd);
+    if (miseDirty) setBetMise(fixtureId, betKey, miseInput, vb.sources, vb.odd, selectedBookmaker);
   };
   const saveOdd = () => { if (oddDirty) setBetActualOdd(fixtureId, betKey, oddInput); };
 
   return (
     <div className="flex flex-col gap-2 pt-2.5 mt-1 border-t border-gold-500/15">
+      {/* Bookmaker picker — uses the bankroll of the selected book for Kelly,
+          and tags the saved bet so it counts in the right history. */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-xs text-white/45 font-heading">Parier chez :</span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            disabled={!unibetAvailable}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBookmaker('unibet'); }}
+            className={clsx(
+              'text-[11px] font-heading font-bold px-2 py-0.5 rounded border transition-all',
+              selectedBookmaker === 'unibet'
+                ? 'bg-red-500/20 border-red-500/50 text-red-200'
+                : 'border-white/[0.08] text-white/40 hover:text-white/70',
+              !unibetAvailable && 'opacity-30 cursor-not-allowed',
+            )}
+          >
+            Unibet
+          </button>
+          <button
+            type="button"
+            disabled={!winamaxAvailable}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBookmaker('winamax'); }}
+            className={clsx(
+              'text-[11px] font-heading font-bold px-2 py-0.5 rounded border transition-all',
+              selectedBookmaker === 'winamax'
+                ? 'bg-yellow-400/20 border-yellow-400/50 text-yellow-200'
+                : 'border-white/[0.08] text-white/40 hover:text-white/70',
+              !winamaxAvailable && 'opacity-30 cursor-not-allowed',
+            )}
+          >
+            Winamax
+          </button>
+        </div>
+      </div>
+
       {/* Step 1 — bookmaker odd (always visible, recomputes Kelly on change) */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -177,13 +227,18 @@ export default function ValueBets() {
   const pronostics = pronosticsByDay[selectedDay] || [];
   const loading = !!loadingDays[selectedDay];
 
-  const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
+  const {
+    initialBankrollUnibet, initialBankrollWinamax,
+    kellyFraction: kFrac, defaultBookmaker,
+  } = useBankrollStore();
   const entries = useHistoryStore((s) => s.entries);
   const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
   const savePronostics = useHistoryStore((s) => s.savePronostics);
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
-  const _bk = getBankrollStats();
-  const liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
+  const uStats = getBankrollStats('unibet');
+  const wStats = getBankrollStats('winamax');
+  const liveBankrollUnibet = initialBankrollUnibet + (uStats.pnl || 0) - (uStats.pendingCommitted || 0);
+  const liveBankrollWinamax = initialBankrollWinamax + (wStats.pnl || 0) - (wStats.pendingCommitted || 0);
 
   // Fetch one day, populate pronosticsByDay
   const loadDay = async (date, { force = false } = {}) => {
@@ -288,7 +343,11 @@ export default function ValueBets() {
           sources: vb.sources || [],
           edgePoisson: vb.edgePoisson,
           trueProbPoisson: vb.trueProbPoisson,
-          stake: (vb.odd && prob) ? kellyStake(prob, vb.odd, liveBankroll, kFrac) : 0,
+          // Stake indicatif basé sur la SOMME des deux bankrolls (Unibet +
+          // Winamax). C'est juste un repère visuel sur la carte ; le vrai
+          // calcul Kelly se fait dans PerBetMiseInputs avec la bankroll du
+          // book sélectionné par l'utilisateur.
+          stake: (vb.odd && prob) ? kellyStake(prob, vb.odd, liveBankrollUnibet + liveBankrollWinamax, kFrac) : 0,
         };
       }).sort((a, b) => (b.edge || 0) - (a.edge || 0));
 
@@ -305,7 +364,7 @@ export default function ValueBets() {
       });
     });
     return groups.sort((a, b) => b.bestEdge - a.bestEdge);
-  }, [pronostics, liveBankroll, kFrac]);
+  }, [pronostics, liveBankrollUnibet, liveBankrollWinamax, kFrac]);
 
   // Plus de filtre : le scan backend ne retourne que des matchs couverts
   // par Unibet ou Winamax. On garde la variable pour compatibilité.
@@ -450,13 +509,13 @@ export default function ValueBets() {
       {/* Match cards — one per match, with all its value bets stacked inside */}
       {!loading && !error && filteredMatches.length > 0 && (
         <div className="space-y-3">
-          {liveBankroll <= 0 && (
+          {liveBankrollUnibet <= 0 && liveBankrollWinamax <= 0 && (
             <div className="px-3.5 py-2.5 rounded-xl bg-brand-500/[0.08] border border-brand-500/25">
               <p className="text-xs text-brand-300 font-heading leading-relaxed flex items-center gap-2">
                 <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>
                   <strong>Bankroll non définie.</strong> Va dans Historique → Bankroll
-                  pour la régler et voir les mises Kelly suggérées.
+                  pour la régler (Unibet et/ou Winamax).
                 </span>
               </p>
             </div>
@@ -573,7 +632,7 @@ export default function ValueBets() {
                               Mise: {formatStake(vb.stake)}
                             </p>
                           ) : (
-                            <p className="text-xs text-white/30 font-heading mt-0.5">{liveBankroll <= 0 ? 'Définir bankroll' : '—'}</p>
+                            <p className="text-xs text-white/30 font-heading mt-0.5">{liveBankrollUnibet <= 0 && liveBankrollWinamax <= 0 ? 'Définir bankroll' : '—'}</p>
                           )}
                         </div>
                       </div>
@@ -592,8 +651,11 @@ export default function ValueBets() {
                       <PerBetMiseInputs
                         fixtureId={m.fixtureId}
                         vb={vb}
-                        liveBankroll={liveBankroll}
+                        leagueId={m.league?.id}
+                        liveBankrollUnibet={liveBankrollUnibet}
+                        liveBankrollWinamax={liveBankrollWinamax}
                         kFrac={kFrac}
+                        defaultBookmaker={defaultBookmaker}
                       />
                     </div>
                   ))}

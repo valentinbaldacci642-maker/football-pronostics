@@ -144,21 +144,55 @@ export const EDGE_MODE_THRESHOLD = {
 export const useBankrollStore = create(
   persist(
     (set, get) => ({
-      initialBankroll: 0,
+      // Bankrolls séparées par bookmaker. L'ancien champ `initialBankroll`
+      // est mappé sur Unibet (migration legacy). Si l'utilisateur ne joue
+      // que chez un seul bookmaker, l'autre reste à 0.
+      initialBankrollUnibet: 0,
+      initialBankrollWinamax: 0,
       kellyFraction: 0.25,
       edgeMode: 'standard',
-      unibetOnly: false,
-      winamaxOnly: false,
-      setInitialBankroll: (amount) => set({ initialBankroll: Math.max(0, parseFloat(amount) || 0) }),
+      // Bookmaker par défaut quand l'utilisateur clique 'Saisis ta mise'
+      // sur un VB sans avoir choisi explicitement.
+      defaultBookmaker: 'unibet',
+      setInitialBankrollUnibet: (amount) => set({
+        initialBankrollUnibet: Math.max(0, parseFloat(amount) || 0),
+      }),
+      setInitialBankrollWinamax: (amount) => set({
+        initialBankrollWinamax: Math.max(0, parseFloat(amount) || 0),
+      }),
+      setDefaultBookmaker: (bm) => set({
+        defaultBookmaker: bm === 'winamax' ? 'winamax' : 'unibet',
+      }),
       setKellyFraction: (frac) => set({ kellyFraction: Math.max(0, Math.min(1, parseFloat(frac) || 0)) }),
       setEdgeMode: (mode) => set({
         edgeMode: ['conservative', 'standard', 'aggressive'].includes(mode) ? mode : 'standard',
       }),
-      setUnibetOnly: (on) => set({ unibetOnly: !!on, ...(on ? { winamaxOnly: false } : {}) }),
-      setWinamaxOnly: (on) => set({ winamaxOnly: !!on, ...(on ? { unibetOnly: false } : {}) }),
-      reset: () => set({ initialBankroll: 0, kellyFraction: 0.25, edgeMode: 'standard', unibetOnly: false, winamaxOnly: false }),
+      reset: () => set({
+        initialBankrollUnibet: 0,
+        initialBankrollWinamax: 0,
+        kellyFraction: 0.25,
+        edgeMode: 'standard',
+        defaultBookmaker: 'unibet',
+      }),
     }),
-    { name: 'pronostats-bankroll-v1' }
+    {
+      name: 'pronostats-bankroll-v1',
+      // Migration : si l'ancien `initialBankroll` existait, on l'attribue à
+      // Unibet (puisque c'était le bookmaker initial).
+      migrate: (persisted) => {
+        if (!persisted) return persisted;
+        if (persisted.initialBankrollUnibet == null && persisted.initialBankroll != null) {
+          persisted.initialBankrollUnibet = persisted.initialBankroll;
+          delete persisted.initialBankroll;
+        }
+        if (persisted.initialBankrollWinamax == null) persisted.initialBankrollWinamax = 0;
+        if (persisted.defaultBookmaker == null) persisted.defaultBookmaker = 'unibet';
+        delete persisted.unibetOnly;
+        delete persisted.winamaxOnly;
+        return persisted;
+      },
+      version: 2,
+    }
   )
 );
 
@@ -583,7 +617,7 @@ export const useHistoryStore = create(
       // live under entries[i].bets[betKey] where betKey = "market::selection".
       // Optional `sources` arg captures the detection sources of the VB at
       // save time (shin / poisson / lineup) so the historique can show them.
-      setBetMise: (fixtureId, betKey, amount, sources, modelOdd) => set((s) => ({
+      setBetMise: (fixtureId, betKey, amount, sources, modelOdd, bookmaker) => set((s) => ({
         entries: s.entries.map((e) => {
           if (e.fixtureId !== fixtureId) return e;
           const next = parseFloat(amount);
@@ -599,6 +633,9 @@ export const useHistoryStore = create(
             // entering "Ma cote". Only overwrite if a positive number was
             // supplied — never wipe a previously stored value.
             ...(Number.isFinite(modelOdd) && modelOdd > 0 ? { modelOdd } : {}),
+            // Bookmaker assignation : 'unibet' / 'winamax'. Sans valeur,
+            // garde la valeur existante (ou undefined = legacy).
+            ...(bookmaker === 'unibet' || bookmaker === 'winamax' ? { bookmaker } : {}),
           };
           return { ...e, bets };
         }),
@@ -763,8 +800,16 @@ export const useHistoryStore = create(
         };
       },
 
-      getBankrollStats: () => {
+      // bookmaker = 'unibet' | 'winamax' | undefined (= toutes confondues).
+      // Filtre les paris par bookmaker assigné. Les paris legacy sans champ
+      // bookmaker sont attribués à 'unibet' (compatibilité ascendante).
+      getBankrollStats: (bookmaker) => {
         const all = get().entries;
+        const matchesBook = (b) => {
+          if (!bookmaker) return true;
+          const bm = b?.bookmaker || 'unibet';
+          return bm === bookmaker;
+        };
 
         // Walk each entry and accumulate stats over the entry-level pick AND
         // every per-bet stake. A pending bet is one with a mise > 0 and no
@@ -777,7 +822,7 @@ export const useHistoryStore = create(
 
         for (const e of all) {
           // Entry-level
-          if (Number.isFinite(e.mise) && e.mise > 0) {
+          if (Number.isFinite(e.mise) && e.mise > 0 && matchesBook(e)) {
             if (e.result === 'win') {
               totalMise += e.mise;
               totalReturn += e.mise * parseFloat(e.actualOdd || e.odd || 1);
@@ -797,6 +842,7 @@ export const useHistoryStore = create(
           // Per-bet stakes
           for (const bet of Object.values(e.bets || {})) {
             if (!Number.isFinite(bet.mise) || bet.mise <= 0) continue;
+            if (!matchesBook(bet)) continue;
             if (bet.result === 'win') {
               // Fallback: actualOdd (user-entered "Ma cote") OR modelOdd
               // (system-suggested at save time). Without modelOdd fallback,

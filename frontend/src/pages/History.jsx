@@ -27,10 +27,11 @@ const RESULT_CONFIG = {
  * Decoupled from /value-bets API state — once saved, a bet stays here even
  * if its underlying value bet disappears from the live list (edge dropped).
  */
-function flattenBets(entries) {
+function flattenBets(entries, bookmaker) {
   const list = [];
+  const matchesBook = (b) => !bookmaker || (b?.bookmaker || 'unibet') === bookmaker;
   for (const e of entries) {
-    if (Number.isFinite(e.mise) && e.mise > 0) {
+    if (Number.isFinite(e.mise) && e.mise > 0 && matchesBook(e)) {
       // Fallback for legacy entries: any pronos pick that's a value bet
       // shows at least the Shin badge (every detected VB has Shin).
       const fallbackSources = e.pickSources && e.pickSources.length
@@ -57,6 +58,7 @@ function flattenBets(entries) {
     }
     for (const [betKey, bet] of Object.entries(e.bets || {})) {
       if (!Number.isFinite(bet.mise) || bet.mise <= 0) continue;
+      if (!matchesBook(bet)) continue;
       const [market, selection] = betKey.split('::');
       // Per-VB stakes always come from the value-bets page → Shin minimum.
       // If sources were stored at save time, use those; otherwise fall back.
@@ -110,7 +112,17 @@ const CustomTooltip = ({ active, payload }) => {
 
 export default function History() {
   const { entries, getStats, getBankrollStats, getBankrollCurve, getCLVStats, setMise, clearAll, clearUnstakedEntries, resolveResult, seedUnibetBets } = useHistoryStore();
-  const { initialBankroll, kellyFraction, edgeMode, setInitialBankroll, setKellyFraction, setEdgeMode, reset: resetBankroll } = useBankrollStore();
+  const {
+    initialBankrollUnibet, initialBankrollWinamax,
+    kellyFraction, edgeMode,
+    setInitialBankrollUnibet, setInitialBankrollWinamax,
+    setKellyFraction, setEdgeMode, reset: resetBankroll,
+  } = useBankrollStore();
+
+  // Bookmaker selector — drives all the filters / displays below.
+  const [activeBookmaker, setActiveBookmaker] = useState('unibet');
+  const initialBankroll = activeBookmaker === 'winamax' ? initialBankrollWinamax : initialBankrollUnibet;
+  const setInitialBankroll = activeBookmaker === 'winamax' ? setInitialBankrollWinamax : setInitialBankrollUnibet;
 
   // Local input state so the bankroll input has a Save button (no save-on-keystroke)
   const [bankrollInput, setBankrollInput] = useState(String(initialBankroll));
@@ -132,7 +144,7 @@ export default function History() {
   const handleSyncBankroll = () => {
     const target = parseFloat(syncInput);
     if (!Number.isFinite(target) || target < 0) return;
-    const _bk = getBankrollStats();
+    const _bk = getBankrollStats(activeBookmaker);
     const live = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
     const delta = target - live;
     if (Math.abs(delta) < 0.005) {
@@ -222,7 +234,7 @@ export default function History() {
   const [tab, setTab] = useState('pending');
   const [search, setSearch] = useState('');
   const stats = getStats();
-  const bkStats = getBankrollStats();
+  const bkStats = getBankrollStats(activeBookmaker);
   const curve = getBankrollCurve();
   const clvStats = getCLVStats();
   // Live bankroll = initial + settled P&L − pending stakes (cash committed at bookie).
@@ -263,9 +275,33 @@ export default function History() {
 
   return (
     <div className="max-w-3xl xl:max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
+      {/* Header + bookmaker selector */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <h1 className="font-display text-4xl text-white tracking-wide leading-none">Historique <span className="text-brand-400">pronos</span></h1>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setActiveBookmaker('unibet')}
+            className={clsx(
+              'text-xs font-heading font-bold px-3 py-1.5 rounded-lg border transition-all',
+              activeBookmaker === 'unibet'
+                ? 'bg-red-500/20 border-red-500/50 text-red-200'
+                : 'border-white/[0.08] text-white/40 hover:text-white/70'
+            )}
+          >
+            Unibet
+          </button>
+          <button
+            onClick={() => setActiveBookmaker('winamax')}
+            className={clsx(
+              'text-xs font-heading font-bold px-3 py-1.5 rounded-lg border transition-all',
+              activeBookmaker === 'winamax'
+                ? 'bg-yellow-400/20 border-yellow-400/50 text-yellow-200'
+                : 'border-white/[0.08] text-white/40 hover:text-white/70'
+            )}
+          >
+            Winamax
+          </button>
+        </div>
       </div>
 
       {/* Stats globales */}
@@ -614,7 +650,7 @@ export default function History() {
       {/* ── RECHERCHE TAB ── */}
       {/* ── PARIS EN COURS TAB ── (every staked bet without a result yet) */}
       {tab === 'pending' && (() => {
-        const allBets = flattenBets(entries);
+        const allBets = flattenBets(entries, activeBookmaker);
         const pending = allBets.filter((b) => !b.result);
 
         return (
@@ -682,7 +718,7 @@ export default function History() {
 
       {/* ── HISTORIQUE PRONOS TAB ── (every settled bet, won or lost) */}
       {tab === 'pronos' && (() => {
-        const allBets = flattenBets(entries);
+        const allBets = flattenBets(entries, activeBookmaker);
         const settled = allBets.filter((b) => b.result);
         const filtered = settled.filter((b) => {
           if (filter === 'win') return b.result === 'win';

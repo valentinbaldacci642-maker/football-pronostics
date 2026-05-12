@@ -12,20 +12,18 @@ export default function Navbar() {
   const [searchFocused, setSearchFocused] = useState(false);
   const navigate = useNavigate();
 
-  // Live bankroll: only displayed when the user has explicitly set an initial
-  // bankroll (> 0). After a reset, it's hidden everywhere. Also hidden on the
-  // Help page where it would compete with the explanatory content.
+  // 2 bankrolls live, une par bookmaker. Affichées en pill séparées si au
+  // moins une initiale > 0. Cachées sur la page Help.
   const location = useLocation();
-  const initialBankroll = useBankrollStore((s) => s.initialBankroll);
+  const initialBankrollUnibet = useBankrollStore((s) => s.initialBankrollUnibet);
+  const initialBankrollWinamax = useBankrollStore((s) => s.initialBankrollWinamax);
   const entries = useHistoryStore((s) => s.entries);
   const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
-  const showBankroll = initialBankroll > 0 && location.pathname !== '/help';
-  let liveBankroll = 0, pendingCommitted = 0;
-  if (showBankroll) {
-    const _bk = getBankrollStats();
-    liveBankroll = initialBankroll + (_bk.pnl || 0) - (_bk.pendingCommitted || 0);
-    pendingCommitted = _bk.pendingCommitted || 0;
-  }
+  const showBar = (initialBankrollUnibet > 0 || initialBankrollWinamax > 0) && location.pathname !== '/help';
+  const uStats = initialBankrollUnibet > 0 ? getBankrollStats('unibet') : null;
+  const wStats = initialBankrollWinamax > 0 ? getBankrollStats('winamax') : null;
+  const uLive = uStats ? initialBankrollUnibet + (uStats.pnl || 0) - (uStats.pendingCommitted || 0) : 0;
+  const wLive = wStats ? initialBankrollWinamax + (wStats.pnl || 0) - (wStats.pendingCommitted || 0) : 0;
 
   const handleSearch = async (e) => {
     const val = e.target.value;
@@ -107,29 +105,44 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Live bankroll pill — only when an initial bankroll is set (> 0).
-          Hidden during search focus on mobile so the input gets full row. */}
-      {showBankroll && (
-        <Link
-          to="/history"
-          className={clsx(
-            'ml-auto items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-dark-800/80 hover:border-brand-500/30 transition-all flex-shrink-0',
-            searchFocused ? 'hidden lg:flex' : 'flex'
+      {/* 2 pills bankroll : Unibet en rouge, Winamax en jaune. Chacune ne
+          s'affiche que si la bankroll initiale du book correspondant > 0. */}
+      {showBar && (
+        <div className={clsx(
+          'ml-auto items-center gap-1.5 flex-shrink-0',
+          searchFocused ? 'hidden lg:flex' : 'flex'
+        )}>
+          {uStats && (
+            <Link
+              to="/history"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-red-500/30 bg-red-500/[0.08] hover:border-red-500/50 transition-all"
+              title={`Unibet · ${uLive.toFixed(2)}€${uStats.pendingCommitted > 0 ? ` · ${uStats.pendingCommitted.toFixed(2)}€ en jeu` : ''}`}
+            >
+              <span className="text-[10px] font-heading font-bold text-red-300/80 leading-none">U</span>
+              <span className={clsx(
+                'font-display text-sm leading-none tracking-wider tabular-nums',
+                uLive >= initialBankrollUnibet ? 'text-brand-400' : 'text-danger'
+              )}>
+                {uLive.toFixed(2)}€
+              </span>
+            </Link>
           )}
-          title={`Bankroll dispo${pendingCommitted > 0 ? ` · ${pendingCommitted.toFixed(2)} € en jeu` : ''}`}
-        >
-          <span className={clsx(
-            'font-display text-base leading-none tracking-wider tabular-nums',
-            liveBankroll >= initialBankroll ? 'text-brand-400' : 'text-danger'
-          )}>
-            {liveBankroll.toFixed(2)} €
-          </span>
-          {pendingCommitted > 0 && (
-            <span className="hidden sm:inline text-xs text-gold-400/80 font-mono leading-none whitespace-nowrap">
-              · {pendingCommitted.toFixed(2)} € en jeu
-            </span>
+          {wStats && (
+            <Link
+              to="/history"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-yellow-400/30 bg-yellow-400/[0.08] hover:border-yellow-400/50 transition-all"
+              title={`Winamax · ${wLive.toFixed(2)}€${wStats.pendingCommitted > 0 ? ` · ${wStats.pendingCommitted.toFixed(2)}€ en jeu` : ''}`}
+            >
+              <span className="text-[10px] font-heading font-bold text-yellow-300/80 leading-none">W</span>
+              <span className={clsx(
+                'font-display text-sm leading-none tracking-wider tabular-nums',
+                wLive >= initialBankrollWinamax ? 'text-brand-400' : 'text-danger'
+              )}>
+                {wLive.toFixed(2)}€
+              </span>
+            </Link>
           )}
-        </Link>
+        </div>
       )}
     </header>
   );
