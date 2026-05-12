@@ -43,6 +43,7 @@ export const WINAMAX_LEAGUE_IDS = new Set([
 
   // Belgique
   144,                   // Jupiler Pro League
+  147,                   // Coupe de Belgique
 
   // Suisse
   207,

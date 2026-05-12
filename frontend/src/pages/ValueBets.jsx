@@ -177,11 +177,7 @@ export default function ValueBets() {
   const pronostics = pronosticsByDay[selectedDay] || [];
   const loading = !!loadingDays[selectedDay];
 
-  const {
-    initialBankroll, kellyFraction: kFrac,
-    unibetOnly, setUnibetOnly,
-    winamaxOnly, setWinamaxOnly,
-  } = useBankrollStore();
+  const { initialBankroll, kellyFraction: kFrac } = useBankrollStore();
   const entries = useHistoryStore((s) => s.entries);
   const getBankrollStats = useHistoryStore((s) => s.getBankrollStats);
   const savePronostics = useHistoryStore((s) => s.savePronostics);
@@ -311,13 +307,9 @@ export default function ValueBets() {
     return groups.sort((a, b) => b.bestEdge - a.bestEdge);
   }, [pronostics, liveBankroll, kFrac]);
 
-  const filteredMatches = useMemo(() => {
-    if (unibetOnly) return matchesWithValueBets.filter((m) => isUnibetLeague(m.league?.id));
-    if (winamaxOnly) return matchesWithValueBets.filter((m) => isWinamaxLeague(m.league?.id));
-    return matchesWithValueBets;
-  }, [matchesWithValueBets, unibetOnly, winamaxOnly]);
-  const hiddenByFilter = matchesWithValueBets.length - filteredMatches.length;
-  const activeBookmaker = unibetOnly ? 'Unibet' : winamaxOnly ? 'Winamax' : null;
+  // Plus de filtre : le scan backend ne retourne que des matchs couverts
+  // par Unibet ou Winamax. On garde la variable pour compatibilité.
+  const filteredMatches = matchesWithValueBets;
 
   const totalValueBetsCount = filteredMatches.reduce((s, m) => s + m.valueBets.length, 0);
   const totalSuggestedStake = filteredMatches.reduce((s, m) => s + m.totalStake, 0);
@@ -394,39 +386,6 @@ export default function ValueBets() {
         ))}
       </div>
 
-      {/* Filtre bookmaker — segmented pill, 3 options exclusives */}
-      <div className="flex flex-col gap-2 px-3.5 py-2.5 rounded-xl bg-dark-800/40 border border-white/[0.06]">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm text-white/70 font-heading font-semibold">
-            Filtre bookmaker
-          </span>
-          <span className="text-[11px] text-white/35 font-heading">
-            {activeBookmaker
-              ? `Uniquement ligues ${activeBookmaker} · ${hiddenByFilter} masqué${hiddenByFilter > 1 ? 's' : ''}`
-              : 'Toutes les ligues'}
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          {[
-            { id: 'none',    label: 'Tout',    active: !unibetOnly && !winamaxOnly, onClick: () => { setUnibetOnly(false); setWinamaxOnly(false); } },
-            { id: 'unibet',  label: 'Unibet',  active: unibetOnly,  onClick: () => setUnibetOnly(true) },
-            { id: 'winamax', label: 'Winamax', active: winamaxOnly, onClick: () => setWinamaxOnly(true) },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              onClick={opt.onClick}
-              className={clsx(
-                'px-3 py-1.5 rounded-lg text-xs font-heading font-semibold border transition-all',
-                opt.active
-                  ? 'bg-brand-500/15 border-brand-500/40 text-brand-400'
-                  : 'border-white/[0.08] text-white/40 hover:text-white/70'
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Summary */}
       {!loading && filteredMatches.length > 0 && (
@@ -515,7 +474,7 @@ export default function ValueBets() {
                 transition={{ delay: Math.min(mi * 0.04, 0.3), duration: 0.28 }}
                 className="football-card p-4 border-l-4 border-gold-500 cursor-pointer hover:border-gold-400 transition-colors space-y-3"
               >
-                {/* League + time header */}
+                {/* League + bookmaker badge + time header */}
                 <div className="flex items-center gap-3">
                   {m.league?.logo && (
                     <img src={m.league.logo} alt="" className="w-4 h-4 object-contain opacity-60 flex-shrink-0" />
@@ -526,6 +485,33 @@ export default function ValueBets() {
                       <span className="text-white/25 ml-1.5">· {m.league.country}</span>
                     )}
                   </span>
+                  {/* Bookmaker badge — tells the user where to place this bet */}
+                  {(() => {
+                    const u = isUnibetLeague(m.league?.id);
+                    const w = isWinamaxLeague(m.league?.id);
+                    if (u && w) {
+                      return (
+                        <span className="text-[10px] font-heading font-bold px-1.5 py-0.5 rounded bg-gradient-to-r from-red-500/15 to-yellow-400/15 border border-white/15 text-white/80 whitespace-nowrap">
+                          Unibet · Winamax
+                        </span>
+                      );
+                    }
+                    if (u) {
+                      return (
+                        <span className="text-[10px] font-heading font-bold px-1.5 py-0.5 rounded bg-red-500/15 border border-red-500/40 text-red-300 whitespace-nowrap">
+                          Unibet
+                        </span>
+                      );
+                    }
+                    if (w) {
+                      return (
+                        <span className="text-[10px] font-heading font-bold px-1.5 py-0.5 rounded bg-yellow-400/15 border border-yellow-400/40 text-yellow-300 whitespace-nowrap">
+                          Winamax
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                   <span className="text-xs text-gold-400/80 font-mono ml-auto">
                     {m.valueBets.length} value bet{m.valueBets.length > 1 ? 's' : ''}
                   </span>

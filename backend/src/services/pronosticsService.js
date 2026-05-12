@@ -2,6 +2,7 @@ const api = require('./apiFootball');
 const analysisService = require('./analysisService');
 const cache = require('../utils/cache');
 const logger = require('../utils/logger');
+const { COVERED_LEAGUE_IDS } = require('../utils/bookmakerLeagues');
 
 // Leagues ranked by prestige/data quality — TOP TIER (places ~1-21).
 // Ces ligues passent en deep analysis (top 10) ou en début de lite scan.
@@ -100,12 +101,14 @@ class PronosticsService {
     // pre-match snapshot from API-Football's /odds endpoint, which is fine
     // since our analysis was computed pre-kickoff.
     const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'CANC', 'ABD', 'AWD', 'WO']);
-    // Tri 3-niveaux : PRIORITY_LEAGUES (UEFA + top 5) → UNIBET_SECONDARY
-    // (les ~50 autres ligues couvertes par Unibet.fr) → tout le reste. Comme
-    // ça, sur une journée chargée (800+ fixtures), les 250 premiers scannés
-    // appartiennent tous à des ligues que l'utilisateur peut effectivement
-    // parier sur Unibet, au lieu de gaspiller le budget sur des ligues
-    // mineures jamais proposées par le bookmaker.
+    // Pré-filtre : on ne scanne QUE les ligues couvertes par Unibet ou
+    // Winamax (les 2 bookmakers utilisés). Économise ~50% des appels API
+    // sur les journées chargées (800+ fixtures dont seulement ~200 sur
+    // ligues utiles) tout en garantissant que chaque VB détecté est
+    // jouable chez au moins l'un des deux books.
+    // Puis tri 2-niveaux : top tier (UEFA + top 5) → reste des ligues
+    // couvertes. On garde l'ancien UNIBET_SECONDARY pour la sous-priorité
+    // dans le scan (top leagues d'abord, périphérie ensuite).
     const tier = (id) => {
       const top = PRIORITY_LEAGUES.indexOf(id);
       if (top !== -1) return top;
@@ -115,6 +118,7 @@ class PronosticsService {
     };
     const upcoming = fixtures
       .filter((f) => !FINISHED_STATUSES.has(f.fixture?.status?.short))
+      .filter((f) => COVERED_LEAGUE_IDS.has(f.league?.id))
       .sort((a, b) => tier(a.league?.id) - tier(b.league?.id));
 
     if (upcoming.length === 0) return [];
