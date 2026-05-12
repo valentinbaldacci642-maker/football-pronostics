@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { Target, TrendingUp, RefreshCw, Shield, Trophy, ChevronRight, BookOpen, Star, Save, Flame } from 'lucide-react';
 import { pronosticsApi, getRateLimitedUntil } from '../services/api';
 import { formatTime } from '../utils/format';
+import { isUnibetLeague } from '../utils/unibetLeagues';
+import { isWinamaxLeague } from '../utils/winamaxLeagues';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -433,7 +435,7 @@ function Skeleton() {
 
 // Build a list of date offsets [0, 1, 2, 3] starting today
 function buildDayOptions() {
-  return [0, 1, 2, 3].map((offset) => {
+  return Array.from({ length: 8 }, (_, i) => i).map((offset) => {
     const d = new Date();
     d.setDate(d.getDate() + offset);
     const iso = d.toISOString().split('T')[0];
@@ -500,13 +502,26 @@ export default function Home() {
   // Reset retry counter on success (when error clears)
   useEffect(() => { if (!error) setRateLimitRetries(0); }, [error]);
 
-  const highConf = pronostics.filter((p) => p.confidence >= 70).length;
-  const valueBets = pronostics.filter((p) => p.pick?.isValue).length;
-  const avgConf = pronostics.length > 0
-    ? Math.round(pronostics.reduce((s, p) => s + p.confidence, 0) / pronostics.length)
+  // Filtre Unibet ∪ Winamax + top 10 par ordre de confiance descendant.
+  // Le backend pré-filtre déjà ces ligues mais on garde une safety net pour
+  // les caches qui auraient pu sauvegarder des matchs hors-couverture.
+  const topPronostics = pronostics
+    .filter((p) => {
+      const lid = p.fixture?.league?.id;
+      return isUnibetLeague(lid) || isWinamaxLeague(lid);
+    })
+    .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+    .slice(0, 10);
+
+  const highConf = topPronostics.filter((p) => p.confidence >= 70).length;
+  const valueBets = topPronostics.filter((p) => p.pick?.isValue).length;
+  const avgConf = topPronostics.length > 0
+    ? Math.round(topPronostics.reduce((s, p) => s + p.confidence, 0) / topPronostics.length)
     : 0;
-  const isLowConfidenceFallback = pronostics.length > 0 && pronostics.every((p) => p.confidence < 45);
-  const bankroll = useBankrollStore((s) => s.initialBankroll);
+  const isLowConfidenceFallback = topPronostics.length > 0 && topPronostics.every((p) => p.confidence < 45);
+  const initialBankrollUnibet = useBankrollStore((s) => s.initialBankrollUnibet);
+  const initialBankrollWinamax = useBankrollStore((s) => s.initialBankrollWinamax);
+  const bankroll = initialBankrollUnibet + initialBankrollWinamax;
   const showLowBankrollHint = bankroll > 0 && bankroll < 50;
   const bkStats = useHistoryStore((s) => s.getBankrollStats());
   const liveBankroll = bankroll + (bkStats.pnl || 0) - (bkStats.pendingCommitted || 0);
@@ -569,7 +584,7 @@ export default function Home() {
       </div>
 
       {/* Stats */}
-      {!loading && pronostics.length > 0 && (
+      {!loading && topPronostics.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -617,7 +632,7 @@ export default function Home() {
       )}
 
       {/* Empty */}
-      {!loading && !error && pronostics.length === 0 && (
+      {!loading && !error && topPronostics.length === 0 && (
         <div className="glass-card p-12 text-center space-y-4">
           <div className="text-6xl font-display text-white/10 tracking-widest">0 PRONOSTICS</div>
           <p className="text-white/40 font-heading font-semibold">Aucun match disponible pour aujourd'hui</p>
@@ -627,10 +642,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* Top 10 pronos — every match (value-bet ones too). Cards with
-          detected value bets show a 'X value bets détectés' indicator that
-          links to /value-bets for the dedicated Kelly view. */}
-      {!loading && !error && pronostics.length > 0 && (
+      {/* Top 10 pronos — filtrés Unibet ∪ Winamax, triés par confidence
+          desc. La carte 'featured' = #1 (meilleur pronostic), puis 2-10. */}
+      {!loading && !error && topPronostics.length > 0 && (
         <>
           {isLowConfidenceFallback && (
             <div className="px-3.5 py-2.5 rounded-xl bg-gold-500/[0.06] border border-gold-500/20">
@@ -641,28 +655,20 @@ export default function Home() {
             </div>
           )}
 
-          <PronosticCard pronostic={pronostics[0]} featured index={0} />
-
-          {/* Top 10 meilleurs pronos — featured ([0]) + 9 next, by confidence desc */}
-          <div className="space-y-3 pt-2">
+          <div className="space-y-3">
             <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">
-              Top 10 meilleurs pronos du jour
+              Top 10 pronos du jour ({topPronostics.length})
             </h2>
-            {pronostics.slice(1, 10).length === 0 ? (
-              <div className="text-center text-xs text-white/30 py-6 font-heading">
-                Aucun autre prono pour ce jour. Reviens plus tard ou clique Actualiser.
-              </div>
-            ) : (
-              pronostics.slice(1, 10).map((p, i) => (
-                <Link
-                  key={p.fixture?.fixture?.id || i}
-                  to={`/match/${p.fixture?.fixture?.id}`}
-                  className="block"
-                >
-                  <PronosticCard pronostic={p} index={i + 1} />
-                </Link>
-              ))
-            )}
+            <PronosticCard pronostic={topPronostics[0]} featured index={0} />
+            {topPronostics.slice(1).map((p, i) => (
+              <Link
+                key={p.fixture?.fixture?.id || i}
+                to={`/match/${p.fixture?.fixture?.id}`}
+                className="block"
+              >
+                <PronosticCard pronostic={p} index={i + 1} />
+              </Link>
+            ))}
           </div>
         </>
       )}
