@@ -701,6 +701,29 @@ export const useHistoryStore = create(
       // Mark a per-VB bet as cashed out. `cashoutReturn` is the actual amount
       // returned by the bookmaker (in €). The PnL is then cashoutReturn - mise
       // and may be positive or negative.
+      // Duplique un pari sous une nouvelle clé unique. Utilisé quand le user
+      // a placé plusieurs fois le même VB sur le bookmaker (ex: 2x 0.12€ sur
+      // 1X2 X chez Unibet) et veut tracker chaque pari indépendamment dans
+      // l'app (un peut être cashed out, l'autre rester en cours).
+      duplicateBet: (fixtureId, sourceBetKey) => set((s) => ({
+        entries: s.entries.map((e) => {
+          if (e.fixtureId !== fixtureId) return e;
+          const source = e.bets?.[sourceBetKey];
+          if (!source) return e;
+          // Nouvelle clé : on suffixe par un timestamp pour garantir l'unicité.
+          // Le format reste lisible côté History (split('::') prend les 2 premiers).
+          const newKey = `${sourceBetKey}::dup${Date.now()}`;
+          const { result, cashoutReturn, ...rest } = source;
+          return {
+            ...e,
+            bets: {
+              ...e.bets,
+              [newKey]: { ...rest }, // pending (no result, no cashout)
+            },
+          };
+        }),
+      })),
+
       setBetCashout: (fixtureId, betKey, cashoutReturn) => set((s) => ({
         entries: s.entries.map((e) => {
           if (e.fixtureId !== fixtureId) return e;

@@ -829,6 +829,7 @@ export default function History() {
 function BetCard({ bet }) {
   const setBetCashout = useHistoryStore((s) => s.setBetCashout);
   const clearBetResult = useHistoryStore((s) => s.clearBetResult);
+  const duplicateBet = useHistoryStore((s) => s.duplicateBet);
   const setBetClosingOdd = useHistoryStore((s) => s.setBetClosingOdd);
   const [cashoutInput, setCashoutInput] = useState('');
   const [showCashoutInput, setShowCashoutInput] = useState(false);
@@ -946,19 +947,31 @@ function BetCard({ bet }) {
 
           {/* Cashout marking — pending per-VB bets get an inline 'Cash Out'
               action so the user can record a manual cashout from the
-              bookmaker without waiting for FT auto-resolution. */}
+              bookmaker without waiting for FT auto-resolution.
+              + bouton Dupliquer : crée un 2e pari identique pour les cas
+              où l'utilisateur a parié plusieurs fois la même combinaison. */}
           {!bet.result && bet.betKey && bet.mise > 0 && (
             <div className="flex items-center gap-1.5">
               {!showCashoutInput ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCashoutInput(true)}
-                  className="flex items-center gap-1 text-xs text-info/70 hover:text-info font-heading font-semibold px-2 py-1 rounded-md border border-info/30 hover:bg-info/10 transition-all"
-                  title="Marquer comme cash out"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  Cash Out
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowCashoutInput(true)}
+                    className="flex items-center gap-1 text-xs text-info/70 hover:text-info font-heading font-semibold px-2 py-1 rounded-md border border-info/30 hover:bg-info/10 transition-all"
+                    title="Marquer comme cash out"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Cash Out
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => duplicateBet(bet.fixtureId, bet.betKey)}
+                    className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 font-heading font-semibold px-2 py-1 rounded-md border border-white/[0.08] hover:border-white/20 transition-all"
+                    title="Dupliquer ce pari (si tu l'as placé plusieurs fois)"
+                  >
+                    +1
+                  </button>
+                </>
               ) : (
                 <>
                   <input
