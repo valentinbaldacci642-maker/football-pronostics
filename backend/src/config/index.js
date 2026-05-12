@@ -15,11 +15,11 @@ module.exports = {
     ttlLeagues: 86400,                                    // 24 h
   },
   valueBet: {
-    // 6% min edge sur le consensus Shin → compromis entre la perte d'edge
-    // sur Unibet.fr (cotes ~7% plus tight que le consensus mondial) et le
-    // volume de VBs détectés. Avec 6% Shin, ~2-3% reste à Unibet sur la
-    // plupart des paris, donc edge réel toujours positif sur la moyenne.
-    minEdge: 6,
+    // 5% min edge sur le consensus Shin. Plus permissif que 6% → capture
+    // plus de VBs marginaux. À l'utilisateur de vérifier que l'edge tient
+    // chez Unibet/Winamax via l'input "Ma cote" (les cotes locales sont
+    // ~7% tighter que le consensus).
+    minEdge: 5,
     minProb: 25,
     minOdds: 1.4,
     maxOdds: 10.0,

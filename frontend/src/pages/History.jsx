@@ -463,7 +463,7 @@ export default function History() {
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'conservative', label: 'Conservateur', sub: 'edge ≥ 8%', color: 'brand' },
-                  { id: 'standard',     label: 'Standard',    sub: 'edge ≥ 6%', color: 'gold' },
+                  { id: 'standard',     label: 'Standard',    sub: 'edge ≥ 5%', color: 'gold' },
                   { id: 'aggressive',   label: 'Aggressif',   sub: 'tout',      color: 'red' },
                 ].map((m) => (
                   <button
