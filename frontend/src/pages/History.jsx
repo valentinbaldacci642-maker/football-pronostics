@@ -1007,36 +1007,13 @@ function BetCard({ bet }) {
 
           {/* Cashout: undo button so the user can fix a mis-clicked cashout */}
           {bet.result === 'cashout' && bet.betKey && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleUndoCashout}
-                className="text-[11px] text-white/30 hover:text-white/60 font-heading underline-offset-2 hover:underline transition-colors"
-                title="Réinitialiser ce pari (le repasse en cours)"
-              >
-                Annuler le cash out
-              </button>
-              <button
-                type="button"
-                onClick={() => duplicateBet(bet.fixtureId, bet.betKey)}
-                className="text-[11px] text-white/30 hover:text-white/60 font-heading underline-offset-2 hover:underline transition-colors"
-                title="Créer un pari identique en cours (utile si tu as parié plusieurs fois)"
-              >
-                Dupliquer en pari en cours
-              </button>
-            </div>
-          )}
-
-          {/* Duplicate on already-settled (win/loss) bets too, useful when the
-              user has placed the same bet multiple times on the bookmaker. */}
-          {(bet.result === 'win' || bet.result === 'loss') && bet.betKey && (
             <button
               type="button"
-              onClick={() => duplicateBet(bet.fixtureId, bet.betKey)}
+              onClick={handleUndoCashout}
               className="text-[11px] text-white/30 hover:text-white/60 font-heading underline-offset-2 hover:underline transition-colors"
-              title="Créer un pari identique en cours"
+              title="Réinitialiser ce pari (le repasse en cours)"
             >
-              Dupliquer en pari en cours
+              Annuler le cash out
             </button>
           )}
 
