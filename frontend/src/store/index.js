@@ -754,19 +754,19 @@ export const useHistoryStore = create(
         }),
       })),
 
-      getStats: () => {
-        // Walk every entry and count ONLY user-placed bets (not auto-tracked
-        // pronos). A bet = top-level mise > 0 OR any per-VB mise > 0.
-        // Each per-bet stake also counts as a separate unit so pari multiple
-        // sur le même match comptent pour 2 dans Total/Wins/etc.
+      // bookmaker = 'unibet' | 'winamax' | undefined (= toutes confondues).
+      // Filtre les paris pour ne compter que ceux attribués au book demandé.
+      // Les paris legacy sans champ bookmaker comptent comme 'unibet'.
+      getStats: (bookmaker) => {
         const all = get().entries;
+        const matchesBook = (b) => !bookmaker || (b?.bookmaker || 'unibet') === bookmaker;
         let total = 0;
         let settled = 0;
         let wins = 0;
         let roiSum = 0;
         for (const e of all) {
           // Entry-level pick
-          if (Number.isFinite(e.mise) && e.mise > 0) {
+          if (Number.isFinite(e.mise) && e.mise > 0 && matchesBook(e)) {
             total += 1;
             if (e.result === 'win') {
               settled += 1; wins += 1;
@@ -779,10 +779,11 @@ export const useHistoryStore = create(
           // Per-VB stakes (each one a separate bet)
           for (const bet of Object.values(e.bets || {})) {
             if (!Number.isFinite(bet.mise) || bet.mise <= 0) continue;
+            if (!matchesBook(bet)) continue;
             total += 1;
             if (bet.result === 'win') {
               settled += 1; wins += 1;
-              roiSum += (parseFloat(bet.actualOdd || 1) - 1);
+              roiSum += (parseFloat(bet.actualOdd || bet.modelOdd || 1) - 1);
             } else if (bet.result === 'loss') {
               settled += 1;
               roiSum -= 1;

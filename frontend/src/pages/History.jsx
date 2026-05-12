@@ -121,8 +121,15 @@ export default function History() {
 
   // Bookmaker selector — drives all the filters / displays below.
   const [activeBookmaker, setActiveBookmaker] = useState('unibet');
-  const initialBankroll = activeBookmaker === 'winamax' ? initialBankrollWinamax : initialBankrollUnibet;
-  const setInitialBankroll = activeBookmaker === 'winamax' ? setInitialBankrollWinamax : setInitialBankrollUnibet;
+  // En mode 'all', l'initial bankroll affichée = somme des deux ; l'édition
+  // est désactivée (faut switch sur un book spécifique pour modifier).
+  const initialBankroll = activeBookmaker === 'winamax' ? initialBankrollWinamax
+    : activeBookmaker === 'unibet' ? initialBankrollUnibet
+    : initialBankrollUnibet + initialBankrollWinamax;
+  const setInitialBankroll = activeBookmaker === 'winamax' ? setInitialBankrollWinamax
+    : activeBookmaker === 'unibet' ? setInitialBankrollUnibet
+    : () => {}; // no-op en mode all
+  const isAllMode = activeBookmaker === 'all';
 
   // Local input state so the bankroll input has a Save button (no save-on-keystroke)
   const [bankrollInput, setBankrollInput] = useState(String(initialBankroll));
@@ -233,8 +240,12 @@ export default function History() {
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('pending');
   const [search, setSearch] = useState('');
-  const stats = getStats();
-  const bkStats = getBankrollStats(activeBookmaker);
+  // activeBookmaker peut être 'unibet', 'winamax', ou 'all' (cumul). En
+  // mode 'all', on passe undefined aux selectors → stats agrégées sur les
+  // deux books.
+  const statsBookmaker = activeBookmaker === 'all' ? undefined : activeBookmaker;
+  const stats = getStats(statsBookmaker);
+  const bkStats = getBankrollStats(statsBookmaker);
   const curve = getBankrollCurve();
   const clvStats = getCLVStats();
   // Live bankroll = initial + settled P&L − pending stakes (cash committed at bookie).
@@ -300,6 +311,18 @@ export default function History() {
             )}
           >
             Winamax
+          </button>
+          <button
+            onClick={() => setActiveBookmaker('all')}
+            className={clsx(
+              'text-xs font-heading font-bold px-3 py-1.5 rounded-lg border transition-all',
+              activeBookmaker === 'all'
+                ? 'bg-brand-500/20 border-brand-500/50 text-brand-300'
+                : 'border-white/[0.08] text-white/40 hover:text-white/70'
+            )}
+            title="Stats agrégées Unibet + Winamax (lecture seule)"
+          >
+            Total
           </button>
         </div>
       </div>
@@ -385,7 +408,9 @@ export default function History() {
           <div className="glass-card p-4 space-y-3">
             <p className="text-xs font-heading font-semibold text-white/35 uppercase tracking-wider">Paramètres bankroll</p>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-white/40 font-heading">Bankroll de départ (€)</span>
+              <span className="text-xs text-white/40 font-heading">
+                Bankroll de départ {activeBookmaker === 'unibet' ? 'Unibet' : activeBookmaker === 'winamax' ? 'Winamax' : 'cumul (Unibet + Winamax)'} (€)
+              </span>
               <div className="flex gap-2">
                 <input
                   type="number"
@@ -394,14 +419,19 @@ export default function History() {
                   value={bankrollInput}
                   onChange={(e) => setBankrollInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleSaveBankroll(); }}
-                  className="flex-1 bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50"
+                  disabled={isAllMode}
+                  className={clsx(
+                    'flex-1 bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white font-display tracking-wider focus:outline-none focus:border-brand-500/50',
+                    isAllMode && 'opacity-40 cursor-not-allowed'
+                  )}
+                  title={isAllMode ? 'Sélectionne Unibet ou Winamax pour éditer' : ''}
                 />
                 <button
                   onClick={handleSaveBankroll}
-                  disabled={!bankrollChanged}
+                  disabled={!bankrollChanged || isAllMode}
                   className={clsx(
                     'flex items-center gap-1.5 px-4 py-2 rounded-lg border text-xs font-heading font-semibold transition-all whitespace-nowrap',
-                    bankrollChanged
+                    bankrollChanged && !isAllMode
                       ? 'bg-brand-500/15 border-brand-500/40 text-brand-400 hover:bg-brand-500/25'
                       : 'border-white/[0.05] text-white/20 cursor-not-allowed'
                   )}
@@ -411,6 +441,11 @@ export default function History() {
                   Enregistrer
                 </button>
               </div>
+              {isAllMode && (
+                <span className="text-[10px] text-white/30 font-heading mt-0.5">
+                  Lecture seule. Sélectionne <strong>Unibet</strong> ou <strong>Winamax</strong> en haut pour modifier la bankroll d'un book spécifique.
+                </span>
+              )}
             </label>
 
             {/* Sync with bookmaker — quick reconciliation when the live
@@ -650,7 +685,7 @@ export default function History() {
       {/* ── RECHERCHE TAB ── */}
       {/* ── PARIS EN COURS TAB ── (every staked bet without a result yet) */}
       {tab === 'pending' && (() => {
-        const allBets = flattenBets(entries, activeBookmaker);
+        const allBets = flattenBets(entries, statsBookmaker);
         const pending = allBets.filter((b) => !b.result);
 
         return (
@@ -718,7 +753,7 @@ export default function History() {
 
       {/* ── HISTORIQUE PRONOS TAB ── (every settled bet, won or lost) */}
       {tab === 'pronos' && (() => {
-        const allBets = flattenBets(entries, activeBookmaker);
+        const allBets = flattenBets(entries, statsBookmaker);
         const settled = allBets.filter((b) => b.result);
         const filtered = settled.filter((b) => {
           if (filter === 'win') return b.result === 'win';
