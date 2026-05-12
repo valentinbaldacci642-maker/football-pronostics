@@ -15,27 +15,60 @@ import { isWinamaxLeague } from '../utils/winamaxLeagues';
 import ValueBetSources from '../components/match/ValueBetSources';
 
 function PerBetMiseInputs({ fixtureId, vb, leagueId, liveBankrollUnibet, liveBankrollWinamax, kFrac, defaultBookmaker }) {
-  const betKey = `${vb.market}::${vb.selection}`;
   const setBetMise = useHistoryStore((s) => s.setBetMise);
   const setBetActualOdd = useHistoryStore((s) => s.setBetActualOdd);
   const entries = useHistoryStore((s) => s.entries);
   const existingEntry = entries.find((e) => e.fixtureId === fixtureId);
-  const saved = existingEntry?.bets?.[betKey] || {};
-  const savedMise = saved.mise != null ? String(saved.mise) : '';
-  const savedOdd = saved.actualOdd != null ? String(saved.actualOdd) : '';
 
   // Which bookmakers can actually be used for this VB (based on league
   // coverage). Disable picker buttons for non-covered books.
   const unibetAvailable = isUnibetLeague(leagueId);
   const winamaxAvailable = isWinamaxLeague(leagueId);
-  const initialBookmaker = saved.bookmaker
-    || (defaultBookmaker === 'winamax' && winamaxAvailable ? 'winamax'
-      : unibetAvailable ? 'unibet'
-      : winamaxAvailable ? 'winamax'
-      : 'unibet');
+
+  // betKey includes the bookmaker so a user can place TWO separate bets on
+  // the same VB (one Unibet, one Winamax) without overwriting each other.
+  // Legacy bets (saved before this fix) live under the bookmaker-less key
+  // and are migrated on the fly when matched.
+  const legacyKey = `${vb.market}::${vb.selection}`;
+  const keyFor = (bm) => `${vb.market}::${vb.selection}::${bm}`;
+  const readSaved = (bm) => {
+    const bets = existingEntry?.bets || {};
+    if (bets[keyFor(bm)]) return bets[keyFor(bm)];
+    // Legacy: bet under old key whose bookmaker matches the requested one.
+    const legacy = bets[legacyKey];
+    if (legacy && (legacy.bookmaker || 'unibet') === bm) return legacy;
+    return {};
+  };
+
+  // Default bookmaker pick : the one that has an existing saved bet first,
+  // then user's global default if covered, then any covered, then unibet.
+  const initialBookmaker = (() => {
+    const u = readSaved('unibet');
+    const w = readSaved('winamax');
+    if (u.mise != null && unibetAvailable) return 'unibet';
+    if (w.mise != null && winamaxAvailable) return 'winamax';
+    if (defaultBookmaker === 'winamax' && winamaxAvailable) return 'winamax';
+    if (unibetAvailable) return 'unibet';
+    if (winamaxAvailable) return 'winamax';
+    return 'unibet';
+  })();
   const [selectedBookmaker, setSelectedBookmaker] = useState(initialBookmaker);
+
+  // Saved data follows the currently selected bookmaker — switching the
+  // picker reloads the inputs to that book's saved state.
+  const saved = readSaved(selectedBookmaker);
+  const savedMise = saved.mise != null ? String(saved.mise) : '';
+  const savedOdd = saved.actualOdd != null ? String(saved.actualOdd) : '';
+
   const [miseInput, setMiseInput] = useState(savedMise);
   const [oddInput, setOddInput] = useState(savedOdd);
+  // When the user clicks Unibet ↔ Winamax, re-prime the inputs to that
+  // book's saved state instead of keeping the previous book's value.
+  useEffect(() => {
+    setMiseInput(savedMise);
+    setOddInput(savedOdd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBookmaker]);
 
   const miseDirty = miseInput !== savedMise;
   const oddDirty = oddInput !== savedOdd;
@@ -60,9 +93,11 @@ function PerBetMiseInputs({ fixtureId, vb, leagueId, liveBankrollUnibet, liveBan
   const usingCustomOdd = parseFloat(oddInput) > 0 && parseFloat(oddInput) !== vb.odd;
 
   const saveMise = () => {
-    if (miseDirty) setBetMise(fixtureId, betKey, miseInput, vb.sources, vb.odd, selectedBookmaker);
+    if (miseDirty) setBetMise(fixtureId, keyFor(selectedBookmaker), miseInput, vb.sources, vb.odd, selectedBookmaker);
   };
-  const saveOdd = () => { if (oddDirty) setBetActualOdd(fixtureId, betKey, oddInput); };
+  const saveOdd = () => {
+    if (oddDirty) setBetActualOdd(fixtureId, keyFor(selectedBookmaker), oddInput);
+  };
 
   return (
     <div className="flex flex-col gap-2 pt-2.5 mt-1 border-t border-gold-500/15">
