@@ -32,6 +32,16 @@ export default function App() {
   // app keeps working in localStorage-only mode.
   useEffect(() => { initCloudSync(); }, []);
 
+  // Backend warm-up : Render free tier endort l'instance après ~15min
+  // d'inactivité, ce qui produit un cold start de 30-60s sur le premier
+  // appel. On ping /health dès l'ouverture pour démarrer le réveil en
+  // arrière-plan, comme ça quand l'utilisateur clique sur un match la
+  // backend est déjà debout. Fire-and-forget, on n'attend pas la réponse.
+  useEffect(() => {
+    const base = import.meta.env.VITE_API_URL || 'https://football-pronostics-api-0xhw.onrender.com';
+    fetch(`${base}/health`, { method: 'GET' }).catch(() => {});
+  }, []);
+
   // Backfill matchDate for old historique entries that pre-date the field.
   // Runs once at startup, throttled, no-op if nothing's missing. Wrapped in
   // a small delay so it doesn't compete with the initial page render.

@@ -55,25 +55,29 @@ export function useFixtureDetail(id) {
       setError(null);
     }
 
-    // Fetch the main fixture with one automatic retry. If the backend is
-    // momentarily rate-limited we'd otherwise show "Match introuvable" while
-    // the fixture actually exists — wait briefly and try again.
+    // Fetch the main fixture with up to 3 retries. Le backend Render free
+    // tier subit des cold starts (30-60s après inactivité) qui font remonter
+    // soit un timeout, soit une réponse vide gracieuse. On retry pour gérer
+    // ces deux cas — pendant que l'instance se réveille en arrière-plan.
     const fetchFixture = async () => {
-      try {
-        const res = await fixturesApi.getById(id);
-        return { ok: true, data: res?.response?.[0] };
-      } catch (err) {
-        if (err.code === 'RATE_LIMITED') {
-          await new Promise((r) => setTimeout(r, 1500));
-          try {
-            const res = await fixturesApi.getById(id);
-            return { ok: true, data: res?.response?.[0] };
-          } catch (err2) {
-            return { ok: false, error: err2.message };
-          }
+      const tryOnce = async () => {
+        try {
+          const res = await fixturesApi.getById(id);
+          return { ok: true, data: res?.response?.[0] };
+        } catch (err) {
+          return { ok: false, error: err.message, code: err.code };
         }
-        return { ok: false, error: err.message };
+      };
+      const delays = [0, 2000, 4000]; // immédiat, +2s, +4s
+      for (let i = 0; i < delays.length; i++) {
+        if (delays[i] > 0) await new Promise((r) => setTimeout(r, delays[i]));
+        const r = await tryOnce();
+        // Succès SI on a une vraie fixture data.
+        if (r.ok && r.data) return r;
+        // Pas la peine de retry si rate-limited persistant après 4s.
+        if (r.code === 'RATE_LIMITED' && i === delays.length - 1) return r;
       }
+      return { ok: false, error: 'Match introuvable après plusieurs essais' };
     };
 
     const fixResult = await fetchFixture();
