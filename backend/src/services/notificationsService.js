@@ -131,7 +131,7 @@ async function sendNewVbsNotification(newVbs) {
     ? `Nouveau value bet ${edgePct}`
     : `${newVbs.length} nouveaux value bets`;
   const body = newVbs.length === 1
-    ? `${top.homeTeam} vs ${top.awayTeam} — ${top.selection} @ ${top.odd}`
+    ? `${top.homeTeam} vs ${top.awayTeam} — ${top.selection} @ ${top.odd != null ? top.odd.toFixed(2) : '?'}`
     : `Top: ${top.homeTeam} vs ${top.awayTeam} — ${top.selection} (${edgePct})`;
 
   // FCM caps multicast at 500 tokens — fine for our single-user app, but
