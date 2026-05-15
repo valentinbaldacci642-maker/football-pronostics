@@ -1,9 +1,10 @@
 import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { notificationsApi } from './api';
 
-// Lazy-import the plugin so the web build doesn't try to bundle native
-// bindings. On web the plugin no-ops and registration is skipped.
-let PushNotifications = null;
+// Static import so Capacitor can wire the plugin bridge at JS init time.
+// On web the plugin's stub no-ops, so we gate the *runtime* behavior on
+// Capacitor.isNativePlatform() instead of trying to skip the import.
 
 const LS_KEY = 'pushNotifs.enabled';
 const LS_TOKEN_KEY = 'pushNotifs.lastToken';
@@ -19,17 +20,6 @@ export function setNotificationsEnabled(on) {
   localStorage.setItem(LS_KEY, on ? '1' : '0');
 }
 
-async function getPlugin() {
-  if (PushNotifications) return PushNotifications;
-  try {
-    const mod = await import('@capacitor/push-notifications');
-    PushNotifications = mod.PushNotifications;
-    return PushNotifications;
-  } catch (_) {
-    return null;
-  }
-}
-
 /**
  * Request permission, register the device with FCM, ship the token to
  * the backend. Idempotent — safe to call on every app launch. Re-sending
@@ -39,8 +29,7 @@ export async function initPushNotifications() {
   if (!Capacitor.isNativePlatform()) return { ok: false, reason: 'web' };
   if (!isNotificationsEnabled()) return { ok: false, reason: 'disabled' };
 
-  const Push = await getPlugin();
-  if (!Push) return { ok: false, reason: 'plugin-missing' };
+  const Push = PushNotifications;
 
   try {
     const perm = await Push.checkPermissions();

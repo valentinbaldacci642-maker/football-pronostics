@@ -64,7 +64,9 @@ function extractVbs(pronostics) {
  * tokens. `minEdge` filters out low-edge VBs (default 7%). Returns a
  * summary used by the route handler / by UptimeRobot's response log.
  */
-async function scanAndNotify({ minEdge = 0.07, date = null, dryRun = false } = {}) {
+// minEdge is expressed in percentage POINTS (e.g. 7 means 7%), matching
+// analysisService.js where `edge = trueProbPct - impliedPct` (both in %).
+async function scanAndNotify({ minEdge = 7, date = null, dryRun = false } = {}) {
   lastScanAt = Date.now();
 
   const pronostics = await pronosticsService.getBestPronostics(false, date);
@@ -124,7 +126,7 @@ async function sendNewVbsNotification(newVbs) {
   // One notification per scan (not per VB) so the user doesn't get spammed
   // with 12 banners when a fresh batch lands. Title = count, body = top match.
   const top = newVbs[0];
-  const edgePct = top.edge != null ? `${(top.edge * 100).toFixed(1)}%` : '';
+  const edgePct = top.edge != null ? `${top.edge.toFixed(1)}%` : '';
   const title = newVbs.length === 1
     ? `Nouveau value bet ${edgePct}`
     : `${newVbs.length} nouveaux value bets`;
