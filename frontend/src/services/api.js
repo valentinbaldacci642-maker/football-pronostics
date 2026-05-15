@@ -176,4 +176,10 @@ export const newsApi = {
   getLatest: () => api.get('/news'),
 };
 
+export const notificationsApi = {
+  register: (token, platform) => api.post('/notifications/register', { token, platform }),
+  unregister: (token) => api.post('/notifications/unregister', { token }),
+  status: () => api.get('/notifications/status'),
+};
+
 export default api;

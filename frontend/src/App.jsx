@@ -5,6 +5,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { useHistoryStore } from './store';
 import { resolveFinishedMatches } from './utils/resolveResults';
 import { initCloudSync } from './services/cloudSync';
+import { initPushNotifications } from './services/pushNotifications';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
 import BottomNav from './components/common/BottomNav';
@@ -31,6 +32,10 @@ export default function App() {
   // Initialize cloud sync (Supabase). No-op if env vars are missing —
   // app keeps working in localStorage-only mode.
   useEffect(() => { initCloudSync(); }, []);
+
+  // Register FCM push notifications on native (Android). Idempotent —
+  // re-sending the same token is a no-op server-side. Web → skipped.
+  useEffect(() => { initPushNotifications().catch(() => {}); }, []);
 
   // Backend warm-up : Render free tier endort l'instance après ~15min
   // d'inactivité, ce qui produit un cold start de 30-60s sur le premier

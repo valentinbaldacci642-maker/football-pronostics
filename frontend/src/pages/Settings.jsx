@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { motion } from 'framer-motion';
-import { Settings as SettingsIcon, SlidersHorizontal, User, Cloud, LogOut, Loader2, CheckCircle2 } from 'lucide-react';
+import { Settings as SettingsIcon, SlidersHorizontal, User, Cloud, LogOut, Loader2, CheckCircle2, Bell, BellOff } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore, signIn, signUp, signOut, pullFromCloud, pushToCloud } from '../services/cloudSync';
+import { isNotificationsEnabled, enablePushNotifications, disablePushNotifications } from '../services/pushNotifications';
 
 const TABS = [
   { id: 'general', label: 'Paramètres généraux', icon: SlidersHorizontal },
@@ -42,14 +44,90 @@ export default function Settings() {
         ))}
       </div>
 
-      {tab === 'general' && (
-        <section className="glass-card p-6">
-          {/* À remplir */}
-        </section>
-      )}
+      {tab === 'general' && <GeneralTab />}
 
       {tab === 'account' && <AccountTab />}
     </motion.div>
+  );
+}
+
+function GeneralTab() {
+  const isNative = Capacitor.isNativePlatform();
+  const [notifsEnabled, setNotifsEnabled] = useState(() => isNotificationsEnabled());
+  const [busy, setBusy] = useState(false);
+  const [statusMsg, setStatusMsg] = useState(null);
+
+  // Re-read on mount in case Settings was opened after the App.jsx
+  // init flow already toggled state.
+  useEffect(() => { setNotifsEnabled(isNotificationsEnabled()); }, []);
+
+  const onToggle = async () => {
+    if (busy) return;
+    setBusy(true);
+    setStatusMsg(null);
+    try {
+      if (notifsEnabled) {
+        await disablePushNotifications();
+        setNotifsEnabled(false);
+        setStatusMsg({ ok: true, text: 'Notifications désactivées' });
+      } else {
+        const r = await enablePushNotifications();
+        if (r?.ok) {
+          setNotifsEnabled(true);
+          setStatusMsg({ ok: true, text: 'Notifications activées' });
+        } else {
+          setStatusMsg({ ok: false, text: r?.reason === 'permission-denied'
+            ? 'Permission refusée — autorise les notifications dans les réglages Android'
+            : `Activation impossible (${r?.reason || 'erreur'})` });
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="glass-card p-6 space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <p className="text-base font-heading font-bold text-white flex items-center gap-2 mb-1">
+            {notifsEnabled ? <Bell className="w-4 h-4 text-brand-400" /> : <BellOff className="w-4 h-4 text-white/40" />}
+            Notifications value bets
+          </p>
+          <p className="text-xs text-white/50 leading-relaxed">
+            Reçois une notif quand un nouveau value bet ≥ 7% d'edge est détecté.
+            Le serveur scanne les pronostics toutes les 10 minutes en arrière-plan.
+          </p>
+          {!isNative && (
+            <p className="text-xs text-amber-300/80 mt-2">
+              Disponible uniquement sur l'app Android (pas sur la version web).
+            </p>
+          )}
+        </div>
+        <button
+          onClick={onToggle}
+          disabled={busy || !isNative}
+          className={clsx(
+            'relative w-12 h-6 rounded-full transition-colors flex-shrink-0',
+            notifsEnabled ? 'bg-brand-500/60' : 'bg-white/10',
+            (busy || !isNative) && 'opacity-50 cursor-not-allowed',
+          )}
+        >
+          <div
+            className={clsx(
+              'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all',
+              notifsEnabled ? 'left-6' : 'left-0.5',
+            )}
+          />
+        </button>
+      </div>
+
+      {statusMsg && (
+        <p className={clsx('text-xs font-heading', statusMsg.ok ? 'text-brand-400' : 'text-danger')}>
+          {statusMsg.text}
+        </p>
+      )}
+    </section>
   );
 }
 
