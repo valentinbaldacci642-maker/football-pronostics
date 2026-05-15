@@ -64,9 +64,9 @@ function extractVbs(pronostics) {
  * tokens. `minEdge` filters out low-edge VBs (default 7%). Returns a
  * summary used by the route handler / by UptimeRobot's response log.
  */
-// minEdge is expressed in percentage POINTS (e.g. 7 means 7%), matching
+// minEdge is expressed in percentage POINTS (e.g. 5 means 5%), matching
 // analysisService.js where `edge = trueProbPct - impliedPct` (both in %).
-async function scanAndNotify({ minEdge = 7, date = null, dryRun = false } = {}) {
+async function scanAndNotify({ minEdge = 5, date = null, dryRun = false } = {}) {
   lastScanAt = Date.now();
 
   const pronostics = await pronosticsService.getBestPronostics(false, date);
