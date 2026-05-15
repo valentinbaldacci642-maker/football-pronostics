@@ -59,10 +59,13 @@ router.get('/scan-new-vbs', authScan, async (req, res) => {
 });
 
 // Manual reset for the "already-notified" set — useful when testing or
-// after an algorithm tweak that should re-evaluate everything.
-router.post('/reset-state', authScan, (req, res) => {
+// after an algorithm tweak that should re-evaluate everything. Available
+// in both GET (easier to hit from a browser) and POST.
+const handleReset = (req, res) => {
   notifications.resetNotifiedKeys();
   res.json({ ok: true, status: notifications.getStatus() });
-});
+};
+router.get('/reset-state', authScan, handleReset);
+router.post('/reset-state', authScan, handleReset);
 
 module.exports = router;
