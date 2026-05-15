@@ -143,9 +143,15 @@ async function sendNewVbsNotification(newVbs) {
   for (let i = 0; i < recipients.length; i += CHUNK) {
     const slice = recipients.slice(i, i + CHUNK);
     try {
+      // Public URL to the app icon — shown as the large image in the
+      // notification body. The small icon (status bar) comes from the
+      // AndroidManifest meta-data `default_notification_icon`.
+      const iconUrl = process.env.NOTIFICATION_ICON_URL
+        || 'https://pronos-foufous-app.vercel.app/pwa-512x512.png';
+
       const resp = await messaging.sendEachForMulticast({
         tokens: slice,
-        notification: { title, body },
+        notification: { title, body, imageUrl: iconUrl },
         data: {
           type: 'new_vbs',
           count: String(newVbs.length),
@@ -156,6 +162,7 @@ async function sendNewVbsNotification(newVbs) {
           notification: {
             channelId: 'value_bets',
             sound: 'default',
+            imageUrl: iconUrl,
           },
         },
       });
