@@ -126,9 +126,9 @@ export const fixturesApi = {
   getByDate: (date, league) => api.get('/fixtures', { params: { date, league, timezone: tz } }),
   getByLeagueSeason: (league, season) => api.get('/fixtures', { params: { league, season } }),
   getByTeam: (teamId, { last, next, season } = {}) => api.get('/fixtures', { params: { team: teamId, last, next, season } }),
-  getStatistics: (id) => api.get(`/fixtures/${id}/statistics`),
-  getEvents: (id) => api.get(`/fixtures/${id}/events`),
-  getLineups: (id) => api.get(`/fixtures/${id}/lineups`),
+  getStatistics: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}/statistics`, fresh ? { params: { fresh: 1 } } : undefined),
+  getEvents: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}/events`, fresh ? { params: { fresh: 1 } } : undefined),
+  getLineups: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}/lineups`, fresh ? { params: { fresh: 1 } } : undefined),
   getH2H: (t1, t2) => api.get(`/fixtures/h2h/${t1}/${t2}`, { params: { last: 10 } }),
 };
 

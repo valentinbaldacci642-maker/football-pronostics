@@ -100,8 +100,14 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// ?fresh=1 evicts the 20-min fixture cache before fetching. Used by the
+// frontend during live-match polling so the displayed minute/score/events
+// actually advance instead of being frozen at first-load value.
 router.get('/:id/statistics', async (req, res, next) => {
   try {
+    if (req.query.fresh === '1') {
+      cache.del(cache.buildKey('api', '/fixtures/statistics', JSON.stringify({ fixture: req.params.id })));
+    }
     res.json(await api.getFixtureStatistics(req.params.id));
   } catch (err) {
     next(err);
@@ -110,6 +116,9 @@ router.get('/:id/statistics', async (req, res, next) => {
 
 router.get('/:id/events', async (req, res, next) => {
   try {
+    if (req.query.fresh === '1') {
+      cache.del(cache.buildKey('api', '/fixtures/events', JSON.stringify({ fixture: req.params.id })));
+    }
     res.json(await api.getFixtureEvents(req.params.id));
   } catch (err) {
     next(err);
@@ -118,6 +127,9 @@ router.get('/:id/events', async (req, res, next) => {
 
 router.get('/:id/lineups', async (req, res, next) => {
   try {
+    if (req.query.fresh === '1') {
+      cache.del(cache.buildKey('api', '/fixtures/lineups', JSON.stringify({ fixture: req.params.id })));
+    }
     res.json(await api.getFixtureLineups(req.params.id));
   } catch (err) {
     next(err);
