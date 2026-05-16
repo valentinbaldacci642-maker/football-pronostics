@@ -202,10 +202,15 @@ class ApiFootballService {
     return this.request('/fixtures', { id }, config.cache.ttlFixtures);
   }
 
-  async getFixturesByDate(date, league, season) {
+  async getFixturesByDate(date, league, season, timezone) {
     const params = { date };
     if (league) params.league = league;
     if (season) params.season = season;
+    // Without a timezone, API-Football groups matches by UTC date — a
+    // kickoff at 22:00 UTC on day D is listed under D, but in Paris it's
+    // already 00:00 of D+1, so the user sees it under the wrong day in
+    // their app. Passing timezone makes API-Football group correctly.
+    if (timezone) params.timezone = timezone;
     return this.request('/fixtures', params, config.cache.ttlFixtures);
   }
 

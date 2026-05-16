@@ -10,7 +10,8 @@ router.get('/today', async (req, res, next) => {
     const date = typeof req.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
       ? req.query.date
       : null;
-    const data = await pronosticsService.getBestPronostics(force, date);
+    const timezone = typeof req.query.timezone === 'string' ? req.query.timezone : null;
+    const data = await pronosticsService.getBestPronostics(force, date, timezone);
     // Marker so we can verify which backend version is live by inspecting
     // the response. Increment when changing the scan algorithm.
     res.json({

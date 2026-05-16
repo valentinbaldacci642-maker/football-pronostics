@@ -109,12 +109,21 @@ api.interceptors.response.use(
   }
 );
 
+// Browser-detected IANA timezone (e.g. "Europe/Paris"). Forwarded to the
+// backend so API-Football groups matches by *local* day instead of UTC.
+// Without this, a kickoff at 22:00 UTC on day D appears under day D in
+// the app even though the user's wall clock shows 00:00 of D+1.
+const tz = (() => {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; }
+  catch { return undefined; }
+})();
+
 export const fixturesApi = {
-  getToday: (league) => api.get('/fixtures/today', { params: { league } }),
-  getTomorrow: (league) => api.get('/fixtures/tomorrow', { params: { league } }),
+  getToday: (league) => api.get('/fixtures/today', { params: { league, timezone: tz } }),
+  getTomorrow: (league) => api.get('/fixtures/tomorrow', { params: { league, timezone: tz } }),
   getLive: () => api.get('/fixtures/live'),
   getById: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}`, fresh ? { params: { fresh: 1 } } : undefined),
-  getByDate: (date, league) => api.get('/fixtures', { params: { date, league } }),
+  getByDate: (date, league) => api.get('/fixtures', { params: { date, league, timezone: tz } }),
   getByLeagueSeason: (league, season) => api.get('/fixtures', { params: { league, season } }),
   getByTeam: (teamId, { last, next, season } = {}) => api.get('/fixtures', { params: { team: teamId, last, next, season } }),
   getStatistics: (id) => api.get(`/fixtures/${id}/statistics`),
@@ -168,6 +177,7 @@ export const pronosticsApi = {
     const params = {};
     if (force) params.force = 1;
     if (date) params.date = date;
+    if (tz) params.timezone = tz;
     return api.get('/pronostics/today', { params });
   },
 };

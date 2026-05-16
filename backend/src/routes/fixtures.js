@@ -6,7 +6,7 @@ const logger = require('../utils/logger');
 
 router.get('/', async (req, res, next) => {
   try {
-    const { date, league, season, team, live, status, from, to, round, ids, last, next } = req.query;
+    const { date, league, season, team, live, status, from, to, round, ids, last, next, timezone } = req.query;
     const params = {};
 
     if (live === 'true' || live === 'all') return res.json(await api.getLiveFixtures());
@@ -21,6 +21,7 @@ router.get('/', async (req, res, next) => {
     if (ids) params.ids = ids;
     if (last) params.last = parseInt(last);
     if (next) params.next = parseInt(next);
+    if (timezone) params.timezone = timezone;
 
     const data = await api.getFixtures(params);
     res.json(data);
@@ -39,10 +40,13 @@ router.get('/live', async (req, res, next) => {
 
 router.get('/today', async (req, res, next) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const { league } = req.query;
+    const { league, timezone } = req.query;
+    // When a client-supplied timezone is provided, use the date *in that
+    // zone* so a Paris user querying at 00:30 doesn't get yesterday's UTC
+    // date — they expect "today" to mean today in their wall-clock.
+    const today = todayInZone(timezone);
     // No season param — let API auto-detect; sending season restricts free plan
-    const data = await api.getFixturesByDate(today, league, null);
+    const data = await api.getFixturesByDate(today, league, null, timezone);
     res.json(data);
   } catch (err) {
     next(err);
@@ -51,14 +55,35 @@ router.get('/today', async (req, res, next) => {
 
 router.get('/tomorrow', async (req, res, next) => {
   try {
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-    const { league } = req.query;
-    const data = await api.getFixturesByDate(tomorrow, league, null);
+    const { league, timezone } = req.query;
+    const tomorrow = todayInZone(timezone, 1);
+    const data = await api.getFixturesByDate(tomorrow, league, null, timezone);
     res.json(data);
   } catch (err) {
     next(err);
   }
 });
+
+/**
+ * Returns the local-date string (YYYY-MM-DD) in the given IANA timezone,
+ * optionally offset by `deltaDays`. Falls back to UTC date if zone is
+ * missing or invalid.
+ */
+function todayInZone(zone, deltaDays = 0) {
+  const now = new Date(Date.now() + deltaDays * 86400000);
+  if (!zone) return now.toISOString().split('T')[0];
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(now);
+    const y = parts.find((p) => p.type === 'year').value;
+    const m = parts.find((p) => p.type === 'month').value;
+    const d = parts.find((p) => p.type === 'day').value;
+    return `${y}-${m}-${d}`;
+  } catch (_) {
+    return now.toISOString().split('T')[0];
+  }
+}
 
 router.get('/:id', async (req, res) => {
   try {
