@@ -114,6 +114,32 @@ async function scanAndNotify({ minEdge = 5, date = null, dryRun = false } = {}) 
   };
 }
 
+// French day labels for compact relative formatting
+const DAYS_FR = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
+const MONTHS_FR = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+
+/**
+ * Format kickoff ISO string into a compact French label.
+ *   - Today  → "Aujourd'hui 21:00"
+ *   - Tomorrow → "Demain 18:30"
+ *   - Otherwise → "sam 16 nov 20:00"
+ */
+function formatKickoff(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dayDiff = Math.round((startOfDay(d) - startOfDay(now)) / 86400000);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const time = `${hh}:${mm}`;
+  if (dayDiff === 0) return `Aujourd'hui ${time}`;
+  if (dayDiff === 1) return `Demain ${time}`;
+  if (dayDiff === -1) return `Hier ${time}`;
+  return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]} ${time}`;
+}
+
 async function sendNewVbsNotification(newVbs) {
   const messaging = getMessaging();
   if (!messaging) {
@@ -123,62 +149,72 @@ async function sendNewVbsNotification(newVbs) {
   const recipients = listTokens();
   if (recipients.length === 0) return 0;
 
-  // One notification per scan (not per VB) so the user doesn't get spammed
-  // with 12 banners when a fresh batch lands. Title = count, body = top match.
-  const top = newVbs[0];
-  const edgePct = top.edge != null ? `${top.edge.toFixed(1)}%` : '';
-  const title = newVbs.length === 1
-    ? `Nouveau value bet ${edgePct}`
-    : `${newVbs.length} nouveaux value bets`;
-  const body = newVbs.length === 1
-    ? `${top.homeTeam} vs ${top.awayTeam} — ${top.selection} @ ${top.odd != null ? top.odd.toFixed(2) : '?'}`
-    : `Top: ${top.homeTeam} vs ${top.awayTeam} — ${top.selection} (${edgePct})`;
+  // One notification PER VB so the user sees each match individually
+  // (date + teams + market) instead of an opaque "21 new VBs" summary.
+  // Android stacks them under one group thanks to the shared `tag` prefix
+  // and channel, so the notification shade stays tidy.
+  const iconUrl = process.env.NOTIFICATION_ICON_URL
+    || 'https://pronos-foufous-app.vercel.app/pwa-512x512.png';
 
-  // FCM caps multicast at 500 tokens — fine for our single-user app, but
-  // chunk anyway for safety.
-  const CHUNK = 450;
   let sent = 0;
   const invalidTokens = [];
 
-  for (let i = 0; i < recipients.length; i += CHUNK) {
-    const slice = recipients.slice(i, i + CHUNK);
-    try {
-      // Public URL to the app icon — shown as the large image in the
-      // notification body. The small icon (status bar) comes from the
-      // AndroidManifest meta-data `default_notification_icon`.
-      const iconUrl = process.env.NOTIFICATION_ICON_URL
-        || 'https://pronos-foufous-app.vercel.app/pwa-512x512.png';
+  for (const vb of newVbs) {
+    const edgePct = vb.edge != null ? `${vb.edge.toFixed(1)}%` : '';
+    const oddStr = vb.odd != null ? `@ ${vb.odd.toFixed(2)}` : '';
+    const kickoffStr = formatKickoff(vb.kickoff);
+    const title = `${vb.homeTeam} vs ${vb.awayTeam}`;
+    // Body packs the match-time, pick, odd, edge so the lock-screen
+    // preview tells the user everything they need to decide.
+    const bodyParts = [];
+    if (kickoffStr) bodyParts.push(kickoffStr);
+    bodyParts.push(`${vb.selection} ${oddStr}`.trim());
+    if (edgePct) bodyParts.push(`edge ${edgePct}`);
+    const body = bodyParts.join(' · ');
 
-      const resp = await messaging.sendEachForMulticast({
-        tokens: slice,
-        notification: { title, body, imageUrl: iconUrl },
-        data: {
-          type: 'new_vbs',
-          count: String(newVbs.length),
-          fixtureId: String(top.fixtureId),
-        },
-        android: {
-          priority: 'high',
-          notification: {
-            channelId: 'value_bets',
-            sound: 'default',
-            imageUrl: iconUrl,
+    // Stable tag per VB → prevents duplicates if FCM redelivers, and
+    // groups all VB notifs on Android under the same notification stack.
+    const tag = `vb_${vb.fixtureId}_${vb.market}_${vb.selection}`.replace(/[^a-zA-Z0-9_]/g, '_');
+
+    // FCM caps multicast at 500 tokens — chunk for safety.
+    const CHUNK = 450;
+    for (let i = 0; i < recipients.length; i += CHUNK) {
+      const slice = recipients.slice(i, i + CHUNK);
+      try {
+        const resp = await messaging.sendEachForMulticast({
+          tokens: slice,
+          notification: { title, body, imageUrl: iconUrl },
+          data: {
+            type: 'new_vb',
+            fixtureId: String(vb.fixtureId),
+            market: vb.market,
+            selection: vb.selection,
           },
-        },
-      });
-      sent += resp.successCount;
-      resp.responses.forEach((r, idx) => {
-        if (!r.success) {
-          const code = r.error?.code || '';
-          // Token is permanently invalid → drop it
-          if (code === 'messaging/registration-token-not-registered'
-              || code === 'messaging/invalid-registration-token') {
-            invalidTokens.push(slice[idx]);
+          android: {
+            priority: 'high',
+            collapseKey: tag,
+            notification: {
+              channelId: 'value_bets',
+              sound: 'default',
+              imageUrl: iconUrl,
+              tag,
+              notificationCount: 1,
+            },
+          },
+        });
+        sent += resp.successCount;
+        resp.responses.forEach((r, idx) => {
+          if (!r.success) {
+            const code = r.error?.code || '';
+            if (code === 'messaging/registration-token-not-registered'
+                || code === 'messaging/invalid-registration-token') {
+              invalidTokens.push(slice[idx]);
+            }
           }
-        }
-      });
-    } catch (e) {
-      logger.error('FCM multicast failed: ' + e.message);
+        });
+      } catch (e) {
+        logger.error(`FCM multicast failed for VB ${vb.key}: ${e.message}`);
+      }
     }
   }
 
@@ -188,7 +224,7 @@ async function sendNewVbsNotification(newVbs) {
     logger.info(`Pruned ${invalidTokens.length} stale FCM tokens`);
   }
 
-  logger.info(`Notif sent: ${sent}/${recipients.length} tokens for ${newVbs.length} new VBs`);
+  logger.info(`Notifs sent: ${sent} deliveries for ${newVbs.length} new VBs (${recipients.length} tokens)`);
   return sent;
 }
 
