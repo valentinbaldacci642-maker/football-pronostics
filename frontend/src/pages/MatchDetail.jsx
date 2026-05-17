@@ -409,16 +409,20 @@ function EventsTab({ events, home, away }) {
     et2: 'Prolongations',
   };
 
-  // Score cumulé par event + score final par période
+  // Score cumulé par event + score final par période.
+  // Note CSC : API-Football attribue déjà le team field à l'équipe qui
+  // BÉNÉFICIE du but (et non à celle du joueur). Confirmé sur Strasbourg
+  // vs Monaco : un OG par un joueur Monaco bénéficie à Strasbourg, mais
+  // l'event API arrive avec team=Monaco… qui correspond bien au compteur
+  // visible côté UI réelle (5-4 et pas 6-3). On compte donc directement
+  // par ev.team sans logique d'inversion.
   const scoreByPeriod = { ht1: [0, 0], ht2: [0, 0], et1: [0, 0], et2: [0, 0] };
   const scoreAfter = [];
   let hg = 0, ag = 0;
   events.forEach((ev, i) => {
     const meta = getEvent(ev);
     if (meta.isGoal) {
-      const isHome = ev.team?.id === home?.id;
-      const ownGoal = (ev.detail || '').includes('Own');
-      if ((isHome && !ownGoal) || (!isHome && ownGoal)) hg += 1;
+      if (ev.team?.id === home?.id) hg += 1;
       else ag += 1;
     }
     scoreAfter[i] = meta.isGoal ? `${hg} - ${ag}` : null;
