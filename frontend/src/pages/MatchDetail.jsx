@@ -345,17 +345,14 @@ function StatsTab({ stats, home, away }) {
 function EventsTab({ events, home, away }) {
   if (!events?.length) return <div className="text-center py-8 text-white/30">Aucun événement</div>;
 
-  // Détaille l'icône + libellé FR + style par type d'événement.
-  // detail vient brut d'API-Football (ex: "Normal Goal", "Yellow Card",
-  // "Substitution 1") — on l'utilise pour différencier penalty/csc.
   const getEvent = (ev) => {
     const type = ev.type;
     const detail = ev.detail || '';
     if (type === 'Goal') {
-      if (detail.includes('Own')) return { icon: '😱', label: 'But contre son camp', tone: 'goalOG' };
-      if (detail.includes('Penalty')) return { icon: '⚽', label: 'But sur penalty', tone: 'goal' };
-      if (detail.includes('Missed Penalty')) return { icon: '❌', label: 'Penalty manqué', tone: 'miss' };
-      return { icon: '⚽', label: 'But', tone: 'goal' };
+      if (detail.includes('Own')) return { icon: '😱', label: 'But CSC', tone: 'goalOG', isGoal: true };
+      if (detail.includes('Penalty')) return { icon: '🎯', label: 'But sur penalty', tone: 'goal', isGoal: true };
+      if (detail.includes('Missed Penalty')) return { icon: '❌', label: 'Penalty manqué', tone: 'miss', isGoal: false };
+      return { icon: '⚽', label: 'But', tone: 'goal', isGoal: true };
     }
     if (type === 'Card') {
       if (detail.includes('Red')) return { icon: '🟥', label: 'Carton rouge', tone: 'red' };
@@ -367,76 +364,128 @@ function EventsTab({ events, home, away }) {
     return { icon: '•', label: detail || type, tone: 'plain' };
   };
 
-  // Formate la minute (gère le temps additionnel ex: 45+2', 90+3')
   const formatMinute = (time) => {
     const m = time?.elapsed;
     const extra = time?.extra;
     if (m == null) return '';
-    return extra ? `${m}+${extra}'` : `${m}'`;
+    return extra ? `${m}+${extra}` : `${m}`;
   };
 
-  const toneClass = {
-    goal:    'bg-brand-500/15 border-brand-500/40',
-    goalOG:  'bg-orange-500/15 border-orange-500/40',
-    miss:    'bg-red-500/10 border-red-500/30',
-    yellow:  'bg-yellow-500/10 border-yellow-500/30',
-    red:     'bg-red-500/15 border-red-500/40',
-    sub:     'bg-white/[0.03] border-white/10',
-    var:     'bg-purple-500/10 border-purple-500/30',
-    plain:   'bg-white/[0.03] border-white/10',
+  // Score cumulé après chaque event pour les buts. CSC = compte pour
+  // l'équipe adverse (logique foot standard).
+  const scoreAfter = [];
+  let hg = 0, ag = 0;
+  events.forEach((ev, i) => {
+    const meta = getEvent(ev);
+    if (meta.isGoal) {
+      const isHome = ev.team?.id === home?.id;
+      const detail = ev.detail || '';
+      const ownGoal = detail.includes('Own');
+      if ((isHome && !ownGoal) || (!isHome && ownGoal)) hg += 1;
+      else ag += 1;
+    }
+    scoreAfter[i] = meta.isGoal ? `${hg}-${ag}` : null;
+  });
+
+  const bgByTone = {
+    goal:   'bg-brand-500/20 border-brand-500/50',
+    goalOG: 'bg-orange-500/15 border-orange-500/40',
+    miss:   'bg-red-500/10 border-red-500/30',
+    yellow: 'bg-yellow-500/10 border-yellow-500/30',
+    red:    'bg-red-500/20 border-red-500/50',
+    sub:    'bg-white/[0.05] border-white/15',
+    var:    'bg-purple-500/10 border-purple-500/30',
+    plain:  'bg-white/[0.05] border-white/15',
   };
 
   return (
-    <div className="space-y-2">
-      {events.map((ev, i) => {
-        const isHome = ev.team?.id === home?.id;
-        const meta = getEvent(ev);
-        return (
-          <div
-            key={i}
-            className={clsx(
-              'rounded-xl px-3 py-2.5 border flex items-stretch gap-3',
-              toneClass[meta.tone],
-              isHome ? 'flex-row' : 'flex-row-reverse',
-            )}
-          >
-            {/* Minute */}
-            <div className="flex flex-col items-center justify-center min-w-[42px] py-0.5">
-              <span className="text-base font-display text-white leading-none">{formatMinute(ev.time)}</span>
-              <span className="text-[9px] text-white/40 uppercase tracking-wider mt-0.5">{meta.label}</span>
-            </div>
+    <div className="glass-card p-4">
+      {/* En-tête noms d'équipes pour ancrer la timeline */}
+      <div className="grid grid-cols-[1fr_56px_1fr] items-center mb-4 pb-3 border-b border-white/10">
+        <div className="flex items-center gap-2 justify-end">
+          <span className="text-sm font-heading font-bold text-white truncate text-right">{home?.name}</span>
+          <img src={home?.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+        </div>
+        <div className="text-center text-[10px] text-white/30 uppercase tracking-wider font-heading">Min</div>
+        <div className="flex items-center gap-2 justify-start">
+          <img src={away?.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+          <span className="text-sm font-heading font-bold text-white truncate">{away?.name}</span>
+        </div>
+      </div>
 
-            {/* Icon */}
-            <div className="text-2xl flex items-center">{meta.icon}</div>
+      {/* Timeline : 3 colonnes [home event | minute | away event] avec
+          une ligne verticale au centre traversant tous les events */}
+      <div className="relative">
+        {/* Ligne centrale */}
+        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/10 -translate-x-1/2" />
 
-            {/* Player / detail */}
-            <div className={clsx('flex-1 flex flex-col justify-center min-w-0', isHome ? 'text-left' : 'text-right')}>
-              {meta.tone === 'sub' ? (
-                <>
-                  <p className="text-sm font-heading font-semibold text-brand-300 truncate">
-                    ↑ {ev.assist?.name || '—'} <span className="text-[10px] text-white/40 font-normal">(entre)</span>
-                  </p>
-                  <p className="text-xs text-white/50 truncate">
-                    ↓ {ev.player?.name || '—'} <span className="text-[10px] text-white/30">(sort)</span>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm font-heading font-semibold text-white truncate">{ev.player?.name || '—'}</p>
-                  {ev.assist?.name && meta.tone.startsWith('goal') && (
-                    <p className="text-[11px] text-white/50 truncate">Passe déc. : {ev.assist.name}</p>
+        <div className="space-y-3">
+          {events.map((ev, i) => {
+            const isHome = ev.team?.id === home?.id;
+            const meta = getEvent(ev);
+            const score = scoreAfter[i];
+
+            const eventBlock = (
+              <div className={clsx('rounded-lg px-3 py-2.5 border', bgByTone[meta.tone])}>
+                <div className={clsx('flex items-center gap-2', isHome ? 'flex-row-reverse text-right' : 'flex-row text-left')}>
+                  <span className="text-2xl flex-shrink-0">{meta.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    {meta.tone === 'sub' ? (
+                      <>
+                        <p className="text-sm font-heading font-bold text-brand-300 truncate">
+                          ↑ {ev.assist?.name || '—'}
+                        </p>
+                        <p className="text-xs text-white/60 truncate">
+                          ↓ {ev.player?.name || '—'}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-base font-heading font-bold text-white truncate leading-tight">
+                          {ev.player?.name || '—'}
+                        </p>
+                        <p className="text-[11px] text-white/55 mt-0.5 truncate">
+                          {meta.label}
+                          {ev.assist?.name && meta.isGoal && (
+                            <span className="text-white/40"> · passe : {ev.assist.name}</span>
+                          )}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+
+            return (
+              <div key={i} className="grid grid-cols-[1fr_56px_1fr] items-center gap-2">
+                {/* Colonne HOME (vide si event est away) */}
+                <div className="min-w-0">{isHome && eventBlock}</div>
+
+                {/* Minute au centre — pastille ronde sur la ligne */}
+                <div className="flex flex-col items-center gap-1">
+                  <div className={clsx(
+                    'rounded-full px-2 py-1 text-xs font-display font-bold border min-w-[44px] text-center leading-none',
+                    meta.isGoal
+                      ? 'bg-brand-500/30 border-brand-400 text-brand-100'
+                      : 'bg-dark-800 border-white/20 text-white/80',
+                  )}>
+                    {formatMinute(ev.time)}<span className="text-[9px] opacity-60">'</span>
+                  </div>
+                  {score && (
+                    <div className="text-xs font-display font-black text-white tabular-nums leading-none">
+                      {score}
+                    </div>
                   )}
-                </>
-              )}
-            </div>
+                </div>
 
-            {/* Team logo */}
-            <div className="flex items-center">
-              <img src={ev.team?.logo} alt="" className="w-6 h-6 object-contain opacity-70" onError={(e) => e.target.style.display = 'none'} />
-            </div>
-          </div>
-        );
-      })}
+                {/* Colonne AWAY (vide si event est home) */}
+                <div className="min-w-0">{!isHome && eventBlock}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -609,10 +658,10 @@ function SoccerField({ players }) {
               className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
               style={{ left: `${xPercent}%`, top: `${yPercent}%` }}
             >
-              <div className="w-7 h-7 rounded-full bg-brand-500 border-2 border-white/90 flex items-center justify-center text-[10px] font-display text-white shadow-md">
+              <div className="w-11 h-11 rounded-full bg-brand-500 border-2 border-white shadow-lg flex items-center justify-center text-sm font-display font-bold text-white">
                 {p.player?.number ?? '—'}
               </div>
-              <div className="mt-0.5 bg-black/60 backdrop-blur-sm px-1 py-px rounded text-[9px] text-white font-heading font-semibold whitespace-nowrap max-w-[72px] truncate leading-tight">
+              <div className="mt-1 bg-black/75 backdrop-blur-sm px-1.5 py-0.5 rounded text-xs text-white font-heading font-bold whitespace-nowrap max-w-[100px] truncate leading-tight">
                 {lastName}
               </div>
             </div>
@@ -640,29 +689,29 @@ function LineupsTab({ lineups }) {
           <SoccerField players={lu.startXI} />
 
           {/* Liste textuelle du XI (fallback si grid absente, ou complément) */}
-          <div className="space-y-1.5 mt-2">
-            <p className="text-[10px] text-white/35 uppercase tracking-wider font-heading font-semibold">Onze titulaire</p>
+          <div className="space-y-2 mt-3">
+            <p className="text-xs text-white/45 uppercase tracking-wider font-heading font-bold">Onze titulaire</p>
             {lu.startXI?.map((p, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs">
-                <span className="w-5 h-5 rounded bg-dark-600 flex items-center justify-center text-white/50 font-mono flex-shrink-0">
+              <div key={i} className="flex items-center gap-2.5 text-sm">
+                <span className="w-7 h-7 rounded-md bg-dark-600 flex items-center justify-center text-white/70 font-mono font-bold text-xs flex-shrink-0">
                   {p.player?.number}
                 </span>
-                <span className="text-white/80 truncate flex-1">{p.player?.name}</span>
-                <span className="text-white/30">{p.player?.pos}</span>
+                <span className="text-white font-heading font-semibold truncate flex-1">{p.player?.name}</span>
+                <span className="text-xs text-white/40 font-mono">{p.player?.pos}</span>
               </div>
             ))}
           </div>
 
           {lu.substitutes?.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-white/5">
-              <p className="text-[10px] text-white/35 uppercase tracking-wider font-heading font-semibold mb-2">Remplaçants</p>
+            <div className="mt-4 pt-3 border-t border-white/10">
+              <p className="text-xs text-white/45 uppercase tracking-wider font-heading font-bold mb-2">Remplaçants</p>
               {lu.substitutes.map((p, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs py-0.5">
-                  <span className="w-5 h-5 rounded bg-dark-600/50 flex items-center justify-center text-white/30 font-mono flex-shrink-0">
+                <div key={i} className="flex items-center gap-2.5 text-sm py-1">
+                  <span className="w-7 h-7 rounded-md bg-dark-600/60 flex items-center justify-center text-white/50 font-mono font-bold text-xs flex-shrink-0">
                     {p.player?.number}
                   </span>
-                  <span className="text-white/40 truncate flex-1">{p.player?.name}</span>
-                  <span className="text-white/20">{p.player?.pos}</span>
+                  <span className="text-white/70 font-heading truncate flex-1">{p.player?.name}</span>
+                  <span className="text-xs text-white/30 font-mono">{p.player?.pos}</span>
                 </div>
               ))}
             </div>
