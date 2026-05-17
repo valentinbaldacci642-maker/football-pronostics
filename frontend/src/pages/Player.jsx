@@ -307,11 +307,30 @@ function CareerSection({ career, loading, onLoad, season }) {
       </div>
 
       {hasOpened && (
-        <div className="p-3 overflow-x-auto">
+        <>
+          {/* Onglets : filtre par type de compétition */}
+          <div className="flex gap-1 px-3 pt-3 overflow-x-auto no-scrollbar border-b border-white/[0.05]">
+            {CAREER_TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={clsx(
+                  'px-3 py-2 text-xs font-heading font-semibold whitespace-nowrap transition-all border-b-2 -mb-px',
+                  tab === t.id
+                    ? 'text-brand-300 border-brand-400'
+                    : 'text-white/40 border-transparent hover:text-white/70',
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-3 overflow-x-auto">
           {loading && career.length === 0 ? (
             <div className="py-8 text-center text-white/40 text-sm">Chargement de la carrière…</div>
           ) : rows.length === 0 ? (
-            <div className="py-6 text-center text-white/40 text-sm">Aucune donnée de carrière.</div>
+            <div className="py-6 text-center text-white/40 text-sm">Aucun match dans cette catégorie pour la saison sélectionnée.</div>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -378,7 +397,8 @@ function CareerSection({ career, loading, onLoad, season }) {
               </tbody>
             </table>
           )}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
