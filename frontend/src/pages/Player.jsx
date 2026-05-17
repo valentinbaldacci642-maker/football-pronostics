@@ -110,7 +110,7 @@ export default function Player() {
         loading={loading}
       />
 
-      <CareerSection career={career} loading={loadingCareer} onLoad={loadCareerIfNeeded} />
+      <CareerSection career={career} loading={loadingCareer} onLoad={loadCareerIfNeeded} season={season} />
 
       <RecentMatches playerId={id} season={season} />
 
@@ -232,7 +232,38 @@ function SeasonPicker({ seasons, selected, onSelect, loading }) {
   );
 }
 
-function CareerSection({ career, loading, onLoad }) {
+// Classification par nom de league. Important : API-Football n'expose
+// PAS league.type dans la réponse player/statistics, donc on ne peut pas
+// se reposer dessus — on utilise des patterns sur le nom et le pays.
+const INTL_CLUB_KEYWORDS = /champions league|europa league|conference league|libertadores|sudamericana|recopa|afc champions|caf champions|world club|club world|fifa club|super cup|supercup|supercopa|trophée des champions|community shield/i;
+const NATIONAL_TEAM_KEYWORDS = /nations league|world cup|euro\b|copa america|africa cup|afcon|asian cup|gold cup|kirin cup|friendlies|amistosos|cosafa|qualification|qualifier|qualif\.|wc qualif|world cup qualif|euro qualif|olympic|olympiques/i;
+const NATIONAL_CUP_KEYWORDS = /\bcup\b|\bcoupe\b|\bcopa\b|pokal|kupa|puchar|trophy|tropheo|taca|coppa/i;
+
+function competitionBucket(row) {
+  const lname = row.league?.name || '';
+  const country = row.league?.country || '';
+  // 1) Sélection nationale : compétitions FIFA/UEFA/CONMEBOL de sélections
+  //    (Nations League, World Cup, Euros, qualifs, amicaux internationaux)
+  if (NATIONAL_TEAM_KEYWORDS.test(lname)) return 'national';
+  // 2) Coupes européennes / mondiales de clubs (UCL, UEL, Conference, etc.)
+  if (INTL_CLUB_KEYWORDS.test(lname)) return 'international';
+  // 3) Country 'World' (sans avoir matché ci-dessus) → international par défaut
+  if (country === 'World') return 'international';
+  // 4) Coupe nationale : nom contient cup/coupe/copa/pokal/kupa/etc.
+  if (NATIONAL_CUP_KEYWORDS.test(lname)) return 'cup';
+  // 5) Sinon : championnat (ligue régulière)
+  return 'league';
+}
+
+const CAREER_TABS = [
+  { id: 'league', label: 'Championnat' },
+  { id: 'cup', label: 'Coupes nationales' },
+  { id: 'international', label: 'Coupes internationales' },
+  { id: 'national', label: 'Équipe nationale' },
+];
+
+function CareerSection({ career, loading, onLoad, season }) {
+  const [tab, setTab] = useState('league');
   const [hasOpened, setHasOpened] = useState(false);
 
   useEffect(() => {
@@ -241,15 +272,13 @@ function CareerSection({ career, loading, onLoad }) {
     }
   }, [hasOpened, career.length, loading, onLoad]);
 
-  // Tri saison décroissante puis nombre de matchs décroissant pour
-  // grouper visuellement les compétitions principales en tête de chaque
-  // saison (Ligue 1 avant Coupe de France, etc.).
+  // Filtre par saison sélectionnée + par onglet, puis tri par matchs joués
+  // décroissant pour mettre la compétition principale en tête.
   const rows = useMemo(() => {
-    return [...career].sort((a, b) => {
-      if (b.season !== a.season) return b.season - a.season;
-      return (b.games?.appearences || 0) - (a.games?.appearences || 0);
-    });
-  }, [career]);
+    return [...career]
+      .filter((r) => r.season === season && competitionBucket(r) === tab)
+      .sort((a, b) => (b.games?.appearences || 0) - (a.games?.appearences || 0));
+  }, [career, tab, season]);
 
   const totals = useMemo(() => {
     const acc = { games: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
