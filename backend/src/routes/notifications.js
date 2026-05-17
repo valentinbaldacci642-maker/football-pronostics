@@ -42,10 +42,10 @@ router.get('/status', (req, res) => {
 // shared secret is the only auth. minEdge can be tuned per call.
 router.get('/scan-new-vbs', authScan, async (req, res) => {
   try {
-    // minEdge in percentage points (e.g. 5 = 5%). Default 5.
+    // minEdge in percentage points (e.g. 6 = 6%). Default 6.
     const minEdge = Number.isFinite(parseFloat(req.query.minEdge))
       ? parseFloat(req.query.minEdge)
-      : 5;
+      : 6;
     const dryRun = req.query.dry === '1';
     const date = typeof req.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
       ? req.query.date

@@ -114,7 +114,7 @@ export default function Help() {
           <br /><br />
           Affiché sur les cartes via le badge gold
           <span className="text-gold-400 font-bold"> "VALUE +10%"</span>.
-          Si edge ≥ 5% → c'est un <strong>value bet</strong>, on parie. Sans edge → on ne parie pas.
+          Si edge ≥ 6% → c'est un <strong>value bet</strong>, on parie. Sans edge → on ne parie pas.
         </Definition>
 
         <Definition term="📊 ROI — ton gain RÉEL mesuré APRÈS plein de paris">
@@ -354,7 +354,7 @@ export default function Help() {
           faut que <strong>tous</strong> ces critères soient passés :
         </p>
         <ul className="ml-3 space-y-1 text-xs">
-          <li>✅ <strong>edge ≥ 5%</strong> (notre fair prob dépasse l'implicite de 5+ points)</li>
+          <li>✅ <strong>edge ≥ 6%</strong> (notre fair prob dépasse l'implicite de 6+ points)</li>
           <li>✅ <strong>trueProb ≥ 25%</strong> (pas un outsider trop improbable)</li>
           <li>✅ <strong>cote ≥ 1.40</strong> (sinon mise quasi inutile)</li>
           <li>✅ <strong>cote ≤ 10.0</strong> (sinon variance trop forte)</li>
@@ -475,9 +475,9 @@ export default function Help() {
             </p>
           </div>
           <div className="p-3 rounded-lg bg-gold-500/10 border border-gold-500/30">
-            <p className="font-heading font-bold text-gold-400">Standard (edge ≥ 5%) · recommandé · marge anti-Unibet</p>
+            <p className="font-heading font-bold text-gold-400">Standard (edge ≥ 6%) · recommandé · marge anti-Unibet</p>
             <p className="text-xs text-white/50">
-              2-5 value bets par jour, edge minimum 5% (au-dessus de la marge d'erreur du
+              2-5 value bets par jour, edge minimum 6% (au-dessus de la marge d'erreur du
               modèle ±3-4 points). <strong className="text-white">Mode par défaut</strong>
               {' '}— pour 95% des utilisateurs, débutants compris.
             </p>

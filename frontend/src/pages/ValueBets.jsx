@@ -430,7 +430,7 @@ export default function ValueBets() {
           </h1>
           <p className="text-sm text-white/35 font-heading font-medium capitalize">
             {format(new Date(selectedDay + 'T00:00:00'), "EEEE d MMMM yyyy", { locale: fr })}
-            {' · '}Tous les paris où Kelly s'active (edge ≥ 5%)
+            {' · '}Tous les paris où Kelly s'active (edge ≥ 6%)
           </p>
         </div>
         <button
@@ -467,7 +467,7 @@ export default function ValueBets() {
         <p className="text-xs text-orange-300/90 font-heading leading-relaxed">
           ⚠️ <strong>Les value bets peuvent disparaître au cours de la journée.</strong>{' '}
           Si les bookmakers resserrent la cote (ex: 3.13 → 2.95), la proba implicite
-          monte et l'edge baisse — si l'edge passe sous 5%, le pari n'est plus détecté
+          monte et l'edge baisse — si l'edge passe sous 6%, le pari n'est plus détecté
           comme value bet par Kelly et sort de cette liste. Saisis ta mise et ta cote
           dès qu'un value bet t'intéresse, le marché bouge vite.
         </p>

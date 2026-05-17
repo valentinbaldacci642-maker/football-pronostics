@@ -95,7 +95,7 @@ function GeneralTab() {
             Notifications value bets
           </p>
           <p className="text-xs text-white/50 leading-relaxed">
-            Reçois une notif quand un nouveau value bet ≥ 5% d'edge est détecté.
+            Reçois une notif quand un nouveau value bet ≥ 6% d'edge est détecté.
             Le serveur scanne les pronostics toutes les 5 minutes en arrière-plan.
           </p>
           {!isNative && (

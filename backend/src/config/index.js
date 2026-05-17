@@ -15,11 +15,11 @@ module.exports = {
     ttlLeagues: 86400,                                    // 24 h
   },
   valueBet: {
-    // 5% min edge sur le consensus Shin. Plus permissif que 6% → capture
-    // plus de VBs marginaux. À l'utilisateur de vérifier que l'edge tient
-    // chez Unibet/Winamax via l'input "Ma cote" (les cotes locales sont
-    // ~7% tighter que le consensus).
-    minEdge: 5,
+    // 6% min edge sur le consensus Shin. Choisi après expérience pratique :
+    // un seuil 5% laissait passer trop de bruit (-26% ROI sur 51 paris) ;
+    // 6% filtre les edges marginaux qui rétrécissent souvent chez Unibet/
+    // Winamax où les cotes sont ~7% plus serrées que le consensus.
+    minEdge: 6,
     minProb: 25,
     minOdds: 1.4,
     maxOdds: 10.0,
