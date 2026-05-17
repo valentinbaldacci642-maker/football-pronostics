@@ -544,12 +544,30 @@ export const useHistoryStore = create(
       // Self-throttled (4/sec) to stay well under the backend rate limiter
       // and silently skips fixtures the API no longer knows.
       backfillMatchDates: async () => {
-        const targets = get().entries.filter((e) => !e.matchDate && e.fixtureId);
+        // Two kinds of targets:
+        //  1) Missing matchDate (legacy entries from before that field existed)
+        //  2) Stale matchDate — saved kickoff is in the future, but the bet
+        //     itself is > 1 day old. This catches API-Football reschedules
+        //     where the original date got frozen in our local store and now
+        //     drifts past the real kickoff (e.g. match advanced from "demain
+        //     18h" to "today 16h30").
+        const now = Date.now();
+        const dayMs = 24 * 60 * 60_000;
+        const targets = get().entries.filter((e) => {
+          if (!e.fixtureId || e.fixtureId <= 0) return false;
+          if (!e.matchDate) return true;
+          const matchMs = new Date(e.matchDate).getTime();
+          const savedMs = e.savedAt ? new Date(e.savedAt).getTime() : 0;
+          if (!Number.isFinite(matchMs)) return false;
+          return matchMs > now && savedMs && (now - savedMs) > dayMs;
+        });
         if (targets.length === 0) return;
         const { fixturesApi } = await import('../services/api');
         for (const e of targets) {
           try {
-            const res = await fixturesApi.getById(e.fixtureId);
+            // fresh=1: backend caches fixtures 20min, so a stale matchDate
+            // refresh could otherwise return the same wrong date for ~20min.
+            const res = await fixturesApi.getById(e.fixtureId, { fresh: true });
             const matchDate = res?.response?.[0]?.fixture?.date;
             if (matchDate) {
               set((s) => ({
@@ -558,7 +576,7 @@ export const useHistoryStore = create(
             }
           } catch {
             // Fixture no longer in API (purged after season ends, etc.) —
-            // leave matchDate null, the row simply won't show a date.
+            // leave matchDate as-is, the row simply won't show a date.
           }
           // eslint-disable-next-line no-await-in-loop
           await new Promise((r) => setTimeout(r, 250));

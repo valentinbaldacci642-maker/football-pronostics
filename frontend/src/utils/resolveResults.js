@@ -41,7 +41,19 @@ export async function resolveFinishedMatches(entries, onResolve) {
       // Use kickoff time when available — much more accurate than savedAt for
       // bets placed days in advance. A bet saved 5 days ago for a match
       // tonight should be checked tonight, not 5 days ago.
-      const reference = e.matchDate ? new Date(e.matchDate).getTime() : (e.savedAt ? new Date(e.savedAt).getTime() : 0);
+      //
+      // Edge case: matchDate can become stale if API-Football reschedules a
+      // fixture after the bet is saved. We've seen real cases where the
+      // stored matchDate was tomorrow 18h but the match actually played
+      // today at 16h30. Without compensation, the gate below would refuse
+      // to check the API and the bet would never resolve. So: if the bet is
+      // at least 1 day older than the saved kickoff, fall back to savedAt —
+      // by then the match has almost certainly happened.
+      const savedAtMs = e.savedAt ? new Date(e.savedAt).getTime() : 0;
+      const matchMs = e.matchDate ? new Date(e.matchDate).getTime() : 0;
+      const dayMs = 24 * 60 * 60_000;
+      const staleMatchDate = matchMs && savedAtMs && (now - savedAtMs > dayMs);
+      const reference = staleMatchDate ? savedAtMs : (matchMs || savedAtMs);
       if (reference && now - reference < minAgeMs) return false;
       return true;
     })
