@@ -310,18 +310,18 @@ function CareerSection({ career, loading, onLoad }) {
           ) : rows.length === 0 ? (
             <div className="py-6 text-center text-white/40 text-sm">Aucun match dans cette catégorie pour la saison sélectionnée.</div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full">
               <thead>
-                <tr className="text-xs text-white/55 uppercase tracking-wider border-b border-white/5 font-heading font-semibold">
-                  <th className="text-left px-3 py-3">Saison</th>
-                  <th className="text-left px-3 py-3">Équipe</th>
-                  <th className="text-left px-3 py-3 hidden sm:table-cell">Compétition</th>
-                  <th className="text-center px-2 py-3">⌀</th>
-                  <th className="text-center px-2 py-3">MJ</th>
-                  <th className="text-center px-2 py-3">⚽</th>
-                  <th className="text-center px-2 py-3">PD</th>
-                  <th className="text-center px-2 py-3 text-yellow-500/80">🟨</th>
-                  <th className="text-center px-2 py-3 text-red-500/80">🟥</th>
+                <tr className="text-sm text-white/60 uppercase tracking-wider border-b border-white/5 font-heading font-semibold">
+                  <th className="text-left px-3 py-3.5">Saison</th>
+                  <th className="text-left px-3 py-3.5">Équipe</th>
+                  <th className="text-left px-3 py-3.5 hidden sm:table-cell">Compétition</th>
+                  <th className="text-center px-2 py-3.5">⌀</th>
+                  <th className="text-center px-2 py-3.5">MJ</th>
+                  <th className="text-center px-2 py-3.5">⚽</th>
+                  <th className="text-center px-2 py-3.5">PD</th>
+                  <th className="text-center px-2 py-3.5 text-yellow-500/80">🟨</th>
+                  <th className="text-center px-2 py-3.5 text-red-500/80">🟥</th>
                 </tr>
               </thead>
               <tbody>
@@ -329,20 +329,20 @@ function CareerSection({ career, loading, onLoad }) {
                   const rating = r.games?.rating ? parseFloat(r.games.rating) : null;
                   return (
                     <tr key={`${r.season}-${r.team?.id}-${r.league?.id}-${i}`} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                      <td className="px-3 py-3 text-white/70 font-mono text-sm whitespace-nowrap">{r.season}/{(r.season + 1).toString().slice(-2)}</td>
-                      <td className="px-3 py-3">
-                        <Link to={`/team/${r.team?.id}`} className="flex items-center gap-2 group">
-                          {r.team?.logo && <img src={r.team.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" onError={(e) => e.target.style.display = 'none'} />}
-                          <span className="text-white font-heading font-semibold text-sm truncate group-hover:text-brand-400">{r.team?.name}</span>
+                      <td className="px-3 py-3.5 text-white/75 font-mono text-base whitespace-nowrap">{r.season}/{(r.season + 1).toString().slice(-2)}</td>
+                      <td className="px-3 py-3.5">
+                        <Link to={`/team/${r.team?.id}`} className="flex items-center gap-2.5 group">
+                          {r.team?.logo && <img src={r.team.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={(e) => e.target.style.display = 'none'} />}
+                          <span className="text-white font-heading font-bold text-base truncate group-hover:text-brand-400">{r.team?.name}</span>
                         </Link>
                       </td>
-                      <td className="px-3 py-3 hidden sm:table-cell">
-                        <span className="text-white/70 text-sm truncate">{r.league?.name}</span>
+                      <td className="px-3 py-3.5 hidden sm:table-cell">
+                        <span className="text-white/75 text-base truncate">{r.league?.name}</span>
                       </td>
-                      <td className="px-2 py-3 text-center">
+                      <td className="px-2 py-3.5 text-center">
                         {rating != null ? (
                           <span className={clsx(
-                            'inline-block px-2 py-1 rounded text-xs font-mono font-bold tabular-nums',
+                            'inline-block px-2.5 py-1 rounded text-sm font-mono font-bold tabular-nums',
                             rating >= 7.5 ? 'bg-brand-500/30 text-brand-200'
                               : rating >= 7 ? 'bg-brand-500/15 text-brand-300'
                               : rating >= 6.5 ? 'bg-orange-500/15 text-orange-300'
@@ -350,27 +350,27 @@ function CareerSection({ career, loading, onLoad }) {
                           )}>{rating.toFixed(1)}</span>
                         ) : <span className="text-white/25">—</span>}
                       </td>
-                      <td className="px-2 py-3 text-center text-white text-sm font-mono">{r.games?.appearences ?? '—'}</td>
-                      <td className="px-2 py-3 text-center text-sm font-mono">
+                      <td className="px-2 py-3.5 text-center text-white text-base font-mono">{r.games?.appearences ?? '—'}</td>
+                      <td className="px-2 py-3.5 text-center text-base font-mono">
                         <span className={r.goals?.total > 0 ? 'text-brand-400 font-bold' : 'text-white/55'}>{r.goals?.total ?? 0}</span>
                       </td>
-                      <td className="px-2 py-3 text-center text-sm font-mono">
+                      <td className="px-2 py-3.5 text-center text-base font-mono">
                         <span className={r.goals?.assists > 0 ? 'text-brand-400 font-bold' : 'text-white/55'}>{r.goals?.assists ?? 0}</span>
                       </td>
-                      <td className="px-2 py-3 text-center text-yellow-400 text-sm font-mono">{r.cards?.yellow ?? 0}</td>
-                      <td className="px-2 py-3 text-center text-red-400 text-sm font-mono">{r.cards?.red ?? 0}</td>
+                      <td className="px-2 py-3.5 text-center text-yellow-400 text-base font-mono">{r.cards?.yellow ?? 0}</td>
+                      <td className="px-2 py-3.5 text-center text-red-400 text-base font-mono">{r.cards?.red ?? 0}</td>
                     </tr>
                   );
                 })}
-                {/* Ligne TOTAL toutes compétitions confondues */}
+                {/* Ligne TOTAL */}
                 <tr className="border-t-2 border-white/15 bg-white/[0.03]">
-                  <td colSpan={3} className="px-3 py-3 text-xs text-white/55 uppercase tracking-wider font-heading font-bold">Total</td>
-                  <td className="px-2 py-3"></td>
-                  <td className="px-2 py-3 text-center text-white text-sm font-mono font-bold">{totals.games}</td>
-                  <td className="px-2 py-3 text-center text-brand-400 text-sm font-mono font-bold">{totals.goals}</td>
-                  <td className="px-2 py-3 text-center text-brand-400 text-sm font-mono font-bold">{totals.assists}</td>
-                  <td className="px-2 py-3 text-center text-yellow-400 text-sm font-mono font-bold">{totals.yellow}</td>
-                  <td className="px-2 py-3 text-center text-red-400 text-sm font-mono font-bold">{totals.red}</td>
+                  <td colSpan={3} className="px-3 py-3.5 text-sm text-white/60 uppercase tracking-wider font-heading font-bold">Total</td>
+                  <td className="px-2 py-3.5"></td>
+                  <td className="px-2 py-3.5 text-center text-white text-base font-mono font-bold">{totals.games}</td>
+                  <td className="px-2 py-3.5 text-center text-brand-400 text-base font-mono font-bold">{totals.goals}</td>
+                  <td className="px-2 py-3.5 text-center text-brand-400 text-base font-mono font-bold">{totals.assists}</td>
+                  <td className="px-2 py-3.5 text-center text-yellow-400 text-base font-mono font-bold">{totals.yellow}</td>
+                  <td className="px-2 py-3.5 text-center text-red-400 text-base font-mono font-bold">{totals.red}</td>
                 </tr>
               </tbody>
             </table>
@@ -433,18 +433,18 @@ function RecentMatches({ playerId }) {
           ) : matches.length === 0 ? (
             <div className="py-6 text-center text-white/40 text-sm">Aucun match trouvé.</div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full">
               <thead>
-                <tr className="text-xs text-white/55 uppercase tracking-wider border-b border-white/5 font-heading font-semibold">
-                  <th className="text-left px-3 py-3">Date</th>
-                  <th className="text-left px-3 py-3">Match</th>
-                  <th className="text-center px-2 py-3">⌀</th>
-                  <th className="text-center px-2 py-3">Min</th>
-                  <th className="text-center px-2 py-3">⚽</th>
-                  <th className="text-center px-2 py-3">PD</th>
-                  <th className="text-center px-2 py-3 text-yellow-500/80">🟨</th>
-                  <th className="text-center px-2 py-3 text-red-500/80">🟥</th>
-                  <th className="text-center px-2 py-3">Rés</th>
+                <tr className="text-sm text-white/60 uppercase tracking-wider border-b border-white/5 font-heading font-semibold">
+                  <th className="text-left px-3 py-3.5">Date</th>
+                  <th className="text-left px-3 py-3.5">Match</th>
+                  <th className="text-center px-2 py-3.5">⌀</th>
+                  <th className="text-center px-2 py-3.5">Min</th>
+                  <th className="text-center px-2 py-3.5">⚽</th>
+                  <th className="text-center px-2 py-3.5">PD</th>
+                  <th className="text-center px-2 py-3.5 text-yellow-500/80">🟨</th>
+                  <th className="text-center px-2 py-3.5 text-red-500/80">🟥</th>
+                  <th className="text-center px-2 py-3.5">Rés</th>
                 </tr>
               </thead>
               <tbody>
@@ -454,7 +454,6 @@ function RecentMatches({ playerId }) {
                   const rating = s.games?.rating ? parseFloat(s.games.rating) : null;
                   const hg = f.goals?.home, ag = f.goals?.away;
                   const playerTeamId = s.team?.id;
-                  // Détermine W/D/L du POV de l'équipe du joueur
                   let result = '—', resultColor = 'text-white/30';
                   if (Number.isFinite(hg) && Number.isFinite(ag) && playerTeamId) {
                     if (hg === ag) { result = 'N'; resultColor = 'bg-yellow-500/20 text-yellow-300'; }
@@ -466,24 +465,24 @@ function RecentMatches({ playerId }) {
                   }
                   return (
                     <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                      <td className="px-3 py-3 text-white/70 font-mono text-sm whitespace-nowrap">
+                      <td className="px-3 py-3.5 text-white/75 font-mono text-base whitespace-nowrap">
                         {f.fixture?.date ? format(parseISO(f.fixture.date), 'dd.MM.yy', { locale: fr }) : '—'}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3.5">
                         <Link to={`/match/${f.fixture?.id}`} className="block group">
-                          <div className="flex items-center gap-2 text-sm">
-                            {f.teams?.home?.logo && <img src={f.teams.home.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
-                            <span className="text-white truncate max-w-[110px] font-heading font-semibold">{f.teams?.home?.name}</span>
-                            <span className="text-white font-mono font-bold tabular-nums text-base">{hg ?? '–'}-{ag ?? '–'}</span>
-                            {f.teams?.away?.logo && <img src={f.teams.away.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
-                            <span className="text-white truncate max-w-[110px] font-heading font-semibold">{f.teams?.away?.name}</span>
+                          <div className="flex items-center gap-2.5 text-base">
+                            {f.teams?.home?.logo && <img src={f.teams.home.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" />}
+                            <span className="text-white truncate max-w-[130px] font-heading font-semibold">{f.teams?.home?.name}</span>
+                            <span className="text-white font-mono font-bold tabular-nums text-lg">{hg ?? '–'}-{ag ?? '–'}</span>
+                            {f.teams?.away?.logo && <img src={f.teams.away.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" />}
+                            <span className="text-white truncate max-w-[130px] font-heading font-semibold">{f.teams?.away?.name}</span>
                           </div>
                         </Link>
                       </td>
-                      <td className="px-2 py-3 text-center">
+                      <td className="px-2 py-3.5 text-center">
                         {rating != null ? (
                           <span className={clsx(
-                            'inline-block px-2 py-1 rounded text-xs font-mono font-bold tabular-nums',
+                            'inline-block px-2.5 py-1 rounded text-sm font-mono font-bold tabular-nums',
                             rating >= 7.5 ? 'bg-brand-500/30 text-brand-200'
                               : rating >= 7 ? 'bg-brand-500/15 text-brand-300'
                               : rating >= 6.5 ? 'bg-orange-500/15 text-orange-300'
@@ -491,17 +490,17 @@ function RecentMatches({ playerId }) {
                           )}>{rating.toFixed(1)}</span>
                         ) : <span className="text-white/25">—</span>}
                       </td>
-                      <td className="px-2 py-3 text-center text-white/70 text-sm font-mono">{s.games?.minutes ?? '—'}</td>
-                      <td className="px-2 py-3 text-center text-sm font-mono">
+                      <td className="px-2 py-3.5 text-center text-white/75 text-base font-mono">{s.games?.minutes ?? '—'}</td>
+                      <td className="px-2 py-3.5 text-center text-base font-mono">
                         <span className={s.goals?.total > 0 ? 'text-brand-400 font-bold' : 'text-white/55'}>{s.goals?.total ?? 0}</span>
                       </td>
-                      <td className="px-2 py-3 text-center text-sm font-mono">
+                      <td className="px-2 py-3.5 text-center text-base font-mono">
                         <span className={s.goals?.assists > 0 ? 'text-brand-400 font-bold' : 'text-white/55'}>{s.goals?.assists ?? 0}</span>
                       </td>
-                      <td className="px-2 py-3 text-center text-yellow-400 text-sm font-mono">{s.cards?.yellow ?? 0}</td>
-                      <td className="px-2 py-3 text-center text-red-400 text-sm font-mono">{s.cards?.red ?? 0}</td>
-                      <td className="px-2 py-3 text-center">
-                        <span className={clsx('inline-block w-7 py-1 rounded text-xs font-mono font-bold', resultColor)}>{result}</span>
+                      <td className="px-2 py-3.5 text-center text-yellow-400 text-base font-mono">{s.cards?.yellow ?? 0}</td>
+                      <td className="px-2 py-3.5 text-center text-red-400 text-base font-mono">{s.cards?.red ?? 0}</td>
+                      <td className="px-2 py-3.5 text-center">
+                        <span className={clsx('inline-block w-8 py-1 rounded text-sm font-mono font-bold', resultColor)}>{result}</span>
                       </td>
                     </tr>
                   );
