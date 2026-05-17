@@ -399,9 +399,56 @@ function FormDots({ form }) {
   );
 }
 
+// Mapping API description → bucket de qualification.
+// API-Football donne par row une description type :
+//   "Champions League" / "Champions League Qualification"
+//   "UEFA Europa League" / "Europa League Qualification"
+//   "Conference League" / "Conference League Qualification"
+//   "Relegation" / "Relegation Playoffs" (= barrage maintien)
+//   "Promotion - ..." (pour les divisions inférieures qui montent)
+// L'ordre des conditions importe : on teste les variantes Qualification
+// AVANT le mot parent (sinon "Champions League Qualification" matche
+// "Champions League" sans détecter le barrage).
+function getQualifBucket(desc) {
+  const d = (desc || '').toLowerCase();
+  if (!d) return null;
+  if (d.includes('relegation')) {
+    if (d.includes('playoff') || d.includes('play off') || d.includes('play-off')) return 'reldown';
+    return 'relegated';
+  }
+  if (d.includes('champions league')) {
+    return d.includes('qualif') ? 'uclQ' : 'ucl';
+  }
+  if (d.includes('europa league')) {
+    return d.includes('qualif') ? 'uelQ' : 'uel';
+  }
+  if (d.includes('conference')) {
+    return d.includes('qualif') ? 'confQ' : 'conf';
+  }
+  if (d.includes('promotion')) return 'promo';
+  return null;
+}
+
+// Couleurs : direct = saturé, barrage = pâle.
+// Barrage maintien = orange ambre (entre EL et reléguer).
+const BUCKET_STYLES = {
+  ucl:       { border: 'border-l-green-500',   dot: 'bg-green-500',   label: 'LDC' },
+  uclQ:      { border: 'border-l-emerald-300', dot: 'bg-emerald-300', label: 'Barrage LDC' },
+  uel:       { border: 'border-l-orange-500',  dot: 'bg-orange-500',  label: 'Europa' },
+  uelQ:      { border: 'border-l-orange-300',  dot: 'bg-orange-300',  label: 'Barrage Europa' },
+  conf:      { border: 'border-l-sky-500',     dot: 'bg-sky-500',     label: 'Conference' },
+  confQ:     { border: 'border-l-sky-300',     dot: 'bg-sky-300',     label: 'Barrage Conf.' },
+  promo:     { border: 'border-l-brand-500',   dot: 'bg-brand-500',   label: 'Promotion' },
+  reldown:   { border: 'border-l-amber-500',   dot: 'bg-amber-500',   label: 'Barrage maintien' },
+  relegated: { border: 'border-l-red-500',     dot: 'bg-red-500',     label: 'Relégation' },
+};
+
 function StandingsGroup({ group, leagueId, viewMode = 'all' }) {
   const groupName = group[0]?.group;
   const stats = (row) => viewMode === 'home' ? row.home : viewMode === 'away' ? row.away : row.all;
+  // Calcule les buckets effectivement présents dans ce classement pour
+  // n'afficher dans la légende que les couleurs utilisées.
+  const presentBuckets = Array.from(new Set(group.map((r) => getQualifBucket(r.description)).filter(Boolean)));
 
   return (
     <div className="glass-card overflow-hidden">
@@ -429,15 +476,13 @@ function StandingsGroup({ group, leagueId, viewMode = 'all' }) {
           </thead>
           <tbody>
             {group.map((row) => {
-              const desc = row.description?.toLowerCase() || '';
+              const bucket = getQualifBucket(row.description);
+              const accentColor = bucket ? `border-l-2 ${BUCKET_STYLES[bucket].border}` : '';
               const s = stats(row);
-              let accentColor = '';
-              if (desc.includes('champions league') || desc.includes('promotion') || desc.includes('qualification')) accentColor = 'border-l-2 border-l-brand-500';
-              else if (desc.includes('europa') || desc.includes('playoff')) accentColor = 'border-l-2 border-l-gold-500';
-              else if (desc.includes('relegat') || desc.includes('descente')) accentColor = 'border-l-2 border-l-danger';
 
               return (
-                <tr key={row.team.id} className={`border-b border-white/[0.03] hover:bg-white/[0.03] transition-colors ${accentColor}`}>
+                <tr key={row.team.id} className={`border-b border-white/[0.03] hover:bg-white/[0.03] transition-colors ${accentColor}`}
+                    title={bucket ? BUCKET_STYLES[bucket].label : undefined}>
                   <td className="px-4 py-2.5 text-white/30 font-mono text-xs">{row.rank}</td>
                   <td className="px-2 py-2.5">
                     <Link to={`/team/${row.team.id}`} className="flex items-center gap-2 group">
@@ -464,19 +509,20 @@ function StandingsGroup({ group, leagueId, viewMode = 'all' }) {
           </tbody>
         </table>
       </div>
-      {/* Legend */}
-      <div className="px-4 py-2 border-t border-white/[0.04] flex gap-4 flex-wrap">
-        {[
-          { color: 'bg-brand-500', label: 'Champions League' },
-          { color: 'bg-gold-500', label: 'Europa / Conference' },
-          { color: 'bg-danger', label: 'Relégation' },
-        ].map(({ color, label }) => (
-          <div key={label} className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-sm ${color}`} />
-            <span className="text-[10px] text-white/25 font-heading">{label}</span>
-          </div>
-        ))}
-      </div>
+      {/* Legend — uniquement les buckets effectivement présents dans ce classement */}
+      {presentBuckets.length > 0 && (
+        <div className="px-4 py-2.5 border-t border-white/[0.04] flex gap-x-4 gap-y-1.5 flex-wrap">
+          {presentBuckets.map((bucket) => {
+            const s = BUCKET_STYLES[bucket];
+            return (
+              <div key={bucket} className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-sm ${s.dot}`} />
+                <span className="text-[10px] text-white/45 font-heading">{s.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
