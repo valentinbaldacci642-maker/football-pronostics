@@ -103,9 +103,18 @@ api.interceptors.response.use(
       console.warn('[API Rate Limit]', err.config?.url);
       return Promise.reject(e);
     }
-    const message = data?.error || err.message || 'API error';
-    console.error('[API Error]', message, err.config?.url);
-    return Promise.reject(new Error(message));
+    // Guarantee a string message — sometimes backend returns
+    // `{ error: <object> }` and `new Error(object)` yields "[object Object]"
+    // which is useless to the user.
+    let message;
+    if (typeof data?.error === 'string') message = data.error;
+    else if (data?.error) message = JSON.stringify(data.error);
+    else if (typeof err.message === 'string') message = err.message;
+    else message = `API error (HTTP ${status || '?'})`;
+    console.error('[API Error]', message, err.config?.url, data);
+    const e = new Error(message);
+    e.status = status;
+    return Promise.reject(e);
   }
 );
 
