@@ -267,6 +267,29 @@ function AnimatedTab({ children }) {
   );
 }
 
+// Traduction des libellés bruts d'API-Football. Toute clé non listée
+// retombe sur le libellé original (mieux que vide).
+const STAT_LABEL_FR = {
+  'Shots on Goal': 'Tirs cadrés',
+  'Shots off Goal': 'Tirs non cadrés',
+  'Total Shots': 'Tirs (total)',
+  'Blocked Shots': 'Tirs contrés',
+  'Shots insidebox': 'Tirs dans la surface',
+  'Shots outsidebox': 'Tirs hors surface',
+  'Fouls': 'Fautes',
+  'Corner Kicks': 'Corners',
+  'Offsides': 'Hors-jeu',
+  'Ball Possession': 'Possession',
+  'Yellow Cards': 'Cartons jaunes',
+  'Red Cards': 'Cartons rouges',
+  'Goalkeeper Saves': 'Arrêts gardien',
+  'Total passes': 'Passes (total)',
+  'Passes accurate': 'Passes réussies',
+  'Passes %': '% passes réussies',
+  'expected_goals': 'Buts attendus (xG)',
+  'goals_prevented': 'Buts évités',
+};
+
 function StatsTab({ stats, home, away }) {
   if (!stats?.length) return <div className="text-center py-8 text-white/30">Statistiques non disponibles</div>;
 
@@ -300,11 +323,12 @@ function StatsTab({ stats, home, away }) {
       {pairs.map(({ type, home: hv, away: av }) => {
         const h = parseValue(hv), a = parseValue(av);
         const total = h + a || 1;
+        const labelFr = STAT_LABEL_FR[type] || type;
         return (
           <div key={type} className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-white">{hv ?? '—'}</span>
-              <span className="text-white/40">{type}</span>
+              <span className="text-white/40">{labelFr}</span>
               <span className="font-bold text-white">{av ?? '—'}</span>
             </div>
             <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
@@ -321,26 +345,94 @@ function StatsTab({ stats, home, away }) {
 function EventsTab({ events, home, away }) {
   if (!events?.length) return <div className="text-center py-8 text-white/30">Aucun événement</div>;
 
-  const getEventIcon = (type) => {
-    if (type === 'Goal') return '⚽';
-    if (type === 'Card') return '🟨';
-    if (type === 'subst') return '🔄';
-    if (type === 'Var') return '📺';
-    return '•';
+  // Détaille l'icône + libellé FR + style par type d'événement.
+  // detail vient brut d'API-Football (ex: "Normal Goal", "Yellow Card",
+  // "Substitution 1") — on l'utilise pour différencier penalty/csc.
+  const getEvent = (ev) => {
+    const type = ev.type;
+    const detail = ev.detail || '';
+    if (type === 'Goal') {
+      if (detail.includes('Own')) return { icon: '😱', label: 'But contre son camp', tone: 'goalOG' };
+      if (detail.includes('Penalty')) return { icon: '⚽', label: 'But sur penalty', tone: 'goal' };
+      if (detail.includes('Missed Penalty')) return { icon: '❌', label: 'Penalty manqué', tone: 'miss' };
+      return { icon: '⚽', label: 'But', tone: 'goal' };
+    }
+    if (type === 'Card') {
+      if (detail.includes('Red')) return { icon: '🟥', label: 'Carton rouge', tone: 'red' };
+      if (detail.includes('Yellow')) return { icon: '🟨', label: 'Carton jaune', tone: 'yellow' };
+      return { icon: '🟨', label: detail || 'Carton', tone: 'yellow' };
+    }
+    if (type === 'subst') return { icon: '🔄', label: 'Changement', tone: 'sub' };
+    if (type === 'Var') return { icon: '📺', label: detail || 'VAR', tone: 'var' };
+    return { icon: '•', label: detail || type, tone: 'plain' };
+  };
+
+  // Formate la minute (gère le temps additionnel ex: 45+2', 90+3')
+  const formatMinute = (time) => {
+    const m = time?.elapsed;
+    const extra = time?.extra;
+    if (m == null) return '';
+    return extra ? `${m}+${extra}'` : `${m}'`;
+  };
+
+  const toneClass = {
+    goal:    'bg-brand-500/15 border-brand-500/40',
+    goalOG:  'bg-orange-500/15 border-orange-500/40',
+    miss:    'bg-red-500/10 border-red-500/30',
+    yellow:  'bg-yellow-500/10 border-yellow-500/30',
+    red:     'bg-red-500/15 border-red-500/40',
+    sub:     'bg-white/[0.03] border-white/10',
+    var:     'bg-purple-500/10 border-purple-500/30',
+    plain:   'bg-white/[0.03] border-white/10',
   };
 
   return (
-    <div className="glass-card p-4 space-y-2">
+    <div className="space-y-2">
       {events.map((ev, i) => {
         const isHome = ev.team?.id === home?.id;
+        const meta = getEvent(ev);
         return (
-          <div key={i} className={clsx('flex items-center gap-3 py-2', isHome ? 'flex-row' : 'flex-row-reverse')}>
-            <span className="text-xs text-white/30 font-mono w-8 text-right">{ev.time?.elapsed}'</span>
-            <span className="text-lg">{getEventIcon(ev.type)}</span>
-            <div className={clsx('flex-1', isHome ? 'text-left' : 'text-right')}>
-              <p className="text-sm font-medium text-white">{ev.player?.name}</p>
-              {ev.assist?.name && <p className="text-xs text-white/30">Assist: {ev.assist.name}</p>}
-              {ev.detail && <p className="text-xs text-white/20">{ev.detail}</p>}
+          <div
+            key={i}
+            className={clsx(
+              'rounded-xl px-3 py-2.5 border flex items-stretch gap-3',
+              toneClass[meta.tone],
+              isHome ? 'flex-row' : 'flex-row-reverse',
+            )}
+          >
+            {/* Minute */}
+            <div className="flex flex-col items-center justify-center min-w-[42px] py-0.5">
+              <span className="text-base font-display text-white leading-none">{formatMinute(ev.time)}</span>
+              <span className="text-[9px] text-white/40 uppercase tracking-wider mt-0.5">{meta.label}</span>
+            </div>
+
+            {/* Icon */}
+            <div className="text-2xl flex items-center">{meta.icon}</div>
+
+            {/* Player / detail */}
+            <div className={clsx('flex-1 flex flex-col justify-center min-w-0', isHome ? 'text-left' : 'text-right')}>
+              {meta.tone === 'sub' ? (
+                <>
+                  <p className="text-sm font-heading font-semibold text-brand-300 truncate">
+                    ↑ {ev.assist?.name || '—'} <span className="text-[10px] text-white/40 font-normal">(entre)</span>
+                  </p>
+                  <p className="text-xs text-white/50 truncate">
+                    ↓ {ev.player?.name || '—'} <span className="text-[10px] text-white/30">(sort)</span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-heading font-semibold text-white truncate">{ev.player?.name || '—'}</p>
+                  {ev.assist?.name && meta.tone.startsWith('goal') && (
+                    <p className="text-[11px] text-white/50 truncate">Passe déc. : {ev.assist.name}</p>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Team logo */}
+            <div className="flex items-center">
+              <img src={ev.team?.logo} alt="" className="w-6 h-6 object-contain opacity-70" onError={(e) => e.target.style.display = 'none'} />
             </div>
           </div>
         );
@@ -472,6 +564,65 @@ function PoissonMatrix({ xG, homeTeam, awayTeam }) {
   );
 }
 
+// Affiche le startXI sur un mini-terrain vertical. API-Football fournit
+// `player.grid` au format "row:col" où row 1 = ligne devant le gardien
+// (donc défense), row max = ligne d'attaque la plus avancée. On positionne
+// chaque ligne du bas (row 1 = près du gardien) vers le haut (row max =
+// avant-centres). Si grid est absent, on retombe sur une liste simple.
+function SoccerField({ players }) {
+  const valid = (players || []).filter((p) => p?.player?.grid);
+  if (valid.length < 7) return null; // données incomplètes → fallback liste
+
+  const byRow = {};
+  valid.forEach((p) => {
+    const [r, c] = p.player.grid.split(':').map(Number);
+    if (!Number.isFinite(r)) return;
+    if (!byRow[r]) byRow[r] = [];
+    byRow[r].push({ ...p, _col: c || 1 });
+  });
+  const rows = Object.keys(byRow).map(Number).sort((a, b) => a - b);
+  if (rows.length === 0) return null;
+  const maxRow = Math.max(...rows);
+
+  return (
+    <div className="relative aspect-[2/2.6] rounded-lg overflow-hidden bg-gradient-to-b from-emerald-700/50 via-emerald-600/40 to-emerald-700/50 border border-emerald-500/30 my-3">
+      {/* Lignes du terrain */}
+      <div className="absolute inset-2 border-2 border-white/25 rounded-sm" />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[28%] aspect-square rounded-full border-2 border-white/25" />
+      <div className="absolute left-2 right-2 top-1/2 h-px bg-white/25" />
+      {/* Surfaces de réparation */}
+      <div className="absolute left-[20%] right-[20%] top-2 h-[14%] border-2 border-t-0 border-white/25" />
+      <div className="absolute left-[20%] right-[20%] bottom-2 h-[14%] border-2 border-b-0 border-white/25" />
+
+      {/* Joueurs */}
+      {rows.map((r) => {
+        const rowPlayers = byRow[r].sort((a, b) => a._col - b._col);
+        // row 1 = défense → bas, row max = attaque → haut
+        const yPercent = 90 - ((r - 1) / Math.max(1, maxRow - 1)) * 80;
+        return rowPlayers.map((p, idx) => {
+          const xPercent = ((idx + 1) / (rowPlayers.length + 1)) * 100;
+          // Nom court : dernier mot (généralement le nom de famille)
+          const lastName = (p.player?.name || '').trim().split(' ').slice(-1)[0];
+          return (
+            <div
+              key={`${r}-${idx}`}
+              className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+              style={{ left: `${xPercent}%`, top: `${yPercent}%` }}
+            >
+              <div className="w-7 h-7 rounded-full bg-brand-500 border-2 border-white/90 flex items-center justify-center text-[10px] font-display text-white shadow-md">
+                {p.player?.number ?? '—'}
+              </div>
+              <div className="mt-0.5 bg-black/60 backdrop-blur-sm px-1 py-px rounded text-[9px] text-white font-heading font-semibold whitespace-nowrap max-w-[72px] truncate leading-tight">
+                {lastName}
+              </div>
+            </div>
+          );
+        });
+      })}
+    </div>
+  );
+}
+
 function LineupsTab({ lineups }) {
   if (!lineups?.length) return <div className="text-center py-8 text-white/30">Compositions non disponibles</div>;
 
@@ -479,31 +630,39 @@ function LineupsTab({ lineups }) {
     <div className="grid gap-4 sm:grid-cols-2">
       {lineups.map((lu) => (
         <div key={lu.team?.id} className="glass-card p-4">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-1">
             <img src={lu.team?.logo} alt="" className="w-6 h-6 object-contain" />
             <span className="font-semibold text-white">{lu.team?.name}</span>
-            <span className="text-xs text-white/30 ml-auto">{lu.formation}</span>
+            <span className="text-xs text-white/30 ml-auto font-mono">{lu.formation}</span>
           </div>
-          <div className="space-y-1.5">
+
+          {/* Mini terrain — affiché si la grid des joueurs est dispo */}
+          <SoccerField players={lu.startXI} />
+
+          {/* Liste textuelle du XI (fallback si grid absente, ou complément) */}
+          <div className="space-y-1.5 mt-2">
+            <p className="text-[10px] text-white/35 uppercase tracking-wider font-heading font-semibold">Onze titulaire</p>
             {lu.startXI?.map((p, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className="w-5 h-5 rounded bg-dark-600 flex items-center justify-center text-white/50 font-mono flex-shrink-0">
                   {p.player?.number}
                 </span>
-                <span className="text-white/80">{p.player?.name}</span>
-                <span className="text-white/30 ml-auto">{p.player?.pos}</span>
+                <span className="text-white/80 truncate flex-1">{p.player?.name}</span>
+                <span className="text-white/30">{p.player?.pos}</span>
               </div>
             ))}
           </div>
+
           {lu.substitutes?.length > 0 && (
             <div className="mt-3 pt-3 border-t border-white/5">
-              <p className="text-xs text-white/25 mb-2">Remplaçants</p>
+              <p className="text-[10px] text-white/35 uppercase tracking-wider font-heading font-semibold mb-2">Remplaçants</p>
               {lu.substitutes.map((p, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs py-0.5">
                   <span className="w-5 h-5 rounded bg-dark-600/50 flex items-center justify-center text-white/30 font-mono flex-shrink-0">
                     {p.player?.number}
                   </span>
-                  <span className="text-white/40">{p.player?.name}</span>
+                  <span className="text-white/40 truncate flex-1">{p.player?.name}</span>
+                  <span className="text-white/20">{p.player?.pos}</span>
                 </div>
               ))}
             </div>
