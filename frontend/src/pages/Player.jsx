@@ -103,13 +103,6 @@ export default function Player() {
 
       <PlayerHeader player={player} statistics={playerData.statistics || []} />
 
-      <SeasonPicker
-        seasons={seasonsAvailable}
-        selected={season}
-        onSelect={setSeason}
-        loading={loading}
-      />
-
       <CareerSection career={career} loading={loadingCareer} onLoad={loadCareerIfNeeded} />
 
       <RecentMatches playerId={id} season={season} />
@@ -200,33 +193,6 @@ function PlayerHeader({ player, statistics }) {
             />
           </Link>
         )}
-      </div>
-    </div>
-  );
-}
-
-function SeasonPicker({ seasons, selected, onSelect, loading }) {
-  if (seasons.length === 0) return null;
-  return (
-    <div>
-      <p className="text-xs text-white/40 uppercase tracking-wider font-heading font-semibold mb-2">Saison</p>
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-        {seasons.map((y) => (
-          <button
-            key={y}
-            onClick={() => onSelect(y)}
-            disabled={loading}
-            className={clsx(
-              'px-3 py-1.5 rounded-xl text-xs font-heading font-semibold border transition-all whitespace-nowrap',
-              selected === y
-                ? 'bg-brand-500/15 border-brand-500/40 text-brand-300'
-                : 'border-white/[0.08] text-white/35 hover:text-white/60',
-              loading && 'opacity-50',
-            )}
-          >
-            {y}/{(y + 1).toString().slice(-2)}
-          </button>
-        ))}
       </div>
     </div>
   );
