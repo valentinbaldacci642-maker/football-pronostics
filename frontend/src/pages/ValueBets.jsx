@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Flame, RefreshCw, ChevronRight, AlertTriangle, Star, Save, Target } from 'lucide-react';
+import { Flame, RefreshCw, ChevronRight, AlertTriangle, Star, Save, Target, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -257,6 +257,8 @@ export default function ValueBets() {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const dayOptions = buildDayOptions();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0].iso);
+  const [sortMode, setSortMode] = useState('edgeDesc'); // edgeDesc | edgeAsc | timeAsc | timeDesc
+  const [sortOpen, setSortOpen] = useState(false);
   const isToday = selectedDay === dayOptions[0].iso;
 
   const pronostics = pronosticsByDay[selectedDay] || [];
@@ -398,8 +400,17 @@ export default function ValueBets() {
         totalStake: valueBets.reduce((s, vb) => s + (vb.stake || 0), 0),
       });
     });
-    return groups.sort((a, b) => b.bestEdge - a.bestEdge);
-  }, [pronostics, liveBankrollUnibet, liveBankrollWinamax, kFrac]);
+    // Sort according to user-selected sortMode. Default = best edge first.
+    // Time sorts use the fixture kickoff (ISO string), falling back to a
+    // big/small constant for missing dates so they don't crash the sort.
+    const SORTERS = {
+      edgeDesc: (a, b) => b.bestEdge - a.bestEdge,
+      edgeAsc: (a, b) => a.bestEdge - b.bestEdge,
+      timeAsc: (a, b) => (a.date || '9999').localeCompare(b.date || '9999'),
+      timeDesc: (a, b) => (b.date || '0').localeCompare(a.date || '0'),
+    };
+    return groups.sort(SORTERS[sortMode] || SORTERS.edgeDesc);
+  }, [pronostics, liveBankrollUnibet, liveBankrollWinamax, kFrac, sortMode]);
 
   // Plus de filtre : le scan backend ne retourne que des matchs couverts
   // par Unibet ou Winamax. On garde la variable pour compatibilité.
@@ -462,22 +473,25 @@ export default function ValueBets() {
         </p>
       </div>
 
-      {/* Day selector */}
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-        {dayOptions.map(({ iso, label }) => (
-          <button
-            key={iso}
-            onClick={() => setSelectedDay(iso)}
-            className={clsx(
-              'px-3 py-1.5 rounded-xl text-xs font-heading font-semibold border transition-all whitespace-nowrap capitalize',
-              selectedDay === iso
-                ? 'bg-gold-500/15 border-gold-500/40 text-gold-300'
-                : 'border-white/[0.08] text-white/35 hover:text-white/60'
-            )}
-          >
-            {label}
-          </button>
-        ))}
+      {/* Day selector + sort button */}
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 flex-1">
+          {dayOptions.map(({ iso, label }) => (
+            <button
+              key={iso}
+              onClick={() => setSelectedDay(iso)}
+              className={clsx(
+                'px-3 py-1.5 rounded-xl text-xs font-heading font-semibold border transition-all whitespace-nowrap capitalize',
+                selectedDay === iso
+                  ? 'bg-gold-500/15 border-gold-500/40 text-gold-300'
+                  : 'border-white/[0.08] text-white/35 hover:text-white/60'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <SortDropdown sortMode={sortMode} setSortMode={setSortMode} open={sortOpen} setOpen={setSortOpen} />
       </div>
 
 
@@ -699,6 +713,56 @@ export default function ValueBets() {
             </Link>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Sort dropdown — small button that toggles a 4-option menu. Closes on
+// outside click via a transparent backdrop so it doesn't need a global
+// listener.
+const SORT_OPTIONS = [
+  { id: 'edgeDesc', label: 'Edge décroissant' },
+  { id: 'edgeAsc', label: 'Edge croissant' },
+  { id: 'timeAsc', label: 'Heure croissante' },
+  { id: 'timeDesc', label: 'Heure décroissante' },
+];
+function SortDropdown({ sortMode, setSortMode, open, setOpen }) {
+  return (
+    <div className="relative flex-shrink-0">
+      <button
+        onClick={() => setOpen(!open)}
+        className="px-3 py-1.5 rounded-xl text-xs font-heading font-semibold border border-white/[0.08] text-white/60 hover:text-white hover:border-white/20 transition-all whitespace-nowrap flex items-center gap-1.5"
+        title="Trier les value bets"
+      >
+        <ArrowUpDown className="w-3.5 h-3.5" />
+        Trier
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Fermer le menu de tri"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-40 bg-transparent cursor-default"
+          />
+          <div className="absolute right-0 top-full mt-1.5 w-48 z-50 rounded-xl border border-white/10 bg-dark-800/95 backdrop-blur-md shadow-xl py-1.5">
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => { setSortMode(opt.id); setOpen(false); }}
+                className={clsx(
+                  'block w-full text-left px-3 py-1.5 text-xs font-heading font-semibold transition-colors',
+                  sortMode === opt.id
+                    ? 'text-gold-300 bg-gold-500/10'
+                    : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
