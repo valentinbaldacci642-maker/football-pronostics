@@ -74,18 +74,22 @@ export default function Player() {
     return () => { cancelled = true; };
   }, [id, season]);
 
-  // Étape 3 (lazy) : charge la carrière complète au 1er affichage de la
-  // section. Évite ~10 calls API si le user ne descend pas jusque-là.
-  const loadCareerIfNeeded = async () => {
-    if (career.length > 0 || loadingCareer) return;
+  // Carrière chargée automatiquement au mount (au lieu d'un clic manuel)
+  // car on en a besoin pour afficher le total buts dans le header. ~10
+  // calls API la 1ère fois, cache 2h ensuite.
+  useEffect(() => {
+    let cancelled = false;
     setLoadingCareer(true);
-    try {
-      const r = await playersApi.getCareer(id);
-      setCareer(r?.response || []);
-    } finally {
-      setLoadingCareer(false);
-    }
-  };
+    (async () => {
+      try {
+        const r = await playersApi.getCareer(id);
+        if (!cancelled) setCareer(r?.response || []);
+      } finally {
+        if (!cancelled) setLoadingCareer(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
 
   if (loading && !playerData) return (
     <div className="flex justify-center items-center h-64"><Spinner /></div>
@@ -101,9 +105,9 @@ export default function Player() {
         <ArrowLeft className="w-4 h-4" /> Retour
       </button>
 
-      <PlayerHeader player={player} statistics={playerData.statistics || []} />
+      <PlayerHeader player={player} statistics={playerData.statistics || []} career={career} />
 
-      <CareerSection career={career} loading={loadingCareer} onLoad={loadCareerIfNeeded} />
+      <CareerSection career={career} loading={loadingCareer} />
 
       <RecentMatches playerId={id} />
 
@@ -122,15 +126,25 @@ const POSITION_FR = {
   Goalkeeper: 'Gardien',
 };
 
-function PlayerHeader({ player, statistics }) {
+function PlayerHeader({ player, statistics, career = [] }) {
   // L'équipe principale est généralement la 1ère entrée des stats (championnat).
-  // Pour le poste, idem : on prend celui de l'équipe principale.
   const mainStat = statistics[0];
   const team = mainStat?.team;
   const positionFr = POSITION_FR[mainStat?.games?.position] || mainStat?.games?.position;
   const birthDateFr = player.birth?.date
     ? format(parseISO(player.birth.date), 'dd.MM.yyyy', { locale: fr })
     : null;
+
+  // Totaux carrière (toutes saisons et toutes compétitions confondues)
+  const careerTotals = useMemo(() => {
+    const acc = { games: 0, goals: 0, assists: 0 };
+    career.forEach((r) => {
+      acc.games += r.games?.appearences || 0;
+      acc.goals += r.goals?.total || 0;
+      acc.assists += r.goals?.assists || 0;
+    });
+    return acc;
+  }, [career]);
 
   return (
     <div className="glass-card p-5">
@@ -194,6 +208,26 @@ function PlayerHeader({ player, statistics }) {
           </Link>
         )}
       </div>
+
+      {/* Totaux carrière toutes compétitions confondues. S'affiche dès que
+          la carrière est chargée (auto au mount de la page). */}
+      {career.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-white/[0.08] grid grid-cols-3 gap-3">
+          <CareerStat label="Buts" value={careerTotals.goals} accent="brand" />
+          <CareerStat label="Passes déc." value={careerTotals.assists} accent="brand" />
+          <CareerStat label="Matchs joués" value={careerTotals.games} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CareerStat({ label, value, accent }) {
+  const colorClass = accent === 'brand' ? 'text-brand-400' : 'text-white';
+  return (
+    <div className="text-center">
+      <p className={`font-display text-2xl sm:text-3xl font-bold tabular-nums leading-none ${colorClass}`}>{value}</p>
+      <p className="text-[10px] sm:text-xs text-white/45 font-heading uppercase tracking-wider mt-1">{label}</p>
     </div>
   );
 }
@@ -237,15 +271,8 @@ const CAREER_TABS = [
   { id: 'national', label: 'Équipe nationale' },
 ];
 
-function CareerSection({ career, loading, onLoad }) {
+function CareerSection({ career, loading }) {
   const [tab, setTab] = useState('league');
-  const [hasOpened, setHasOpened] = useState(false);
-
-  useEffect(() => {
-    if (hasOpened && career.length === 0 && !loading) {
-      onLoad();
-    }
-  }, [hasOpened, career.length, loading, onLoad]);
 
   // Filtre uniquement par onglet (toutes saisons confondues), puis tri
   // saison décroissante puis matchs joués décroissant.
@@ -272,20 +299,12 @@ function CareerSection({ career, loading, onLoad }) {
 
   return (
     <div className="glass-card overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-2">
+      <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
         <h2 className="font-heading font-bold text-white text-lg">Carrière</h2>
-        {!hasOpened && career.length === 0 && (
-          <button
-            onClick={() => setHasOpened(true)}
-            className="flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-300 hover:text-brand-200 border border-brand-500/30 hover:border-brand-500/60 rounded-lg px-3 py-1.5 transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" /> Charger
-          </button>
-        )}
+        {loading && <span className="text-xs text-white/40">chargement…</span>}
       </div>
 
-      {hasOpened && (
-        <>
+      <>
           {/* Onglets : filtre par type de compétition */}
           <div className="flex gap-1 px-3 pt-3 overflow-x-auto no-scrollbar border-b border-white/[0.05]">
             {CAREER_TABS.map((t) => (
@@ -377,7 +396,6 @@ function CareerSection({ career, loading, onLoad }) {
           )}
           </div>
         </>
-      )}
     </div>
   );
 }
