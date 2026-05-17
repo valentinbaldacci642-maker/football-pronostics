@@ -175,6 +175,9 @@ export const playersApi = {
   getSeasons: (id) => api.get(`/players/${id}/seasons`),
   getTrophies: (id) => api.get(`/players/${id}/trophies`),
   getTransfers: (id) => api.get(`/players/${id}/transfers`),
+  getSidelined: (id) => api.get(`/players/${id}/sidelined`),
+  getCareer: (id) => api.get(`/players/${id}/career`),
+  getRecentMatches: (id, season, limit = 15) => api.get(`/players/${id}/recent-matches`, { params: { season, limit } }),
 };
 
 export const analysisApi = {

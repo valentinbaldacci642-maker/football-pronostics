@@ -324,6 +324,18 @@ class ApiFootballService {
     return this.request('/transfers', { player: playerId }, config.cache.ttlTeams);
   }
 
+  // Historique blessures / absences (suspensions, manque de condition, etc.).
+  async getPlayerSidelined(playerId) {
+    return this.request('/sidelined', { player: playerId }, config.cache.ttlTeams);
+  }
+
+  // Stats par match du joueur pour la saison donnée. Récupère les
+  // statistiques détaillées (note, minutes, buts, passes, cartons) pour
+  // chaque match joué par le joueur au sein d'une équipe sur cette saison.
+  async getFixturePlayers(fixtureId) {
+    return this.request('/fixtures/players', { fixture: fixtureId }, config.cache.ttlFixtures);
+  }
+
   // ─── Squad ────────────────────────────────────────────────────────────────
   async getTeamSquad(teamId) {
     return this.request('/players/squads', { team: teamId }, config.cache.ttlTeams);
