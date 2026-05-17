@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Calendar, Trophy, Ruler, Weight, ArrowLeftRight, Activity, Plus } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Ruler, Weight, ArrowLeftRight, Activity, Plus } from 'lucide-react';
 import { playersApi } from '../services/api';
 import { Spinner, ErrorState } from '../components/ui/Loading';
 import { format, parseISO } from 'date-fns';
@@ -14,7 +14,6 @@ export default function Player() {
   const [seasonsAvailable, setSeasonsAvailable] = useState([]);
   const [season, setSeason] = useState(null);
   const [playerData, setPlayerData] = useState(null);
-  const [trophies, setTrophies] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [sidelined, setSidelined] = useState([]);
   const [career, setCareer] = useState([]);
@@ -58,15 +57,13 @@ export default function Player() {
     setError(null);
     (async () => {
       try {
-        const [p, t, tr, sl] = await Promise.allSettled([
+        const [p, tr, sl] = await Promise.allSettled([
           playersApi.getById(id, season),
-          playersApi.getTrophies(id),
           playersApi.getTransfers(id),
           playersApi.getSidelined(id),
         ]);
         if (cancelled) return;
         if (p.status === 'fulfilled') setPlayerData(p.value?.response?.[0] || null);
-        if (t.status === 'fulfilled') setTrophies(t.value?.response || []);
         if (tr.status === 'fulfilled') setTransfers(tr.value?.response || []);
         if (sl.status === 'fulfilled') setSidelined(sl.value?.response || []);
         if (p.status === 'rejected') setError(p.reason?.message || 'Erreur chargement joueur');
@@ -120,8 +117,6 @@ export default function Player() {
       <TransfersTable transfers={transfers} />
 
       <SidelinedTable sidelined={sidelined} />
-
-      <TrophiesList trophies={trophies} />
     </motion.div>
   );
 }
@@ -608,48 +603,3 @@ function translateSidelinedType(t) {
   return map[t] || t || '—';
 }
 
-function TrophiesList({ trophies }) {
-  if (!trophies.length) return null;
-  const grouped = trophies.reduce((acc, t) => {
-    const key = `${t.league}__${t.country}`;
-    if (!acc[key]) acc[key] = { league: t.league, country: t.country, entries: [] };
-    acc[key].entries.push(t);
-    return acc;
-  }, {});
-  const list = Object.values(grouped).sort((a, b) => b.entries.length - a.entries.length);
-
-  return (
-    <div className="glass-card overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
-        <Trophy className="w-4 h-4 text-gold-400" />
-        <h2 className="font-heading font-bold text-white text-lg">Palmarès</h2>
-        <span className="text-xs text-white/40 ml-auto font-mono">{trophies.length}</span>
-      </div>
-      <div className="divide-y divide-white/[0.05]">
-        {list.map((g, i) => (
-          <div key={i} className="px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-heading font-bold text-white truncate">{g.league}</p>
-              <span className="text-xs text-white/45">{g.country}</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {g.entries.map((e, j) => (
-                <span
-                  key={j}
-                  className={clsx(
-                    'text-[10px] font-mono px-1.5 py-0.5 rounded border',
-                    (e.place || '').toLowerCase().includes('winner')
-                      ? 'bg-gold-500/15 border-gold-500/40 text-gold-300'
-                      : 'bg-white/[0.05] border-white/15 text-white/50',
-                  )}
-                >
-                  {e.season} {(e.place || '').toLowerCase().includes('winner') ? '🏆' : ''}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
