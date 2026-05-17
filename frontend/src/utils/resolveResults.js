@@ -74,8 +74,11 @@ export async function resolveFinishedMatches(entries, onResolve) {
       const status = fixture?.fixture?.status?.short;
       const hg = fixture?.goals?.home;
       const ag = fixture?.goals?.away;
+      const realMatchDate = fixture?.fixture?.date;
       if (FINISHED_STATUSES.includes(status) && Number.isFinite(hg) && Number.isFinite(ag)) {
-        onResolve(entry.fixtureId, hg, ag);
+        // Pass the real kickoff back so the store can correct a stale
+        // matchDate (e.g. API reschedule that drifted from the stored date).
+        onResolve(entry.fixtureId, hg, ag, realMatchDate);
         resolved += 1;
       }
     } catch {

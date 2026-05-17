@@ -583,10 +583,17 @@ export const useHistoryStore = create(
         }
       },
 
-      resolveResult: (fixtureId, homeGoals, awayGoals) => set((s) => ({
+      resolveResult: (fixtureId, homeGoals, awayGoals, realMatchDate = null) => set((s) => ({
         entries: s.entries.map((e) => {
           if (e.fixtureId !== fixtureId) return e;
           let next = e;
+
+          // Take the chance to fix a stale matchDate (API reschedule
+          // detection): if the resolver gave us the real kickoff and it
+          // differs from what we stored, overwrite.
+          if (realMatchDate && realMatchDate !== e.matchDate) {
+            next = { ...next, matchDate: realMatchDate };
+          }
 
           // Entry-level pick (the "main" prono on the Pronos page)
           if (!e.result) {
