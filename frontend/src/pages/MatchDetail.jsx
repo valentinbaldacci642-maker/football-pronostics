@@ -349,143 +349,181 @@ function EventsTab({ events, home, away }) {
     const type = ev.type;
     const detail = ev.detail || '';
     if (type === 'Goal') {
-      if (detail.includes('Own')) return { icon: '😱', label: 'But CSC', tone: 'goalOG', isGoal: true };
-      if (detail.includes('Penalty')) return { icon: '🎯', label: 'But sur penalty', tone: 'goal', isGoal: true };
-      if (detail.includes('Missed Penalty')) return { icon: '❌', label: 'Penalty manqué', tone: 'miss', isGoal: false };
-      return { icon: '⚽', label: 'But', tone: 'goal', isGoal: true };
+      if (detail.includes('Own')) return { icon: '⚽', detailFr: 'csc', isGoal: true };
+      if (detail.includes('Penalty')) return { icon: '⚽', detailFr: 'pen.', isGoal: true };
+      if (detail.includes('Missed Penalty')) return { icon: '❌', detailFr: 'pen. manqué', isGoal: false };
+      return { icon: '⚽', detailFr: null, isGoal: true };
     }
     if (type === 'Card') {
-      if (detail.includes('Red')) return { icon: '🟥', label: 'Carton rouge', tone: 'red' };
-      if (detail.includes('Yellow')) return { icon: '🟨', label: 'Carton jaune', tone: 'yellow' };
-      return { icon: '🟨', label: detail || 'Carton', tone: 'yellow' };
+      if (detail.includes('Red')) return { icon: '🟥', detailFr: detail.replace('Red Card', '').trim() || null };
+      if (detail.includes('Yellow')) {
+        // Traduire les fautes courantes
+        const faultMap = {
+          'Foul': 'Faute',
+          'Tackle': 'Tacle',
+          'Hand ball': 'Main',
+          'Argument': 'Contestation',
+          'Tripping': 'Croche-pied',
+          'Pushing': 'Poussée',
+          'Holding': 'Tenu',
+          'Time wasting': 'Anti-jeu',
+          'Diving': 'Simulation',
+          'Persistent fouling': 'Fautes répétées',
+          'Dissent': 'Contestation',
+          'Reckless tackle': 'Tacle dangereux',
+        };
+        const cleaned = detail.replace('Yellow Card', '').trim();
+        const fr = faultMap[cleaned] || cleaned || null;
+        return { icon: '🟨', detailFr: fr };
+      }
+      return { icon: '🟨', detailFr: detail || null };
     }
-    if (type === 'subst') return { icon: '🔄', label: 'Changement', tone: 'sub' };
-    if (type === 'Var') return { icon: '📺', label: detail || 'VAR', tone: 'var' };
-    return { icon: '•', label: detail || type, tone: 'plain' };
+    if (type === 'subst') return { icon: '🔄', detailFr: null, isSub: true };
+    if (type === 'Var') return { icon: '📺', detailFr: detail || 'VAR' };
+    return { icon: '•', detailFr: detail || type };
   };
 
   const formatMinute = (time) => {
     const m = time?.elapsed;
     const extra = time?.extra;
     if (m == null) return '';
-    return extra ? `${m}+${extra}` : `${m}`;
+    return extra ? `${m}+${extra}'` : `${m}'`;
   };
 
-  // Score cumulé après chaque event pour les buts. CSC = compte pour
-  // l'équipe adverse (logique foot standard).
+  // Détermine la mi-temps de l'event à partir de la minute :
+  // - elapsed <= 45 → 1ère MT (incl. additionnel 45+x)
+  // - 46-90       → 2e MT
+  // - 91-105      → prolongation 1
+  // - 106-120     → prolongation 2
+  const periodKey = (ev) => {
+    const m = ev?.time?.elapsed ?? 0;
+    if (m <= 45) return 'ht1';
+    if (m <= 90) return 'ht2';
+    if (m <= 105) return 'et1';
+    return 'et2';
+  };
+  const periodLabel = {
+    ht1: '1ʳᵉ mi-temps',
+    ht2: '2ᵉ mi-temps',
+    et1: 'Prolongations',
+    et2: 'Prolongations',
+  };
+
+  // Score cumulé par event + score final par période
+  const scoreByPeriod = { ht1: [0, 0], ht2: [0, 0], et1: [0, 0], et2: [0, 0] };
   const scoreAfter = [];
   let hg = 0, ag = 0;
   events.forEach((ev, i) => {
     const meta = getEvent(ev);
     if (meta.isGoal) {
       const isHome = ev.team?.id === home?.id;
-      const detail = ev.detail || '';
-      const ownGoal = detail.includes('Own');
+      const ownGoal = (ev.detail || '').includes('Own');
       if ((isHome && !ownGoal) || (!isHome && ownGoal)) hg += 1;
       else ag += 1;
     }
-    scoreAfter[i] = meta.isGoal ? `${hg}-${ag}` : null;
+    scoreAfter[i] = meta.isGoal ? `${hg} - ${ag}` : null;
+    scoreByPeriod[periodKey(ev)] = [hg, ag];
   });
 
-  const bgByTone = {
-    goal:   'bg-brand-500/20 border-brand-500/50',
-    goalOG: 'bg-orange-500/15 border-orange-500/40',
-    miss:   'bg-red-500/10 border-red-500/30',
-    yellow: 'bg-yellow-500/10 border-yellow-500/30',
-    red:    'bg-red-500/20 border-red-500/50',
-    sub:    'bg-white/[0.05] border-white/15',
-    var:    'bg-purple-500/10 border-purple-500/30',
-    plain:  'bg-white/[0.05] border-white/15',
-  };
+  // Groupe les events par période en gardant l'ordre chronologique
+  const grouped = events.reduce((acc, ev, i) => {
+    const k = periodKey(ev);
+    if (!acc[k]) acc[k] = [];
+    acc[k].push({ ev, i });
+    return acc;
+  }, {});
+  const orderedPeriods = ['ht1', 'ht2', 'et1', 'et2'].filter((k) => grouped[k]?.length);
 
   return (
-    <div className="glass-card p-4">
-      {/* En-tête noms d'équipes pour ancrer la timeline */}
-      <div className="grid grid-cols-[1fr_56px_1fr] items-center mb-4 pb-3 border-b border-white/10">
-        <div className="flex items-center gap-2 justify-end">
-          <span className="text-sm font-heading font-bold text-white truncate text-right">{home?.name}</span>
-          <img src={home?.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
-        </div>
-        <div className="text-center text-[10px] text-white/30 uppercase tracking-wider font-heading">Min</div>
-        <div className="flex items-center gap-2 justify-start">
-          <img src={away?.logo} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
-          <span className="text-sm font-heading font-bold text-white truncate">{away?.name}</span>
-        </div>
-      </div>
+    <div className="glass-card overflow-hidden">
+      {orderedPeriods.map((pkey, pi) => {
+        const [phg, pag] = scoreByPeriod[pkey];
+        return (
+          <div key={pkey}>
+            {/* En-tête de mi-temps : bandeau sombre avec label + score */}
+            <div className={clsx(
+              'flex items-center justify-between px-4 py-2 bg-dark-800/80 border-b border-white/5',
+              pi > 0 && 'border-t border-white/5',
+            )}>
+              <span className="text-[11px] text-white/55 uppercase tracking-wider font-heading font-bold">
+                {pi + 1}. {periodLabel[pkey]}
+              </span>
+              <span className="text-sm text-white font-display font-bold tabular-nums">
+                {phg} - {pag}
+              </span>
+            </div>
 
-      {/* Timeline : 3 colonnes [home event | minute | away event] avec
-          une ligne verticale au centre traversant tous les events */}
-      <div className="relative">
-        {/* Ligne centrale */}
-        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/10 -translate-x-1/2" />
+            {/* Events de cette période */}
+            <div className="py-2">
+              {grouped[pkey].map(({ ev, i }) => {
+                const isHome = ev.team?.id === home?.id;
+                const meta = getEvent(ev);
+                const score = scoreAfter[i];
 
-        <div className="space-y-3">
-          {events.map((ev, i) => {
-            const isHome = ev.team?.id === home?.id;
-            const meta = getEvent(ev);
-            const score = scoreAfter[i];
-
-            const eventBlock = (
-              <div className={clsx('rounded-lg px-3 py-2.5 border', bgByTone[meta.tone])}>
-                <div className={clsx('flex items-center gap-2', isHome ? 'flex-row-reverse text-right' : 'flex-row text-left')}>
-                  <span className="text-2xl flex-shrink-0">{meta.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    {meta.tone === 'sub' ? (
-                      <>
-                        <p className="text-sm font-heading font-bold text-brand-300 truncate">
-                          ↑ {ev.assist?.name || '—'}
-                        </p>
-                        <p className="text-xs text-white/60 truncate">
-                          ↓ {ev.player?.name || '—'}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-base font-heading font-bold text-white truncate leading-tight">
-                          {ev.player?.name || '—'}
-                        </p>
-                        <p className="text-[11px] text-white/55 mt-0.5 truncate">
-                          {meta.label}
-                          {ev.assist?.name && meta.isGoal && (
-                            <span className="text-white/40"> · passe : {ev.assist.name}</span>
-                          )}
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-
-            return (
-              <div key={i} className="grid grid-cols-[1fr_56px_1fr] items-center gap-2">
-                {/* Colonne HOME (vide si event est away) */}
-                <div className="min-w-0">{isHome && eventBlock}</div>
-
-                {/* Minute au centre — pastille ronde sur la ligne */}
-                <div className="flex flex-col items-center gap-1">
+                // Bloc texte d'un event normal (but / carton / var…)
+                const contentRow = (
                   <div className={clsx(
-                    'rounded-full px-2 py-1 text-xs font-display font-bold border min-w-[44px] text-center leading-none',
-                    meta.isGoal
-                      ? 'bg-brand-500/30 border-brand-400 text-brand-100'
-                      : 'bg-dark-800 border-white/20 text-white/80',
+                    'flex items-center gap-2 text-sm min-w-0',
+                    isHome ? 'flex-row' : 'flex-row-reverse text-right',
                   )}>
-                    {formatMinute(ev.time)}<span className="text-[9px] opacity-60">'</span>
-                  </div>
-                  {score && (
-                    <div className="text-xs font-display font-black text-white tabular-nums leading-none">
-                      {score}
+                    <span className="text-base flex-shrink-0">{meta.icon}</span>
+                    {meta.isGoal && (
+                      <span className="text-white font-display font-bold tabular-nums whitespace-nowrap">
+                        {score}
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1 truncate">
+                      <span className="text-white font-heading font-bold">{ev.player?.name}</span>
+                      {ev.assist?.name && meta.isGoal && (
+                        <span className="text-white/45 font-heading"> ({ev.assist.name})</span>
+                      )}
+                      {meta.detailFr && !meta.isGoal && (
+                        <span className="text-white/45 font-heading"> ({meta.detailFr})</span>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                );
 
-                {/* Colonne AWAY (vide si event est home) */}
-                <div className="min-w-0">{!isHome && eventBlock}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                // Bloc spécial substitution : Entrant ↔ Sortant côte à côte
+                const subRow = (
+                  <div className={clsx(
+                    'flex items-center gap-2 text-sm min-w-0',
+                    isHome ? 'flex-row' : 'flex-row-reverse text-right',
+                  )}>
+                    <span className="text-base flex-shrink-0">{meta.icon}</span>
+                    <div className="min-w-0 flex-1 truncate">
+                      <span className="text-brand-300 font-heading font-bold">{ev.assist?.name || '—'}</span>
+                      <span className="text-white/45 font-heading"> {ev.player?.name || '—'}</span>
+                    </div>
+                  </div>
+                );
+
+                const eventContent = meta.isSub ? subRow : contentRow;
+                const minuteLabel = (
+                  <span className="text-xs text-white/45 font-mono tabular-nums w-12 flex-shrink-0">
+                    {formatMinute(ev.time)}
+                  </span>
+                );
+
+                return (
+                  <div key={i} className="grid grid-cols-2 gap-2 px-3 py-1.5 hover:bg-white/[0.02]">
+                    {/* Côté domicile */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      {isHome && minuteLabel}
+                      {isHome && eventContent}
+                    </div>
+                    {/* Côté extérieur (les 2 colonnes mirroir, minute à droite) */}
+                    <div className="flex items-center gap-2 min-w-0 justify-end">
+                      {!isHome && eventContent}
+                      {!isHome && minuteLabel}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
