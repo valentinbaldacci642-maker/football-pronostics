@@ -436,12 +436,12 @@ function getQualifBucket(desc) {
 const BUCKET_STYLES = {
   ucl:       { border: 'border-l-green-500',   dot: 'bg-green-500',   label: 'LDC' },
   uclQ:      { border: 'border-l-teal-400',    dot: 'bg-teal-400',    label: 'Barrage LDC' },
-  uel:       { border: 'border-l-orange-500',  dot: 'bg-orange-500',  label: 'Europa' },
-  uelQ:      { border: 'border-l-yellow-400',  dot: 'bg-yellow-400',  label: 'Barrage Europa' },
+  uel:       { border: 'border-l-yellow-400',  dot: 'bg-yellow-400',  label: 'Europa' },
+  uelQ:      { border: 'border-l-rose-400',    dot: 'bg-rose-400',    label: 'Barrage Europa' },
   conf:      { border: 'border-l-blue-500',    dot: 'bg-blue-500',    label: 'Conference' },
   confQ:     { border: 'border-l-violet-400',  dot: 'bg-violet-400',  label: 'Barrage Conf.' },
   promo:     { border: 'border-l-lime-400',    dot: 'bg-lime-400',    label: 'Promotion' },
-  reldown:   { border: 'border-l-pink-500',    dot: 'bg-pink-500',    label: 'Barrage maintien' },
+  reldown:   { border: 'border-l-orange-500',  dot: 'bg-orange-500',  label: 'Barrage maintien' },
   relegated: { border: 'border-l-red-500',     dot: 'bg-red-500',     label: 'Relégation' },
 };
 
