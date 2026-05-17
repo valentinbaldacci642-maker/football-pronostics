@@ -17,7 +17,25 @@ router.get('/topscorers', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    res.json(await api.getPlayer(req.params.id, req.query.season || 2024));
+    res.json(await api.getPlayer(req.params.id, req.query.season || 2025));
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/seasons', async (req, res, next) => {
+  try {
+    res.json(await api.getPlayerSeasons(req.params.id));
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/trophies', async (req, res, next) => {
+  try {
+    res.json(await api.getPlayerTrophies(req.params.id));
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/transfers', async (req, res, next) => {
+  try {
+    res.json(await api.getPlayerTransfers(req.params.id));
   } catch (err) { next(err); }
 });
 

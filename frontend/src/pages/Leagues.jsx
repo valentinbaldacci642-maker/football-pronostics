@@ -337,7 +337,7 @@ function TopScorersTable({ scorers }) {
           const pct = Math.round((goals / maxGoals) * 100);
 
           return (
-            <div key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
+            <Link to={`/player/${player.id}`} key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors group">
               <span className={`w-5 text-center font-mono text-xs flex-shrink-0 ${i === 0 ? 'text-gold-400 font-bold' : i === 1 ? 'text-white/50' : i === 2 ? 'text-amber-600/80' : 'text-white/20'}`}>
                 {i + 1}
               </span>
@@ -349,7 +349,7 @@ function TopScorersTable({ scorers }) {
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-heading font-semibold text-white/85 truncate">{player.name}</span>
+                  <span className="text-sm font-heading font-semibold text-white/85 truncate group-hover:text-brand-400 transition-colors">{player.name}</span>
                   {team?.logo && (
                     <img src={team.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={(e) => e.target.style.display = 'none'} />
                   )}
@@ -370,7 +370,7 @@ function TopScorersTable({ scorers }) {
                   </div>
                 )}
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

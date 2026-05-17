@@ -464,6 +464,14 @@ function EventsTab({ events, home, away }) {
                 const meta = getEvent(ev);
                 const score = scoreAfter[i];
 
+                // Helper : wrappe un nom de joueur dans un Link s'il a
+                // un id, sinon en simple span (cas de noms tronqués API).
+                const PlayerName = ({ p, className }) => (
+                  p?.id
+                    ? <Link to={`/player/${p.id}`} className={clsx(className, 'hover:text-brand-400 transition-colors')}>{p.name}</Link>
+                    : <span className={className}>{p?.name || '—'}</span>
+                );
+
                 // Bloc texte d'un event normal (but / carton / var…)
                 const contentRow = (
                   <div className={clsx(
@@ -477,9 +485,13 @@ function EventsTab({ events, home, away }) {
                       </span>
                     )}
                     <div className="min-w-0 flex-1 truncate">
-                      <span className="text-white font-heading font-bold">{ev.player?.name}</span>
+                      <PlayerName p={ev.player} className="text-white font-heading font-bold" />
                       {ev.assist?.name && meta.isGoal && (
-                        <span className="text-white/45 font-heading"> ({ev.assist.name})</span>
+                        <>
+                          <span className="text-white/45 font-heading"> (</span>
+                          <PlayerName p={ev.assist} className="text-white/45 font-heading" />
+                          <span className="text-white/45 font-heading">)</span>
+                        </>
                       )}
                       {meta.detailFr && !meta.isGoal && (
                         <span className="text-white/45 font-heading"> ({meta.detailFr})</span>
@@ -496,8 +508,9 @@ function EventsTab({ events, home, away }) {
                   )}>
                     <span className="text-base flex-shrink-0">{meta.icon}</span>
                     <div className="min-w-0 flex-1 truncate">
-                      <span className="text-brand-300 font-heading font-bold">{ev.assist?.name || '—'}</span>
-                      <span className="text-white/45 font-heading"> {ev.player?.name || '—'}</span>
+                      <PlayerName p={ev.assist} className="text-brand-300 font-heading font-bold" />
+                      <span className="text-white/45 font-heading"> </span>
+                      <PlayerName p={ev.player} className="text-white/45 font-heading" />
                     </div>
                   </div>
                 );
@@ -694,23 +707,71 @@ function SoccerField({ players }) {
           const xPercent = ((idx + 1) / (rowPlayers.length + 1)) * 100;
           // Nom court : dernier mot (généralement le nom de famille)
           const lastName = (p.player?.name || '').trim().split(' ').slice(-1)[0];
-          return (
-            <div
-              key={`${r}-${idx}`}
-              className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
-              style={{ left: `${xPercent}%`, top: `${yPercent}%` }}
-            >
+          // Sur le terrain, le joueur est cliquable s'il a un id API.
+          const FieldPlayer = (
+            <>
               <div className="w-11 h-11 rounded-full bg-brand-500 border-2 border-white shadow-lg flex items-center justify-center text-sm font-display font-bold text-white">
                 {p.player?.number ?? '—'}
               </div>
               <div className="mt-1 bg-black/75 backdrop-blur-sm px-1.5 py-0.5 rounded text-xs text-white font-heading font-bold whitespace-nowrap max-w-[100px] truncate leading-tight">
                 {lastName}
               </div>
+            </>
+          );
+          return p.player?.id ? (
+            <Link
+              key={`${r}-${idx}`}
+              to={`/player/${p.player.id}`}
+              className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center hover:scale-110 transition-transform"
+              style={{ left: `${xPercent}%`, top: `${yPercent}%` }}
+            >
+              {FieldPlayer}
+            </Link>
+          ) : (
+            <div
+              key={`${r}-${idx}`}
+              className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+              style={{ left: `${xPercent}%`, top: `${yPercent}%` }}
+            >
+              {FieldPlayer}
             </div>
           );
         });
       })}
     </div>
+  );
+}
+
+// Une ligne de joueur dans la liste textuelle. Cliquable si id API présent.
+function LineupRow({ p, subdued = false }) {
+  const inner = (
+    <>
+      <span className={clsx(
+        'w-7 h-7 rounded-md flex items-center justify-center font-mono font-bold text-xs flex-shrink-0',
+        subdued ? 'bg-dark-600/60 text-white/50' : 'bg-dark-600 text-white/70',
+      )}>
+        {p.player?.number}
+      </span>
+      <span className={clsx(
+        'truncate flex-1',
+        subdued ? 'text-white/70 font-heading' : 'text-white font-heading font-semibold',
+      )}>
+        {p.player?.name}
+      </span>
+      <span className={clsx('text-xs font-mono', subdued ? 'text-white/30' : 'text-white/40')}>
+        {p.player?.pos}
+      </span>
+    </>
+  );
+  return p.player?.id ? (
+    <Link
+      to={`/player/${p.player.id}`}
+      className="flex items-center gap-2.5 text-sm py-1 -mx-2 px-2 rounded hover:bg-white/[0.04] transition-colors"
+    >
+      {inner}
+    </Link>
+  ) : (
+    <div className="flex items-center gap-2.5 text-sm py-1">{inner}</div>
   );
 }
 
@@ -730,17 +791,12 @@ function LineupsTab({ lineups }) {
           {/* Mini terrain — affiché si la grid des joueurs est dispo */}
           <SoccerField players={lu.startXI} />
 
-          {/* Liste textuelle du XI (fallback si grid absente, ou complément) */}
+          {/* Liste textuelle du XI (fallback si grid absente, ou complément).
+              Chaque joueur ouvre sa fiche au clic. */}
           <div className="space-y-2 mt-3">
             <p className="text-xs text-white/45 uppercase tracking-wider font-heading font-bold">Onze titulaire</p>
             {lu.startXI?.map((p, i) => (
-              <div key={i} className="flex items-center gap-2.5 text-sm">
-                <span className="w-7 h-7 rounded-md bg-dark-600 flex items-center justify-center text-white/70 font-mono font-bold text-xs flex-shrink-0">
-                  {p.player?.number}
-                </span>
-                <span className="text-white font-heading font-semibold truncate flex-1">{p.player?.name}</span>
-                <span className="text-xs text-white/40 font-mono">{p.player?.pos}</span>
-              </div>
+              <LineupRow key={i} p={p} />
             ))}
           </div>
 
@@ -748,13 +804,7 @@ function LineupsTab({ lineups }) {
             <div className="mt-4 pt-3 border-t border-white/10">
               <p className="text-xs text-white/45 uppercase tracking-wider font-heading font-bold mb-2">Remplaçants</p>
               {lu.substitutes.map((p, i) => (
-                <div key={i} className="flex items-center gap-2.5 text-sm py-1">
-                  <span className="w-7 h-7 rounded-md bg-dark-600/60 flex items-center justify-center text-white/50 font-mono font-bold text-xs flex-shrink-0">
-                    {p.player?.number}
-                  </span>
-                  <span className="text-white/70 font-heading truncate flex-1">{p.player?.name}</span>
-                  <span className="text-xs text-white/30 font-mono">{p.player?.pos}</span>
-                </div>
+                <LineupRow key={i} p={p} subdued />
               ))}
             </div>
           )}

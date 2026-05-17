@@ -171,6 +171,10 @@ export const leaguesApi = {
 export const playersApi = {
   getTopScorers: (league, season) => api.get('/players/topscorers', { params: { league, season } }),
   search: (name) => api.get('/players/search', { params: { name } }),
+  getById: (id, season) => api.get(`/players/${id}`, { params: season ? { season } : {} }),
+  getSeasons: (id) => api.get(`/players/${id}/seasons`),
+  getTrophies: (id) => api.get(`/players/${id}/trophies`),
+  getTransfers: (id) => api.get(`/players/${id}/transfers`),
 };
 
 export const analysisApi = {

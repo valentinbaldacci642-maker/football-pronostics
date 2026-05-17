@@ -310,6 +310,20 @@ class ApiFootballService {
     return this.request('/players', { search: name }, config.cache.ttlTeams);
   }
 
+  // Liste des saisons jouées par un joueur (utile pour afficher un picker
+  // dans la fiche joueur). Cache long (1 jour) car ça change rarement.
+  async getPlayerSeasons(playerId) {
+    return this.request('/players/seasons', { player: playerId }, config.cache.ttlLeagues);
+  }
+
+  async getPlayerTrophies(playerId) {
+    return this.request('/trophies', { player: playerId }, config.cache.ttlTeams);
+  }
+
+  async getPlayerTransfers(playerId) {
+    return this.request('/transfers', { player: playerId }, config.cache.ttlTeams);
+  }
+
   // ─── Squad ────────────────────────────────────────────────────────────────
   async getTeamSquad(teamId) {
     return this.request('/players/squads', { team: teamId }, config.cache.ttlTeams);

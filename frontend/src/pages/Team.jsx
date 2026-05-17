@@ -189,18 +189,18 @@ function SquadTab({ teamId }) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y divide-white/3 sm:divide-y-0">
             {grouped[pos].map((player) => (
-              <div key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/3 transition-colors sm:border-b sm:border-white/3">
+              <Link to={`/player/${player.id}`} key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors sm:border-b sm:border-white/3 group">
                 <div className="w-10 h-10 rounded-full bg-dark-700 overflow-hidden flex-shrink-0">
                   <img src={player.photo} alt={player.name} className="w-full h-full object-cover" onError={e => e.target.style.display='none'} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white/90 truncate">{player.name}</p>
+                  <p className="text-sm font-semibold text-white/90 truncate group-hover:text-brand-400 transition-colors">{player.name}</p>
                   <p className="text-xs text-white/30">{player.age ? `${player.age} ans` : ''}{player.number ? ` · #${player.number}` : ''}</p>
                 </div>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-md flex-shrink-0 ${POSITION_COLORS[pos] || 'text-white/50 bg-white/5'}`}>
                   {pos}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
