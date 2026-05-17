@@ -232,30 +232,7 @@ function SeasonPicker({ seasons, selected, onSelect, loading }) {
   );
 }
 
-// Bucket de compétition pour les onglets de carrière. League type=League =
-// championnat ; Cup en country=World = international ; Cup ailleurs =
-// coupe nationale. National team détecté via "World" + league type=Cup
-// avec mots-clés Nations/World Cup/Friendlies/Euro etc.
-function competitionBucket(row) {
-  const lname = (row.league?.name || '').toLowerCase();
-  const country = row.league?.country || '';
-  const type = row.league?.type || '';
-  const isNational = /nations league|world cup|euro |afcon|copa america|qualif|friendlies|amistosos|kirin cup|asian cup|cosafa/i.test(lname);
-  if (isNational) return 'national';
-  if (country === 'World') return 'international';
-  if (type === 'Cup') return 'cup';
-  return 'league';
-}
-
-const CAREER_TABS = [
-  { id: 'league', label: 'Championnat' },
-  { id: 'cup', label: 'Coupes nationales' },
-  { id: 'international', label: 'Coupes internationales' },
-  { id: 'national', label: 'Équipe nationale' },
-];
-
 function CareerSection({ career, loading, onLoad }) {
-  const [tab, setTab] = useState('league');
   const [hasOpened, setHasOpened] = useState(false);
 
   useEffect(() => {
@@ -264,14 +241,19 @@ function CareerSection({ career, loading, onLoad }) {
     }
   }, [hasOpened, career.length, loading, onLoad]);
 
-  const filtered = useMemo(
-    () => career.filter((r) => competitionBucket(r) === tab),
-    [career, tab],
-  );
+  // Tri saison décroissante puis nombre de matchs décroissant pour
+  // grouper visuellement les compétitions principales en tête de chaque
+  // saison (Ligue 1 avant Coupe de France, etc.).
+  const rows = useMemo(() => {
+    return [...career].sort((a, b) => {
+      if (b.season !== a.season) return b.season - a.season;
+      return (b.games?.appearences || 0) - (a.games?.appearences || 0);
+    });
+  }, [career]);
 
   const totals = useMemo(() => {
     const acc = { games: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
-    filtered.forEach((r) => {
+    rows.forEach((r) => {
       acc.games += r.games?.appearences || 0;
       acc.goals += r.goals?.total || 0;
       acc.assists += r.goals?.assists || 0;
@@ -279,7 +261,7 @@ function CareerSection({ career, loading, onLoad }) {
       acc.red += r.cards?.red || 0;
     });
     return acc;
-  }, [filtered]);
+  }, [rows]);
 
   return (
     <div className="glass-card overflow-hidden">
@@ -296,97 +278,78 @@ function CareerSection({ career, loading, onLoad }) {
       </div>
 
       {hasOpened && (
-        <>
-          <div className="flex gap-1 px-3 pt-3 overflow-x-auto no-scrollbar">
-            {CAREER_TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={clsx(
-                  'px-3 py-1.5 rounded-lg text-xs font-heading font-semibold whitespace-nowrap transition-all border-b-2',
-                  tab === t.id
-                    ? 'text-brand-300 border-brand-400'
-                    : 'text-white/40 border-transparent hover:text-white/70',
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="p-3 overflow-x-auto">
-            {loading && career.length === 0 ? (
-              <div className="py-8 text-center text-white/40 text-sm">Chargement de la carrière…</div>
-            ) : filtered.length === 0 ? (
-              <div className="py-6 text-center text-white/40 text-sm">Aucune donnée dans cette catégorie.</div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-[10px] text-white/40 uppercase tracking-wider border-b border-white/5">
-                    <th className="text-left px-2 py-2">Saison</th>
-                    <th className="text-left px-2 py-2">Équipe</th>
-                    <th className="text-left px-2 py-2 hidden sm:table-cell">Compétition</th>
-                    <th className="text-center px-1.5 py-2">⌀</th>
-                    <th className="text-center px-1.5 py-2">MJ</th>
-                    <th className="text-center px-1.5 py-2">⚽</th>
-                    <th className="text-center px-1.5 py-2">PD</th>
-                    <th className="text-center px-1.5 py-2 text-yellow-500/70">🟨</th>
-                    <th className="text-center px-1.5 py-2 text-red-500/70">🟥</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((r, i) => {
-                    const rating = r.games?.rating ? parseFloat(r.games.rating) : null;
-                    return (
-                      <tr key={`${r.season}-${r.team?.id}-${r.league?.id}-${i}`} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                        <td className="px-2 py-2 text-white/55 font-mono text-xs whitespace-nowrap">{r.season}/{(r.season + 1).toString().slice(-2)}</td>
-                        <td className="px-2 py-2">
-                          <Link to={`/team/${r.team?.id}`} className="flex items-center gap-2 group">
-                            {r.team?.logo && <img src={r.team.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={(e) => e.target.style.display = 'none'} />}
-                            <span className="text-white/85 font-heading font-semibold text-xs truncate group-hover:text-brand-400">{r.team?.name}</span>
-                          </Link>
-                        </td>
-                        <td className="px-2 py-2 hidden sm:table-cell">
-                          <span className="text-white/55 text-xs truncate">{r.league?.name}</span>
-                        </td>
-                        <td className="px-1.5 py-2 text-center">
-                          {rating != null ? (
-                            <span className={clsx(
-                              'inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tabular-nums',
-                              rating >= 7.5 ? 'bg-brand-500/30 text-brand-200'
-                                : rating >= 7 ? 'bg-brand-500/15 text-brand-300'
-                                : rating >= 6.5 ? 'bg-orange-500/15 text-orange-300'
-                                : 'bg-red-500/15 text-red-300',
-                            )}>{rating.toFixed(1)}</span>
-                          ) : <span className="text-white/20">—</span>}
-                        </td>
-                        <td className="px-1.5 py-2 text-center text-white text-xs font-mono">{r.games?.appearences ?? '—'}</td>
-                        <td className="px-1.5 py-2 text-center text-xs font-mono">
-                          <span className={r.goals?.total > 0 ? 'text-brand-400 font-bold' : 'text-white/50'}>{r.goals?.total ?? 0}</span>
-                        </td>
-                        <td className="px-1.5 py-2 text-center text-xs font-mono">
-                          <span className={r.goals?.assists > 0 ? 'text-brand-400 font-bold' : 'text-white/50'}>{r.goals?.assists ?? 0}</span>
-                        </td>
-                        <td className="px-1.5 py-2 text-center text-yellow-400/80 text-xs font-mono">{r.cards?.yellow ?? 0}</td>
-                        <td className="px-1.5 py-2 text-center text-red-400/80 text-xs font-mono">{r.cards?.red ?? 0}</td>
-                      </tr>
-                    );
-                  })}
-                  {/* Ligne TOTAL */}
-                  <tr className="border-t border-white/15 bg-white/[0.03]">
-                    <td colSpan={3} className="px-2 py-2 text-[10px] text-white/40 uppercase tracking-wider font-heading font-bold">Total</td>
-                    <td className="px-1.5 py-2"></td>
-                    <td className="px-1.5 py-2 text-center text-white text-xs font-mono font-bold">{totals.games}</td>
-                    <td className="px-1.5 py-2 text-center text-brand-400 text-xs font-mono font-bold">{totals.goals}</td>
-                    <td className="px-1.5 py-2 text-center text-brand-400 text-xs font-mono font-bold">{totals.assists}</td>
-                    <td className="px-1.5 py-2 text-center text-yellow-400/80 text-xs font-mono font-bold">{totals.yellow}</td>
-                    <td className="px-1.5 py-2 text-center text-red-400/80 text-xs font-mono font-bold">{totals.red}</td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
+        <div className="p-3 overflow-x-auto">
+          {loading && career.length === 0 ? (
+            <div className="py-8 text-center text-white/40 text-sm">Chargement de la carrière…</div>
+          ) : rows.length === 0 ? (
+            <div className="py-6 text-center text-white/40 text-sm">Aucune donnée de carrière.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[10px] text-white/40 uppercase tracking-wider border-b border-white/5">
+                  <th className="text-left px-2 py-2">Saison</th>
+                  <th className="text-left px-2 py-2">Équipe</th>
+                  <th className="text-left px-2 py-2 hidden sm:table-cell">Compétition</th>
+                  <th className="text-center px-1.5 py-2">⌀</th>
+                  <th className="text-center px-1.5 py-2">MJ</th>
+                  <th className="text-center px-1.5 py-2">⚽</th>
+                  <th className="text-center px-1.5 py-2">PD</th>
+                  <th className="text-center px-1.5 py-2 text-yellow-500/70">🟨</th>
+                  <th className="text-center px-1.5 py-2 text-red-500/70">🟥</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const rating = r.games?.rating ? parseFloat(r.games.rating) : null;
+                  return (
+                    <tr key={`${r.season}-${r.team?.id}-${r.league?.id}-${i}`} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                      <td className="px-2 py-2 text-white/55 font-mono text-xs whitespace-nowrap">{r.season}/{(r.season + 1).toString().slice(-2)}</td>
+                      <td className="px-2 py-2">
+                        <Link to={`/team/${r.team?.id}`} className="flex items-center gap-2 group">
+                          {r.team?.logo && <img src={r.team.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" onError={(e) => e.target.style.display = 'none'} />}
+                          <span className="text-white/85 font-heading font-semibold text-xs truncate group-hover:text-brand-400">{r.team?.name}</span>
+                        </Link>
+                      </td>
+                      <td className="px-2 py-2 hidden sm:table-cell">
+                        <span className="text-white/55 text-xs truncate">{r.league?.name}</span>
+                      </td>
+                      <td className="px-1.5 py-2 text-center">
+                        {rating != null ? (
+                          <span className={clsx(
+                            'inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tabular-nums',
+                            rating >= 7.5 ? 'bg-brand-500/30 text-brand-200'
+                              : rating >= 7 ? 'bg-brand-500/15 text-brand-300'
+                              : rating >= 6.5 ? 'bg-orange-500/15 text-orange-300'
+                              : 'bg-red-500/15 text-red-300',
+                          )}>{rating.toFixed(1)}</span>
+                        ) : <span className="text-white/20">—</span>}
+                      </td>
+                      <td className="px-1.5 py-2 text-center text-white text-xs font-mono">{r.games?.appearences ?? '—'}</td>
+                      <td className="px-1.5 py-2 text-center text-xs font-mono">
+                        <span className={r.goals?.total > 0 ? 'text-brand-400 font-bold' : 'text-white/50'}>{r.goals?.total ?? 0}</span>
+                      </td>
+                      <td className="px-1.5 py-2 text-center text-xs font-mono">
+                        <span className={r.goals?.assists > 0 ? 'text-brand-400 font-bold' : 'text-white/50'}>{r.goals?.assists ?? 0}</span>
+                      </td>
+                      <td className="px-1.5 py-2 text-center text-yellow-400/80 text-xs font-mono">{r.cards?.yellow ?? 0}</td>
+                      <td className="px-1.5 py-2 text-center text-red-400/80 text-xs font-mono">{r.cards?.red ?? 0}</td>
+                    </tr>
+                  );
+                })}
+                {/* Ligne TOTAL toutes compétitions confondues */}
+                <tr className="border-t border-white/15 bg-white/[0.03]">
+                  <td colSpan={3} className="px-2 py-2 text-[10px] text-white/40 uppercase tracking-wider font-heading font-bold">Total</td>
+                  <td className="px-1.5 py-2"></td>
+                  <td className="px-1.5 py-2 text-center text-white text-xs font-mono font-bold">{totals.games}</td>
+                  <td className="px-1.5 py-2 text-center text-brand-400 text-xs font-mono font-bold">{totals.goals}</td>
+                  <td className="px-1.5 py-2 text-center text-brand-400 text-xs font-mono font-bold">{totals.assists}</td>
+                  <td className="px-1.5 py-2 text-center text-yellow-400/80 text-xs font-mono font-bold">{totals.yellow}</td>
+                  <td className="px-1.5 py-2 text-center text-red-400/80 text-xs font-mono font-bold">{totals.red}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
     </div>
   );
