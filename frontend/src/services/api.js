@@ -177,7 +177,12 @@ export const playersApi = {
   getTransfers: (id) => api.get(`/players/${id}/transfers`),
   getSidelined: (id) => api.get(`/players/${id}/sidelined`),
   getCareer: (id) => api.get(`/players/${id}/career`),
-  getRecentMatches: (id, season, limit = 15) => api.get(`/players/${id}/recent-matches`, { params: { season, limit } }),
+  getRecentMatches: (id, { season, limit } = {}) => {
+    const params = {};
+    if (season) params.season = season;
+    if (limit) params.limit = limit;
+    return api.get(`/players/${id}/recent-matches`, { params });
+  },
 };
 
 export const analysisApi = {

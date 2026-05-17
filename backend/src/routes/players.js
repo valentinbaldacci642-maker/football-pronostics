@@ -70,40 +70,69 @@ router.get('/:id/career', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Derniers matchs joués par le joueur pour la saison donnée.
-// Stratégie : on récupère les équipes du joueur sur la saison, puis
-// pour chaque équipe on liste les ~limit derniers matchs et on extrait
-// les stats du joueur via /fixtures/players. Bornée à 20 matchs.
+// Matchs joués par le joueur.
+// - Si `?season=YYYY` fourni : seulement cette saison.
+// - Sinon : TOUTES les saisons connues du joueur (peut prendre 30-60s
+//   au 1er appel à cause du volume d'appels API ; le cache 2h fait que
+//   les visites suivantes sont quasi-instantanées).
+// Limite plafonnée à 500 matchs pour éviter un cas pathologique.
 router.get('/:id/recent-matches', async (req, res, next) => {
   try {
     const playerId = parseInt(req.params.id);
-    const season = parseInt(req.query.season) || new Date().getFullYear();
-    const limit = Math.min(parseInt(req.query.limit) || 15, 20);
+    const hardCap = Math.min(parseInt(req.query.limit) || 500, 500);
 
-    const playerData = await api.getPlayer(playerId, season);
-    const stats = playerData?.response?.[0]?.statistics || [];
-    const teamIds = [...new Set(stats.map((s) => s.team?.id).filter(Boolean))];
-    if (teamIds.length === 0) return res.json({ response: [] });
+    // Détermine la liste des saisons à charger
+    let seasons = [];
+    if (req.query.season) {
+      seasons = [parseInt(req.query.season)];
+    } else {
+      const seasonsRes = await api.getPlayerSeasons(playerId);
+      seasons = (seasonsRes?.response || []).filter((y) => Number.isInteger(y)).sort((a, b) => b - a);
+    }
+    if (seasons.length === 0) return res.json({ response: [] });
 
-    // On collecte les fixtures de toutes ses équipes saison, on trie
-    // descendant par date, et on prend les `limit` plus récents.
-    const fixturesResults = await Promise.allSettled(
-      teamIds.map((tid) => api.getFixtures({ team: tid, season, last: limit })),
-    );
+    // Pour chaque saison, on récupère les équipes du joueur puis les
+    // fixtures de chaque équipe sur la saison.
     const allFixtures = [];
-    fixturesResults.forEach((r) => {
-      if (r.status === 'fulfilled') {
-        (r.value?.response || []).forEach((f) => allFixtures.push(f));
-      }
-    });
-    allFixtures.sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
-    const recent = allFixtures.slice(0, limit);
+    for (const season of seasons) {
+      // eslint-disable-next-line no-await-in-loop
+      const playerData = await api.getPlayer(playerId, season);
+      const stats = playerData?.response?.[0]?.statistics || [];
+      const teamIds = [...new Set(stats.map((s) => s.team?.id).filter(Boolean))];
+      if (teamIds.length === 0) continue;
 
-    // Pour chaque fixture, on extrait les stats du joueur. On parallélise
-    // mais on limite à 5 simultanés pour rester gentil avec le throttler.
+      // eslint-disable-next-line no-await-in-loop
+      const fixturesResults = await Promise.allSettled(
+        // pas de paramètre `last` → toutes les fixtures de l'équipe sur la saison
+        teamIds.map((tid) => api.getFixtures({ team: tid, season })),
+      );
+      fixturesResults.forEach((r) => {
+        if (r.status === 'fulfilled') {
+          (r.value?.response || []).forEach((f) => allFixtures.push(f));
+        }
+      });
+    }
+
+    // Dédoublonne (un même match peut apparaître pour 2 équipes du
+    // joueur si transferred mid-season), trie desc, plafonne.
+    const seen = new Set();
+    const unique = [];
+    allFixtures
+      .sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date))
+      .forEach((f) => {
+        const fid = f.fixture?.id;
+        if (!fid || seen.has(fid)) return;
+        seen.add(fid);
+        unique.push(f);
+      });
+    const limited = unique.slice(0, hardCap);
+
+    // Pour chaque fixture, on extrait les stats du joueur via
+    // /fixtures/players. Parallélisé par lots de 5 pour ne pas saturer
+    // le throttler upstream.
     const out = [];
-    for (let i = 0; i < recent.length; i += 5) {
-      const slice = recent.slice(i, i + 5);
+    for (let i = 0; i < limited.length; i += 5) {
+      const slice = limited.slice(i, i + 5);
       // eslint-disable-next-line no-await-in-loop
       const chunk = await Promise.allSettled(slice.map((f) => api.getFixturePlayers(f.fixture.id)));
       chunk.forEach((r, j) => {

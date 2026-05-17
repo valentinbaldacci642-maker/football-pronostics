@@ -105,7 +105,7 @@ export default function Player() {
 
       <CareerSection career={career} loading={loadingCareer} onLoad={loadCareerIfNeeded} />
 
-      <RecentMatches playerId={id} season={season} />
+      <RecentMatches playerId={id} />
 
       <TransfersTable transfers={transfers} />
 
@@ -382,25 +382,21 @@ function CareerSection({ career, loading, onLoad }) {
   );
 }
 
-// Lazy : ne charge les 15 derniers matchs qu'au clic du bouton, pour
-// économiser ~20 appels API quand l'utilisateur ne descend pas jusque-là.
-function RecentMatches({ playerId, season }) {
+// Lazy : ne charge l'historique de matchs qu'au clic du bouton car ça
+// peut prendre 30-60s au 1er appel (~200-400 calls API pour un joueur
+// avec 10 saisons jouées). Les visites suivantes sont quasi-instantanées
+// grâce au cache 2h côté backend.
+function RecentMatches({ playerId }) {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [opened, setOpened] = useState(false);
-
-  useEffect(() => {
-    // Reset si on change de saison
-    setMatches([]);
-    setOpened(false);
-  }, [season]);
 
   const load = async () => {
     if (loading) return;
     setOpened(true);
     setLoading(true);
     try {
-      const r = await playersApi.getRecentMatches(playerId, season, 15);
+      const r = await playersApi.getRecentMatches(playerId);
       setMatches(r?.response || []);
     } finally {
       setLoading(false);
@@ -410,13 +406,18 @@ function RecentMatches({ playerId, season }) {
   return (
     <div className="glass-card overflow-hidden">
       <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-2">
-        <h2 className="font-heading font-bold text-white text-lg">Derniers matchs</h2>
+        <h2 className="font-heading font-bold text-white text-lg">
+          Tous les matchs
+          {opened && matches.length > 0 && (
+            <span className="text-xs text-white/45 font-mono ml-2">{matches.length}</span>
+          )}
+        </h2>
         {!opened && (
           <button
             onClick={load}
             className="flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-300 hover:text-brand-200 border border-brand-500/30 hover:border-brand-500/60 rounded-lg px-3 py-1.5 transition-all"
           >
-            <Plus className="w-3.5 h-3.5" /> Charger les 15 derniers
+            <Plus className="w-3.5 h-3.5" /> Charger l'historique
           </button>
         )}
       </div>
@@ -424,9 +425,13 @@ function RecentMatches({ playerId, season }) {
       {opened && (
         <div className="p-3 overflow-x-auto">
           {loading ? (
-            <div className="py-8 text-center text-white/40 text-sm">Récupération des stats match par match…</div>
+            <div className="py-8 text-center text-white/40 text-sm">
+              Récupération de l'historique complet match par match…
+              <br />
+              <span className="text-[10px] text-white/30">Peut prendre 30-60s la 1ère fois (gros volume API).</span>
+            </div>
           ) : matches.length === 0 ? (
-            <div className="py-6 text-center text-white/40 text-sm">Aucun match récent.</div>
+            <div className="py-6 text-center text-white/40 text-sm">Aucun match trouvé.</div>
           ) : (
             <table className="w-full text-sm">
               <thead>
