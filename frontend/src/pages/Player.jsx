@@ -113,8 +113,6 @@ export default function Player() {
         loading={loading}
       />
 
-      <StatisticsGrid statistics={playerData.statistics || []} />
-
       <CareerSection career={career} loading={loadingCareer} onLoad={loadCareerIfNeeded} />
 
       <RecentMatches playerId={id} season={season} />
@@ -184,85 +182,6 @@ function SeasonPicker({ seasons, selected, onSelect, loading }) {
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-function StatisticsGrid({ statistics }) {
-  if (!statistics.length) {
-    return (
-      <div className="glass-card p-6 text-center text-white/40 text-sm">
-        Aucune statistique pour cette saison.
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-4">
-      <p className="text-xs text-white/40 uppercase tracking-wider font-heading font-semibold">
-        Statistiques · {statistics.length} compétition{statistics.length > 1 ? 's' : ''}
-      </p>
-      {statistics.map((s, i) => (
-        <div key={i} className="glass-card p-4">
-          <div className="flex items-center gap-3 mb-4">
-            {s.team?.logo && <img src={s.team.logo} alt="" className="w-8 h-8 object-contain" />}
-            <div className="flex-1 min-w-0">
-              <Link to={`/team/${s.team?.id}`} className="font-heading font-bold text-white text-base hover:text-brand-400 transition-colors truncate block">
-                {s.team?.name}
-              </Link>
-              <p className="text-xs text-white/45 truncate flex items-center gap-1.5">
-                {s.league?.logo && <img src={s.league.logo} alt="" className="w-3.5 h-3.5 object-contain" />}
-                {s.league?.name} · {s.league?.country}
-              </p>
-            </div>
-            {s.games?.position && (
-              <span className="text-[10px] uppercase tracking-wider font-mono text-white/40 px-2 py-1 rounded bg-white/[0.05]">
-                {s.games.position}
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            <Stat label="Matchs" value={s.games?.appearences} />
-            <Stat label="Titulaire" value={s.games?.lineups} />
-            <Stat label="Minutes" value={s.games?.minutes} />
-            <Stat label="Note moy." value={s.games?.rating ? parseFloat(s.games.rating).toFixed(2) : null} accent={s.games?.rating ? parseFloat(s.games.rating) >= 7 ? 'brand' : null : null} />
-
-            <Stat label="Buts" value={s.goals?.total} accent={s.goals?.total > 0 ? 'brand' : null} />
-            <Stat label="Passes déc." value={s.goals?.assists} accent={s.goals?.assists > 0 ? 'brand' : null} />
-            <Stat label="Tirs" value={s.shots?.total} />
-            <Stat label="Tirs cadrés" value={s.shots?.on} />
-
-            <Stat label="Passes" value={s.passes?.total} />
-            <Stat label="% passes" value={s.passes?.accuracy != null ? `${s.passes.accuracy}%` : null} />
-            <Stat label="Passes clés" value={s.passes?.key} />
-            <Stat label="Dribbles ✓" value={s.dribbles?.success} />
-
-            <Stat label="Tacles" value={s.tackles?.total} />
-            <Stat label="Duels gag." value={s.duels?.won} />
-            <Stat label="Fautes faites" value={s.fouls?.committed} />
-            <Stat label="Fautes subies" value={s.fouls?.drawn} />
-
-            <Stat label="🟨 Jaunes" value={s.cards?.yellow} accent={s.cards?.yellow > 5 ? 'orange' : null} />
-            <Stat label="🟥 Rouges" value={s.cards?.red} accent={s.cards?.red > 0 ? 'danger' : null} />
-            <Stat label="Penaltys" value={s.penalty?.scored != null ? `${s.penalty.scored}/${(s.penalty.scored || 0) + (s.penalty.missed || 0)}` : null} />
-            <Stat label="Buts encaissés" value={s.goals?.conceded} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Stat({ label, value, accent }) {
-  const display = value === 0 || value ? value : '—';
-  const color = accent === 'brand' ? 'text-brand-400'
-    : accent === 'orange' ? 'text-orange-400'
-    : accent === 'danger' ? 'text-danger'
-    : 'text-white';
-  return (
-    <div className="rounded-lg bg-dark-800/60 px-2.5 py-2">
-      <p className={`text-base font-display font-bold tabular-nums leading-none ${color}`}>{display}</p>
-      <p className="text-[10px] text-white/35 font-heading mt-1 truncate uppercase tracking-wider">{label}</p>
     </div>
   );
 }
