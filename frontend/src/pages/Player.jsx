@@ -239,17 +239,26 @@ const INTL_CLUB_KEYWORDS = /champions league|europa league|conference league|lib
 const NATIONAL_TEAM_KEYWORDS = /nations league|world cup|euro\b|copa america|africa cup|afcon|asian cup|gold cup|kirin cup|friendlies|amistosos|cosafa|qualification|qualifier|qualif\.|wc qualif|world cup qualif|euro qualif|olympic|olympiques/i;
 const NATIONAL_CUP_KEYWORDS = /\bcup\b|\bcoupe\b|\bcopa\b|pokal|kupa|puchar|trophy|tropheo|taca|coppa/i;
 
+// "Friendlies Clubs" / "Club Friendlies" / "Preseason" = matchs de
+// préparation de club, à ne PAS confondre avec les amicaux internationaux
+// (où le nom est juste "Friendlies" sans "Clubs").
+const CLUB_FRIENDLY = /friendlies\s+clubs?|clubs?\s+friendl|preseason|pre-season|amicaux clubs?/i;
+
 function competitionBucket(row) {
   const lname = row.league?.name || '';
   const country = row.league?.country || '';
-  // 1) Sélection nationale : compétitions FIFA/UEFA/CONMEBOL de sélections
-  //    (Nations League, World Cup, Euros, qualifs, amicaux internationaux)
+  // 0) Cas spécial : amicaux club → on les classe en championnat (pas dans
+  //    sélection nationale, ce serait trompeur). Si l'API ajoute un jour
+  //    une catégorie "préparation" on pourra la séparer.
+  if (CLUB_FRIENDLY.test(lname)) return 'league';
+  // 1) Sélection nationale : Nations League, World Cup, Euros, qualifs,
+  //    amicaux internationaux ("Friendlies" sans "Clubs")
   if (NATIONAL_TEAM_KEYWORDS.test(lname)) return 'national';
   // 2) Coupes européennes / mondiales de clubs (UCL, UEL, Conference, etc.)
   if (INTL_CLUB_KEYWORDS.test(lname)) return 'international';
-  // 3) Country 'World' (sans avoir matché ci-dessus) → international par défaut
+  // 3) Country 'World' (sans avoir matché ci-dessus) → international
   if (country === 'World') return 'international';
-  // 4) Coupe nationale : nom contient cup/coupe/copa/pokal/kupa/etc.
+  // 4) Coupe nationale : cup, coupe, copa, pokal, kupa, etc.
   if (NATIONAL_CUP_KEYWORDS.test(lname)) return 'cup';
   // 5) Sinon : championnat (ligue régulière)
   return 'league';
