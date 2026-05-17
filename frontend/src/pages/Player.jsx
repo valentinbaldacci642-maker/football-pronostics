@@ -101,7 +101,7 @@ export default function Player() {
         <ArrowLeft className="w-4 h-4" /> Retour
       </button>
 
-      <PlayerHeader player={player} />
+      <PlayerHeader player={player} statistics={playerData.statistics || []} />
 
       <SeasonPicker
         seasons={seasonsAvailable}
@@ -121,34 +121,85 @@ export default function Player() {
   );
 }
 
-function PlayerHeader({ player }) {
+// Traduction des libellés de poste API-Football.
+const POSITION_FR = {
+  Attacker: 'Attaquant',
+  Midfielder: 'Milieu',
+  Defender: 'Défenseur',
+  Goalkeeper: 'Gardien',
+};
+
+function PlayerHeader({ player, statistics }) {
+  // L'équipe principale est généralement la 1ère entrée des stats (championnat).
+  // Pour le poste, idem : on prend celui de l'équipe principale.
+  const mainStat = statistics[0];
+  const team = mainStat?.team;
+  const positionFr = POSITION_FR[mainStat?.games?.position] || mainStat?.games?.position;
+  const birthDateFr = player.birth?.date
+    ? format(parseISO(player.birth.date), 'dd.MM.yyyy', { locale: fr })
+    : null;
+
   return (
-    <div className="glass-card p-6">
-      <div className="flex items-center gap-5">
+    <div className="glass-card p-5">
+      <div className="flex items-center gap-4">
+        {/* Photo joueur */}
         <img
           src={player.photo}
           alt={player.name}
-          className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-2 border-white/10"
+          className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg object-cover flex-shrink-0 bg-dark-700"
           onError={(e) => { e.target.style.display = 'none'; }}
         />
+
+        {/* Bloc central : nom + poste + infos */}
         <div className="flex-1 min-w-0">
-          <h1 className="font-display text-3xl md:text-4xl text-white tracking-wide leading-tight truncate">
+          <h1 className="font-display text-2xl sm:text-3xl text-white tracking-wide leading-tight truncate">
             {player.firstname} {player.lastname}
           </h1>
-          {player.nationality && (
-            <p className="text-sm text-white/55 font-heading mt-1 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5" /> {player.nationality}
-              {player.age != null && <span className="text-white/35">· {player.age} ans</span>}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-white/50 font-mono">
-            {player.birth?.date && (
-              <span className="flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Né le {format(parseISO(player.birth.date), 'd MMM yyyy', { locale: fr })}{player.birth.place && ` · ${player.birth.place}`}</span>
+          <div className="mt-2 space-y-1 text-sm">
+            {(positionFr || team) && (
+              <p className="text-white/80 font-heading">
+                {positionFr && <span className="font-semibold">{positionFr}</span>}
+                {team && (
+                  <>
+                    {positionFr && ' '}
+                    <Link to={`/team/${team.id}`} className="text-brand-300 hover:text-brand-200 transition-colors">
+                      ({team.name})
+                    </Link>
+                  </>
+                )}
+              </p>
             )}
-            {player.height && <span className="flex items-center gap-1.5"><Ruler className="w-3 h-3" /> {player.height}</span>}
-            {player.weight && <span className="flex items-center gap-1.5"><Weight className="w-3 h-3" /> {player.weight}</span>}
+            {(player.age != null || birthDateFr) && (
+              <p className="text-white/70 font-heading">
+                <span className="font-semibold text-white/45">Âge :</span>{' '}
+                {player.age ?? '—'}{birthDateFr && ` (${birthDateFr})`}
+              </p>
+            )}
+            {player.nationality && (
+              <p className="text-white/70 font-heading flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-white/45 flex-shrink-0" /> {player.nationality}
+              </p>
+            )}
+            {(player.height || player.weight) && (
+              <p className="text-white/55 font-heading text-xs flex gap-3">
+                {player.height && <span className="flex items-center gap-1"><Ruler className="w-3 h-3" /> {player.height}</span>}
+                {player.weight && <span className="flex items-center gap-1"><Weight className="w-3 h-3" /> {player.weight}</span>}
+              </p>
+            )}
           </div>
         </div>
+
+        {/* Logo équipe à droite (cliquable vers la fiche équipe) */}
+        {team?.logo && (
+          <Link to={`/team/${team.id}`} className="flex-shrink-0 hover:scale-105 transition-transform">
+            <img
+              src={team.logo}
+              alt={team.name}
+              className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          </Link>
+        )}
       </div>
     </div>
   );
