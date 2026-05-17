@@ -513,13 +513,13 @@ function StandingsGroup({ group, leagueId, viewMode = 'all' }) {
       </div>
       {/* Legend — uniquement les buckets effectivement présents dans ce classement */}
       {presentBuckets.length > 0 && (
-        <div className="px-4 py-3 border-t border-white/[0.04] flex gap-x-5 gap-y-2 flex-wrap">
+        <div className="px-4 py-4 border-t border-white/[0.04] flex gap-x-6 gap-y-3 flex-wrap">
           {presentBuckets.map((bucket) => {
             const s = BUCKET_STYLES[bucket];
             return (
-              <div key={bucket} className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded ${s.dot}`} />
-                <span className="text-xs text-white/75 font-heading font-semibold">{s.label}</span>
+              <div key={bucket} className="flex items-center gap-2.5">
+                <span className={`w-4 h-4 rounded ${s.dot}`} />
+                <span className="text-base text-white font-heading font-bold">{s.label}</span>
               </div>
             );
           })}
