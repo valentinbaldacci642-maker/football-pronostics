@@ -110,7 +110,7 @@ export default function Player() {
         loading={loading}
       />
 
-      <CareerSection career={career} loading={loadingCareer} onLoad={loadCareerIfNeeded} season={season} />
+      <CareerSection career={career} loading={loadingCareer} onLoad={loadCareerIfNeeded} />
 
       <RecentMatches playerId={id} season={season} />
 
@@ -271,7 +271,7 @@ const CAREER_TABS = [
   { id: 'national', label: 'Équipe nationale' },
 ];
 
-function CareerSection({ career, loading, onLoad, season }) {
+function CareerSection({ career, loading, onLoad }) {
   const [tab, setTab] = useState('league');
   const [hasOpened, setHasOpened] = useState(false);
 
@@ -281,13 +281,16 @@ function CareerSection({ career, loading, onLoad, season }) {
     }
   }, [hasOpened, career.length, loading, onLoad]);
 
-  // Filtre par saison sélectionnée + par onglet, puis tri par matchs joués
-  // décroissant pour mettre la compétition principale en tête.
+  // Filtre uniquement par onglet (toutes saisons confondues), puis tri
+  // saison décroissante puis matchs joués décroissant.
   const rows = useMemo(() => {
     return [...career]
-      .filter((r) => r.season === season && competitionBucket(r) === tab)
-      .sort((a, b) => (b.games?.appearences || 0) - (a.games?.appearences || 0));
-  }, [career, tab, season]);
+      .filter((r) => competitionBucket(r) === tab)
+      .sort((a, b) => {
+        if (b.season !== a.season) return b.season - a.season;
+        return (b.games?.appearences || 0) - (a.games?.appearences || 0);
+      });
+  }, [career, tab]);
 
   const totals = useMemo(() => {
     const acc = { games: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
