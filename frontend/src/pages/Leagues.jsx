@@ -429,17 +429,19 @@ function getQualifBucket(desc) {
   return null;
 }
 
-// Couleurs : direct = saturé, barrage = pâle.
-// Barrage maintien = orange ambre (entre EL et reléguer).
+// Chaque qualification a sa propre famille de couleurs pour éviter toute
+// confusion entre buckets proches (ex: Conf vs Barrage Conf en bleu clair
+// devenaient indistinguables). On change carrément de teinte plutôt que
+// de jouer sur la luminosité.
 const BUCKET_STYLES = {
   ucl:       { border: 'border-l-green-500',   dot: 'bg-green-500',   label: 'LDC' },
-  uclQ:      { border: 'border-l-emerald-300', dot: 'bg-emerald-300', label: 'Barrage LDC' },
+  uclQ:      { border: 'border-l-teal-400',    dot: 'bg-teal-400',    label: 'Barrage LDC' },
   uel:       { border: 'border-l-orange-500',  dot: 'bg-orange-500',  label: 'Europa' },
-  uelQ:      { border: 'border-l-orange-300',  dot: 'bg-orange-300',  label: 'Barrage Europa' },
-  conf:      { border: 'border-l-sky-500',     dot: 'bg-sky-500',     label: 'Conference' },
-  confQ:     { border: 'border-l-sky-300',     dot: 'bg-sky-300',     label: 'Barrage Conf.' },
-  promo:     { border: 'border-l-brand-500',   dot: 'bg-brand-500',   label: 'Promotion' },
-  reldown:   { border: 'border-l-amber-500',   dot: 'bg-amber-500',   label: 'Barrage maintien' },
+  uelQ:      { border: 'border-l-yellow-400',  dot: 'bg-yellow-400',  label: 'Barrage Europa' },
+  conf:      { border: 'border-l-blue-500',    dot: 'bg-blue-500',    label: 'Conference' },
+  confQ:     { border: 'border-l-violet-400',  dot: 'bg-violet-400',  label: 'Barrage Conf.' },
+  promo:     { border: 'border-l-lime-400',    dot: 'bg-lime-400',    label: 'Promotion' },
+  reldown:   { border: 'border-l-pink-500',    dot: 'bg-pink-500',    label: 'Barrage maintien' },
   relegated: { border: 'border-l-red-500',     dot: 'bg-red-500',     label: 'Relégation' },
 };
 
@@ -477,7 +479,7 @@ function StandingsGroup({ group, leagueId, viewMode = 'all' }) {
           <tbody>
             {group.map((row) => {
               const bucket = getQualifBucket(row.description);
-              const accentColor = bucket ? `border-l-2 ${BUCKET_STYLES[bucket].border}` : '';
+              const accentColor = bucket ? `border-l-[5px] ${BUCKET_STYLES[bucket].border}` : '';
               const s = stats(row);
 
               return (
