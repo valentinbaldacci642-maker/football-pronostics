@@ -313,7 +313,7 @@ export default function Help() {
             <p className="font-heading font-bold text-gold-400 mb-1">🔥 Value bets à parier</p>
             <p className="text-xs text-white/60 leading-relaxed">
               Bloc en dessous du pari principal listant tous les value bets détectés
-              sur le match (≥5% edge), sauf celui choisi comme principal.
+              sur le match (≥6% edge), sauf celui choisi comme principal.
               <br /><br />
               Chaque ligne affiche la cote, le pari, l'edge, et la
               <strong> mise Kelly suggérée</strong>. C'est ici que se trouvent les
@@ -323,7 +323,7 @@ export default function Help() {
         </div>
 
         <p className="text-xs text-white/50 italic">
-          💡 Le pari principal peut afficher "Kelly inactif · edge &lt; 5%" — c'est
+          💡 Le pari principal peut afficher "Kelly inactif · edge &lt; 6%" — c'est
           normal, ça veut dire qu'il faut regarder les value bets à parier en
           dessous, pas miser sur le principal.
         </p>
@@ -570,11 +570,19 @@ export default function Help() {
           Flux d'actualités football (transferts, blessures, résultats).
         </Definition>
         <Definition term="📚 Historique">
-          4 onglets :
+          Le contenu se filtre par bookmaker via les 3 boutons en haut de page :
+          <ul className="ml-3 mt-1 text-xs space-y-0.5">
+            <li>🔴 <strong>Unibet</strong> · ne montre que les paris pris sur Unibet (stats ROI / W / L isolées)</li>
+            <li>🟡 <strong>Winamax</strong> · idem côté Winamax</li>
+            <li>🟢 <strong>Total</strong> · agrégé des deux books (vue globale)</li>
+          </ul>
+          5 indicateurs en haut : <strong>Réussite</strong> · <strong>Gagnés</strong> · <strong>Perdus</strong> · <strong>Cash out</strong> (compté séparément, n'affecte pas réussite/perdus) · <strong>ROI</strong> (gain/mise réel).
+          <br /><br />
+          Onglets :
           <ul className="ml-3 mt-1 text-xs space-y-0.5">
             <li><strong>Historique matchs</strong> — pronos dont le match est terminé, filtres W/L/En cours</li>
             <li><strong>Historique pronos</strong> — paris où tu as saisi une mise (avec mise, cote réelle, cote au kick-off, CLV, P&L, note)</li>
-            <li><strong>Bankroll</strong> — paramètres complet (bankroll, Kelly, mode edge), stats P&L, courbe, export CSV, vérification résultats, reset</li>
+            <li><strong>Bankroll</strong> — paramètres complet, stats P&L, courbe, export CSV, reset</li>
             <li><strong>Équipe</strong> — recherche par nom d'équipe</li>
           </ul>
         </Definition>
@@ -651,7 +659,7 @@ export default function Help() {
           <li>• En ouvrant la page Historique, vérifie tous les paris non résolus des 14 derniers jours</li>
           <li>• Si match = FT/AET/PEN → marque W ou L selon le score réel</li>
           <li>• Bankroll mise à jour en cascade (P&L recalculé, courbe redessinée)</li>
-          <li>• Plafond : 30 paris par session (économie quota API)</li>
+          <li>• Plafond : 100 paris par session (économie quota API)</li>
           <li>• Bouton manuel <strong>"Vérifier les résultats"</strong> dans Paris en cours pour forcer sans relancer l'app</li>
         </ul>
       </Section>
@@ -679,7 +687,7 @@ export default function Help() {
           <li>• Les bookmakers <strong>resserrent leurs cotes</strong> au fil de la journée
             (plus de paris arrivent, ils ajustent)</li>
           <li>• Exemple : Under 2.5 passe de @1.50 → @1.42 → la proba implicite monte de 66.7% à 70.4%</li>
-          <li>• Si l'edge passe sous 5% → le pari ne s'affiche plus comme value bet</li>
+          <li>• Si l'edge passe sous 6% → le pari ne s'affiche plus comme value bet</li>
           <li>• Donc le VB peut <strong>apparaître puis disparaître</strong> en quelques heures</li>
         </ul>
 
@@ -901,6 +909,135 @@ export default function Help() {
           toujours quand je parie BTTS sur Premier League"). Tu peux ajuster ta
           stratégie en conséquence.
         </Definition>
+      </Section>
+
+      {/* Deux bankrolls (Unibet / Winamax) */}
+      <Section icon={ArrowLeftRight} title="Deux bankrolls séparées : Unibet + Winamax" color="gold">
+        <p>
+          L'app gère <strong className="text-white">deux bankrolls indépendantes</strong>,
+          une par bookmaker, parce que les cotes et la dispo des ligues diffèrent entre
+          Unibet.fr et Winamax.fr et qu'on veut suivre la perf de chacune isolément.
+        </p>
+        <ul className="ml-3 space-y-1 text-xs">
+          <li>• <strong>Bankroll Unibet</strong> + <strong>Bankroll Winamax</strong> à
+            saisir séparément dans Historique → Bankroll</li>
+          <li>• La Navbar affiche les <strong>2 pills</strong> (U rouge, W jaune) avec la
+            bankroll live de chaque book — celles à 0 sont masquées</li>
+          <li>• Au moment de saisir une mise sur un VB, un <strong>picker bookmaker</strong>{' '}
+            te demande où le pari est placé (Unibet ou Winamax)</li>
+          <li>• Le calcul Kelly utilise la bankroll du book sélectionné</li>
+          <li>• Les stats (ROI, gagnés, perdus, cash out) sont filtrées par book dans
+            Historique via les boutons U / W / Total</li>
+        </ul>
+        <p className="text-xs text-white/50 italic">
+          Tu peux miser <strong>plusieurs fois</strong> sur le même VB avec des bookmakers
+          différents (ex: 2€ sur Unibet @1.85 puis 1€ sur Winamax @1.92). Chaque pari est
+          tracké séparément avec sa cote et son book.
+        </p>
+      </Section>
+
+      {/* Bouton +1 (multi-paris sur même VB) */}
+      <Section icon={Save} title="Bouton +1 : plusieurs paris sur le même value bet" color="info">
+        <p>
+          Sur la page Value bets, à côté de chaque pari déjà placé, un petit bouton
+          <strong className="text-white"> +1 </strong> permet de dupliquer le pari pour
+          en saisir un <strong>deuxième</strong> sur le même VB (utile quand tu fractionnes
+          ta mise entre deux books ou si tu veux remettre après cash out partiel).
+        </p>
+        <ul className="ml-3 space-y-1 text-xs">
+          <li>• Chaque duplicate est une entrée séparée dans Historique → mise / cote /
+            résultat indépendants</li>
+          <li>• Tu peux les résoudre individuellement (cash out 1/2 par exemple)</li>
+          <li>• Tu peux changer le bookmaker du duplicate (mettre l'un sur Unibet et le
+            duplicate sur Winamax)</li>
+        </ul>
+      </Section>
+
+      {/* Cash out */}
+      <Section icon={Activity} title="Cash out (encaissement anticipé)" color="info">
+        <p>
+          Quand tu fais un cash out chez ton bookmaker (encaisser avant la fin du match
+          au prix proposé), tu peux le saisir directement sur la carte du pari :
+        </p>
+        <ul className="ml-3 space-y-1 text-xs">
+          <li>• Champ <strong>"Cash out"</strong> sur le pari en cours · tape le montant
+            reçu du bookie</li>
+          <li>• Le pari sort de "Paris en cours" et passe dans la catégorie <strong>Cash out</strong></li>
+          <li>• <strong>N'est PAS compté dans Gagnés ni Perdus</strong> (catégorie séparée
+            pour ne pas fausser le win rate)</li>
+          <li>• Contribue quand même au ROI : P&L = cashout − mise (positif ou négatif)</li>
+          <li>• "Annuler le cash out" si tu t'es trompé</li>
+        </ul>
+      </Section>
+
+      {/* Tri sur Value Bets */}
+      <Section icon={ListChecks} title="Tri sur la page Value Bets" color="info">
+        <p>
+          Bouton <strong>Trier</strong> à droite du sélecteur de jours (sur les 8 jours
+          disponibles aujourd'hui → J+7), avec 4 modes :
+        </p>
+        <ul className="ml-3 space-y-1 text-xs">
+          <li>• <strong>Edge décroissant</strong> (défaut) · les meilleurs edges en haut</li>
+          <li>• <strong>Edge croissant</strong> · les edges les plus marginaux en haut</li>
+          <li>• <strong>Heure croissante</strong> · matchs à venir le plus tôt en haut</li>
+          <li>• <strong>Heure décroissante</strong> · matchs les plus tardifs en haut</li>
+        </ul>
+        <p className="text-xs text-white/50 italic">
+          Heure croissante est pratique pour ne pas rater un kick-off imminent ; heure
+          décroissante pour préparer ta soirée tranquillement.
+        </p>
+      </Section>
+
+      {/* Filtre des ligues Unibet/Winamax */}
+      <Section icon={Shield} title="Filtre des ligues : seuls les paris jouables" color="info">
+        <p>
+          Le scan ne te montre <strong className="text-white">que les value bets sur des
+          ligues réellement couvertes par Unibet.fr ou Winamax.fr</strong>. Pas de
+          mauvaise surprise : tout ce qui apparaît est pariable chez au moins un des
+          deux books.
+        </p>
+        <ul className="ml-3 space-y-1 text-xs">
+          <li>• ~80 ligues couvertes Unibet (top 5 + 2èmes div + coupes + ligues
+            secondaires européennes + Amérique du Sud + Asie)</li>
+          <li>• ~75 ligues couvertes Winamax (recoupe Unibet à 95% mais inclut
+            quelques exclus : South Africa PSL, Belgian Cup)</li>
+          <li>• Sur chaque carte VB, un <strong>badge bookmaker</strong> indique
+            quel(s) book(s) la couvre(nt) : Unibet · Winamax · les deux</li>
+        </ul>
+      </Section>
+
+      {/* Notifications push */}
+      <Section icon={Zap} title="Notifications push value bets" color="brand">
+        <p>
+          L'app Android peut t'envoyer une <strong className="text-white">notif push</strong>{' '}
+          dès qu'un nouveau value bet ≥ 6% d'edge apparaît, même quand l'app est fermée.
+        </p>
+        <ul className="ml-3 space-y-1 text-xs">
+          <li>• Réglages Android → Paramètres → toggle <strong>"Notifications value bets"</strong></li>
+          <li>• Le serveur scanne automatiquement <strong>toutes les 5 minutes</strong>{' '}
+            en arrière-plan (UptimeRobot trigger)</li>
+          <li>• 1 notification par VB (titre = équipes, corps = date du match + pick + cote + edge)</li>
+          <li>• Les VBs déjà notifiés ne re-notifient pas (mémoire backend)</li>
+          <li>• Logo de l'app dans la status bar + corps</li>
+        </ul>
+        <p className="text-xs text-white/50 italic">
+          Si l'app est en "Force Stop" sur Android (réglages manuels), les notifs sont
+          bloquées jusqu'à la prochaine ouverture manuelle de l'app — c'est volontaire
+          côté Android, on peut rien faire.
+        </p>
+      </Section>
+
+      {/* Live in-app polling */}
+      <Section icon={RefreshCw} title="Live polling auto (page détail match)" color="info">
+        <p>
+          Quand tu ouvres la page d'un match en direct (statut 1H / HT / 2H / ET),
+          l'app rafraîchit automatiquement <strong>toutes les 30 secondes</strong> :
+        </p>
+        <ul className="ml-3 space-y-1 text-xs">
+          <li>• Minute en cours · score · events (buts, cartons) · stats · cotes live</li>
+          <li>• Bypass du cache backend pour avoir la donnée la plus fraîche</li>
+          <li>• Idem sur la page Favoris (refresh des matchs live ajoutés en favoris)</li>
+        </ul>
       </Section>
 
       {/* Footer */}
