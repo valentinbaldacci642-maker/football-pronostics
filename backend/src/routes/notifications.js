@@ -2,21 +2,11 @@ const express = require('express');
 const router = express.Router();
 const notifications = require('../services/notificationsService');
 const logger = require('../utils/logger');
+const adminAuth = require('../middleware/adminAuth');
 
-// Shared secret protects the scan endpoint from public spam. UptimeRobot
-// passes it via query param (?key=…) since the free tier doesn't support
-// custom headers. Set NOTIFICATIONS_SCAN_SECRET on Render.
-function authScan(req, res, next) {
-  const expected = process.env.NOTIFICATIONS_SCAN_SECRET;
-  if (!expected) {
-    // Pas de secret configuré → on accepte (mode dev / pas encore set up).
-    // En prod le secret DOIT être défini.
-    return next();
-  }
-  const provided = req.query.key || req.headers['x-scan-key'];
-  if (provided !== expected) return res.status(401).json({ error: 'Invalid scan key' });
-  return next();
-}
+// Fail-closed: secret must be set, comparison is constant-time. UptimeRobot
+// free tier needs query-string auth (no custom headers), so allowQueryKey.
+const authScan = adminAuth({ allowQueryKey: true });
 
 router.post('/register', (req, res) => {
   const { token, platform } = req.body || {};

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const cache = require('../utils/cache');
 const api = require('../services/apiFootball');
+const adminAuth = require('../middleware/adminAuth');
 
 router.get('/stats', (req, res) => {
   res.json({
@@ -10,7 +11,7 @@ router.get('/stats', (req, res) => {
   });
 });
 
-router.delete('/flush', (req, res) => {
+router.delete('/flush', adminAuth(), (req, res) => {
   cache.flush();
   res.json({ message: 'Cache flushed successfully' });
 });

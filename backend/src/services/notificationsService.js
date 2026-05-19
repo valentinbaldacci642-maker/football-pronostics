@@ -12,9 +12,24 @@ const notifiedVbKeys = new Set();  // "fixtureId::market::selection"
 let lastScanAt = 0;
 let lastSentCount = 0;
 
+// Hard cap to bound memory against unauthenticated spam. Real users are
+// in the low double digits; 10k leaves plenty of headroom while making a
+// flood attack non-trivial. When full, oldest entries are evicted (LRU-ish
+// since Map preserves insertion order and we re-set on each call).
+const MAX_TOKENS = 10_000;
+const ALLOWED_PLATFORMS = new Set(['android', 'ios', 'web', 'unknown']);
+
 function registerToken(token, platform = 'unknown') {
   if (!token || typeof token !== 'string') return false;
-  tokens.set(token, { platform, registeredAt: Date.now() });
+  // FCM registration tokens are ~140-260 chars. Reject anything outside
+  // a sane range so an attacker can't fill memory with megabyte tokens.
+  if (token.length < 100 || token.length > 512) return false;
+  const safePlatform = ALLOWED_PLATFORMS.has(platform) ? platform : 'unknown';
+  if (tokens.size >= MAX_TOKENS && !tokens.has(token)) {
+    const oldest = tokens.keys().next().value;
+    if (oldest) tokens.delete(oldest);
+  }
+  tokens.set(token, { platform: safePlatform, registeredAt: Date.now() });
   return true;
 }
 

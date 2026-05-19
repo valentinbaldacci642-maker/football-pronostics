@@ -12,8 +12,10 @@ const app = express();
 
 app.use(helmet());
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// 64kb is plenty for our payloads (FCM token register = a few hundred
+// bytes). The previous 10mb let an attacker cheaply pressure memory.
+app.use(express.json({ limit: '64kb' }));
+app.use(express.urlencoded({ extended: true, limit: '64kb' }));
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -24,14 +26,17 @@ const corsOptions = {
     const allowed = (process.env.CORS_ORIGIN || 'http://localhost:5173')
       .split(',')
       .map((s) => s.trim());
-    if (allowed.includes('*') || allowed.includes(origin)) {
+    // Wildcard combined with credentials:true is unsafe and forbidden by
+    // the CORS spec — explicitly refuse it so a misconfigured env var
+    // can't silently expose authenticated endpoints to any origin.
+    if (allowed.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS: origin ${origin} not allowed`));
     }
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'OPTIONS', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-scan-key'],
   credentials: true,
 };
 
@@ -56,6 +61,19 @@ const limiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 app.use('/api/', limiter);
+
+// Tight per-IP cap on unauthenticated mutation endpoints (FCM token
+// register/unregister). Real users hit /register once per app launch;
+// 30/15min/IP gives ample room while making a token-flood attack costly.
+const mutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use('/api/notifications/register', mutationLimiter);
+app.use('/api/notifications/unregister', mutationLimiter);
 
 app.use(morgan('combined', {
   stream: { write: (msg) => logger.info(msg.trim()) },

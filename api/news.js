@@ -72,9 +72,26 @@ const FEEDS = [
   { url: 'https://news.google.com/rss/search?q=site:footmercato.net&hl=fr&gl=FR&ceid=FR:fr', source: 'Foot Mercato' },
 ];
 
+// Restrict CORS to our own origins to prevent abuse of this serverless
+// function from arbitrary websites (would burn Vercel invocations / bw).
+const ALLOWED_ORIGINS = [
+  'https://football-pronostics-tau.vercel.app',
+  'https://pronos-foufous-app.vercel.app',
+  'http://localhost:5173',
+  'http://localhost',
+  'https://localhost',
+  'capacitor://localhost',
+];
+
 module.exports = async function(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate');
+  const origin = req.headers.origin || '';
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  // Aggressive edge caching: news feeds change slowly, and shared caching
+  // means most hits never reach the function at all → bandwidth-safe.
+  res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
 
   const results = await Promise.allSettled(
     FEEDS.map(async function(feed) {
