@@ -89,7 +89,8 @@ app.get('/version', (req, res) => {
   res.json({ version: '1.1.0', deployed: new Date().toISOString() });
 });
 
-app.get('/api/quota', (req, res) => {
+const adminAuth = require('./middleware/adminAuth');
+app.get('/api/quota', adminAuth(), (req, res) => {
   const apiFootball = require('./services/apiFootball');
   res.json(apiFootball.getQuotaInfo());
 });

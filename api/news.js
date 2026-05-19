@@ -1,19 +1,65 @@
 const https = require('https');
 const http = require('http');
 
+// Block requests to internal/loopback/link-local/private ranges so a
+// redirect from an upstream feed can't pivot into Vercel's metadata
+// service, our own backend, or any internal infra. IPv4 + IPv6.
+const SSRF_BLOCKLIST = [
+  /^localhost$/i,
+  /^127\./,           // loopback
+  /^10\./,            // RFC1918
+  /^192\.168\./,      // RFC1918
+  /^172\.(1[6-9]|2\d|3[01])\./, // RFC1918
+  /^169\.254\./,      // link-local (incl. cloud metadata 169.254.169.254)
+  /^0\./,             // 0.0.0.0/8
+  /^::1$/,            // IPv6 loopback
+  /^fe80:/i,          // IPv6 link-local
+  /^fc00:/i, /^fd00:/i, // IPv6 unique local
+];
+
+function isSafeUrl(url) {
+  let parsed;
+  try { parsed = new URL(url); } catch (_) { return false; }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+  const host = parsed.hostname;
+  if (!host) return false;
+  return !SSRF_BLOCKLIST.some((re) => re.test(host));
+}
+
+// 5 MB cap is plenty for RSS payloads (real feeds are <500 KB). A larger
+// response is almost certainly hostile or broken — abort to protect the
+// 256 MB function memory budget.
+const MAX_BODY = 5 * 1024 * 1024;
+
 function fetchUrl(url, redirects) {
   if (redirects === undefined) redirects = 3;
   return new Promise(function(resolve, reject) {
+    if (!isSafeUrl(url)) return reject(new Error('blocked URL'));
     const client = url.startsWith('https') ? https : http;
     const req = client.get(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0)' },
       timeout: 10000,
     }, function(res) {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects > 0) {
-        return fetchUrl(res.headers.location, redirects - 1).then(resolve).catch(reject);
+        // Resolve relative Location headers against the current URL, then
+        // re-validate to make sure the target isn't internal.
+        let nextUrl;
+        try { nextUrl = new URL(res.headers.location, url).toString(); }
+        catch (_) { return reject(new Error('bad redirect')); }
+        res.resume(); // discard body so the socket can be reused
+        return fetchUrl(nextUrl, redirects - 1).then(resolve).catch(reject);
       }
       let data = '';
-      res.on('data', function(chunk) { data += chunk; });
+      let total = 0;
+      res.on('data', function(chunk) {
+        total += chunk.length;
+        if (total > MAX_BODY) {
+          req.destroy();
+          reject(new Error('response too large'));
+          return;
+        }
+        data += chunk;
+      });
       res.on('end', function() { resolve(data); });
     });
     req.on('error', reject);
