@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Zap, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
@@ -43,6 +43,48 @@ function shiftDate(iso, deltaDays) {
   const date = new Date(Date.UTC(y, m - 1, d));
   date.setUTCDate(date.getUTCDate() + deltaDays);
   return date.toISOString().slice(0, 10);
+}
+
+// API-Football round labels are inconsistent (English, mixed casing,
+// different formats for league vs cup). Translate the common shapes to
+// short French labels and pass through anything we don't recognise.
+function formatRoundLabel(round) {
+  if (!round) return '';
+  const m1 = round.match(/^Regular Season\s*-\s*(\d+)$/i);
+  if (m1) return `Journée ${m1[1]}`;
+  const m2 = round.match(/^Group Stage\s*-\s*(\d+)$/i);
+  if (m2) return `Journée ${m2[1]} (poules)`;
+  const map = {
+    'Round of 16': '1/8 de finale',
+    'Round of 32': '1/16 de finale',
+    'Quarter-finals': 'Quarts',
+    'Quarter Finals': 'Quarts',
+    'Semi-finals': 'Demies',
+    'Semi Finals': 'Demies',
+    'Final': 'Finale',
+    '3rd Place Final': '3e place',
+    'Preliminary Round': 'Tour préliminaire',
+  };
+  return map[round] || round;
+}
+
+// Bucket fixtures by their league.round, then sort chronologically (asc
+// by earliest kickoff in each round). Result is what the round navigator
+// pages through — index 0 is the oldest round in the dataset.
+function groupByRound(fixtures) {
+  const map = new Map();
+  for (const f of fixtures) {
+    const round = f.league?.round || '—';
+    if (!map.has(round)) map.set(round, []);
+    map.get(round).push(f);
+  }
+  const arr = Array.from(map.entries()).map(([round, matches]) => {
+    matches.sort((a, b) => new Date(a.fixture?.date) - new Date(b.fixture?.date));
+    const minDate = matches[0]?.fixture?.date ? new Date(matches[0].fixture.date).getTime() : 0;
+    return { round, matches, minDate };
+  });
+  arr.sort((a, b) => a.minDate - b.minDate);
+  return arr;
 }
 
 function groupByLeague(fixtures) {
@@ -132,6 +174,10 @@ export default function Matchs() {
   const [error, setError] = useState(null);
   const [liveCount, setLiveCount] = useState(0);
   const [sidebarOpenMobile, setSidebarOpenMobile] = useState(false);
+  // Round navigator state, used by Calendrier / Résultats to page one
+  // round at a time (Journée 35 → 36 etc). null = falls back to the most
+  // recent round for résultats, the earliest upcoming for calendrier.
+  const [selectedRound, setSelectedRound] = useState(null);
   const dateInputRef = useRef(null);
 
   // On desktop, clicking a transparent <input type="date"> overlay does
@@ -163,9 +209,38 @@ export default function Matchs() {
   }, [leagueParam]);
 
   const selectedLeagueId = selectedLeague?.id ?? null;
-  // Server-side filter when a league is active (upcoming N matches),
-  // otherwise the API returns one day's fixtures and we show them all.
-  const fixtures = allFixtures;
+  // Reset the round selection whenever the source dataset changes, so the
+  // navigator doesn't get stuck on a round that no longer exists after
+  // switching league or tab.
+  useEffect(() => { setSelectedRound(null); }, [selectedLeagueId, tabParam]);
+
+  // Build {round, matches[], minDate} groups from the loaded fixtures —
+  // only meaningful on Calendrier / Résultats (one league, multiple rounds).
+  const roundsEnabled = tabParam === 'calendrier' || tabParam === 'resultats';
+  const roundGroups = useMemo(
+    () => (roundsEnabled ? groupByRound(allFixtures) : []),
+    [allFixtures, roundsEnabled]
+  );
+  // Default round: most recent for Résultats, earliest upcoming for Calendrier.
+  // We derive on each render so a stale selectedRound (after a tab switch
+  // before the reset effect has fired) doesn't break the navigator.
+  const defaultRound = roundGroups.length
+    ? (tabParam === 'resultats'
+        ? roundGroups[roundGroups.length - 1].round
+        : roundGroups[0].round)
+    : null;
+  const currentRound = selectedRound && roundGroups.some((g) => g.round === selectedRound)
+    ? selectedRound
+    : defaultRound;
+  const currentRoundIdx = roundGroups.findIndex((g) => g.round === currentRound);
+  const canPrevRound = currentRoundIdx > 0;
+  const canNextRound = currentRoundIdx >= 0 && currentRoundIdx < roundGroups.length - 1;
+
+  // Display either every match (Matchs tab) or only the selected round's
+  // matches (Calendrier / Résultats).
+  const fixtures = roundsEnabled && currentRound
+    ? (roundGroups[currentRoundIdx]?.matches || [])
+    : allFixtures;
 
   const fetchFixtures = useCallback(async () => {
     // Classements tab doesn't use fetchFixtures — StandingsView handles its
@@ -440,6 +515,40 @@ export default function Matchs() {
                       title="Effacer le filtre"
                     >
                       <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Round navigator (Calendrier / Résultats only). Hidden when
+                    the dataset only has one round — no point in left/right
+                    arrows if there's nothing to navigate to. */}
+                {roundsEnabled && selectedLeague && roundGroups.length > 1 && (
+                  <div className="flex items-stretch gap-1 p-1 bg-dark-800 rounded-xl border border-white/[0.08]">
+                    <button
+                      onClick={() => canPrevRound && setSelectedRound(roundGroups[currentRoundIdx - 1].round)}
+                      disabled={!canPrevRound}
+                      className="flex items-center justify-center w-10 rounded-lg text-white/50 hover:text-white hover:bg-dark-700 disabled:text-white/15 disabled:hover:bg-transparent transition-all"
+                      title="Journée précédente"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <div className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-white">
+                      <span className="font-heading font-semibold tracking-wide">
+                        {formatRoundLabel(currentRound) || 'Journée'}
+                      </span>
+                      {currentRoundIdx >= 0 && (
+                        <span className="text-xs text-white/30 font-mono">
+                          {currentRoundIdx + 1}/{roundGroups.length}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => canNextRound && setSelectedRound(roundGroups[currentRoundIdx + 1].round)}
+                      disabled={!canNextRound}
+                      className="flex items-center justify-center w-10 rounded-lg text-white/50 hover:text-white hover:bg-dark-700 disabled:text-white/15 disabled:hover:bg-transparent transition-all"
+                      title="Journée suivante"
+                    >
+                      <ChevronRight className="w-5 h-5" />
                     </button>
                   </div>
                 )}
