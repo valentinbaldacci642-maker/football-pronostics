@@ -95,7 +95,10 @@ router.get('/:id', async (req, res) => {
     // Au lieu de renvoyer 500 (qui casse le frontend), on log et retourne
     // une réponse vide → le frontend affiche 'match introuvable' / charge
     // dégradé au lieu d'une page d'erreur.
-    logger.error(`getFixtureById(${req.params.id}) failed: ${err?.message}`);
+    // Strip CRLF + truncate so a crafted ?id=...%0A[FAKE LINE] can't
+    // forge log entries that confuse log review or external aggregators.
+    const safeId = String(req.params.id).replace(/[\r\n]/g, '_').slice(0, 50);
+    logger.error(`getFixtureById(${safeId}) failed: ${err?.message}`);
     res.json({ response: [], results: 0, paging: {}, errors: {} });
   }
 });
