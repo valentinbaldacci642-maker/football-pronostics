@@ -559,12 +559,60 @@ export default function Help() {
             <li>• Confidence 1X2 + indication si le pari principal est conseillé</li>
           </ul>
         </Definition>
-        <Definition term="📅 Matchs/Pronostics">
-          Tous les matchs du jour groupés par ligue. Filtres par ligue, par statut
-          (en cours, terminés, à venir). Sélecteur de date pour matchs passés/futurs.
+        <Definition term="📅 Tous les matchs (4 onglets + sidebar ligues)">
+          La page hub pour explorer le foot mondial. Présentation type Flashscore :
+          chaque match s'affiche en <strong>ligne dense</strong> (heure · domicile / score · extérieur / score · statut LIVE),
+          empilé sous le bandeau de sa ligue. Toutes les ligues du monde sont
+          accessibles via la <strong className="text-white">sidebar de droite</strong> (drawer
+          coulissant côté mobile, bouton « Pays » dans le header).
+          <br /><br />
+          <strong className="text-white">Sidebar droite — deux sections :</strong>
+          <ul className="ml-3 mt-1 text-xs space-y-0.5">
+            <li>📌 <strong>Ligues épinglées</strong> · top 10 (Bundesliga, Premier League, La Liga, Ligue 1, Ligue 2, Coupe de France, Serie A, Eredivisie, LDC, Europa)</li>
+            <li>🌍 <strong>Pays</strong> · liste alphabétique de tous les pays couverts par l'API. Click sur un pays → déploie ses ligues + coupes nationales</li>
+            <li>🔍 <strong>Barre de recherche</strong> · filtre instantanément par nom de pays OU de ligue (déploie automatiquement les pays qui matchent)</li>
+          </ul>
+          <br />
+          <strong className="text-white">Click sur une ligue</strong> → filtre actif (chip
+          violet « Filtré sur : X » avec ✕ pour effacer) ET bascule automatique sur l'onglet
+          <strong> Calendrier</strong> pour voir le programme à venir.
+          <br /><br />
+          <strong className="text-white">Les 4 onglets en haut de page :</strong>
+          <ul className="ml-3 mt-1 text-xs space-y-1">
+            <li>
+              <strong className="text-brand-300">Matchs</strong> · matchs du jour groupés par ligue.
+              Sélecteur de date (◀ Aujourd'hui ▶) cliquable pour ouvrir le picker natif.
+              Toggle <strong>En direct</strong> séparé pour ne voir que les LIVE.
+              Si une ligue est sélectionnée → bascule en mode « 50 prochains matchs de cette ligue ».
+            </li>
+            <li>
+              <strong className="text-brand-300">Calendrier</strong> · matchs <strong>à venir</strong> de la
+              ligue sélectionnée (saison complète chargée). Navigateur de journée
+              <strong> ◀ Journée N ▶ </strong> avec compteur N/total. Tri par numéro de journée
+              quand toutes sont numérotées (« Regular Season - 35 » → <em>Journée 35</em>),
+              sinon par date (utile pour les coupes : 1/8, 1/4, Demies, Finale…).
+            </li>
+            <li>
+              <strong className="text-brand-300">Résultats</strong> · matchs <strong>déjà joués</strong> de
+              la ligue. Mêmes flèches ◀ Journée N ▶, ouvre par défaut sur la dernière journée
+              jouée. Pratique pour repartir en arrière journée par journée.
+            </li>
+            <li>
+              <strong className="text-brand-300">Classements</strong> · ancien contenu de la page
+              Ligues fusionné ici. Picker top 5 EU + bouton « Voir toutes les compétitions »
+              avec recherche. Une fois une ligue choisie → onglets <em>Classement</em> (Global /
+              Domicile / Extérieur, légendes couleurs UCL/UEL/Conf/Relégation) et
+              <em> Buteurs</em> (top 15 avec photo, équipe, buts/passes).
+            </li>
+          </ul>
+          <p className="text-xs text-white/50 italic mt-2">
+            Lien historique : la page <em>Ligues</em> a été fusionnée dans <em>Matchs</em> ·
+            les anciens liens <code>/leagues</code> redirigent automatiquement vers
+            <code> /matchs?tab=classements</code>.
+          </p>
         </Definition>
-        <Definition term="🏆 Ligues / 🌍 Coupe du Monde">
-          Classement, top scoreurs, statistiques par ligue. Calendrier dédié World Cup.
+        <Definition term="🌍 Coupe du Monde">
+          Page dédiée à la Coupe du Monde (calendrier, groupes, phase finale).
         </Definition>
         <Definition term="📰 Actu Football">
           Flux d'actualités football (transferts, blessures, résultats).
