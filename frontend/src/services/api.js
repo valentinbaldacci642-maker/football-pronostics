@@ -138,6 +138,8 @@ export const fixturesApi = {
   // N upcoming fixtures rather than only today's, so a league with no
   // game today still surfaces its real schedule (e.g. Coupe de France).
   getUpcomingByLeague: (league, count = 50) => api.get('/fixtures', { params: { league, next: count, timezone: tz } }),
+  // Counterpart for the Résultats tab: last N finished fixtures of a league.
+  getRecentByLeague: (league, count = 50) => api.get('/fixtures', { params: { league, last: count, timezone: tz } }),
   getByTeam: (teamId, { last, next, season } = {}) => api.get('/fixtures', { params: { team: teamId, last, next, season } }),
   getStatistics: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}/statistics`, fresh ? { params: { fresh: 1 } } : undefined),
   getEvents: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}/events`, fresh ? { params: { fresh: 1 } } : undefined),

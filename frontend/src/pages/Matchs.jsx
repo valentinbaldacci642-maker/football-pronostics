@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Zap, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
-  BarChart2, List, Trophy, X,
+  BarChart2, List, Trophy, X, History,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import MatchRow from '../components/match/MatchRow';
@@ -113,10 +113,11 @@ export default function Matchs() {
     else sp.delete('mode');
     setSearchParams(sp, { replace: true });
   };
-  const tabParam = searchParams.get('tab') === 'classements' ? 'classements' : 'matchs';
+  const rawTab = searchParams.get('tab');
+  const tabParam = ['classements', 'calendrier', 'resultats'].includes(rawTab) ? rawTab : 'matchs';
   const setTab = (next) => {
     const sp = new URLSearchParams(searchParams);
-    if (next === 'classements') sp.set('tab', 'classements');
+    if (next && next !== 'matchs') sp.set('tab', next);
     else sp.delete('tab');
     setSearchParams(sp, { replace: true });
   };
@@ -167,21 +168,37 @@ export default function Matchs() {
   const fixtures = allFixtures;
 
   const fetchFixtures = useCallback(async () => {
+    // Classements tab doesn't use fetchFixtures — StandingsView handles its
+    // own data. Calendrier and Résultats only make sense with a league.
+    if (tabParam === 'classements') return;
+    if ((tabParam === 'calendrier' || tabParam === 'resultats') && !selectedLeagueId) {
+      setAllFixtures([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       let result;
-      if (mode === 'live') {
+      if (tabParam === 'calendrier' && selectedLeagueId) {
+        result = await fixturesApi.getUpcomingByLeague(selectedLeagueId, 50);
+      } else if (tabParam === 'resultats' && selectedLeagueId) {
+        result = await fixturesApi.getRecentByLeague(selectedLeagueId, 50);
+      } else if (mode === 'live') {
         result = await fixturesApi.getLive();
       } else if (selectedLeagueId) {
-        // League selected → ALL upcoming fixtures for it, not just today's.
-        // Lets users see a league's full schedule (e.g. Coupe de France
-        // even when no game today).
+        // Matchs tab + league filter → next 50 upcoming. Keeps the
+        // "click league = see real schedule" UX even when staying on Matchs.
         result = await fixturesApi.getUpcomingByLeague(selectedLeagueId, 50);
       } else {
         result = await fixturesApi.getByDate(selectedDate);
       }
       const all = result?.response || [];
+      // Résultats tab: API may return fixtures sorted earliest-first. Reverse
+      // so the most recent finished match is on top — that's what the user
+      // expects when browsing a "Résultats" page.
+      if (tabParam === 'resultats') all.reverse();
       setAllFixtures(all);
       if (mode === 'live') setLiveCount(all.length);
     } catch (err) {
@@ -189,7 +206,7 @@ export default function Matchs() {
     } finally {
       setLoading(false);
     }
-  }, [mode, selectedDate, selectedLeagueId]);
+  }, [mode, selectedDate, selectedLeagueId, tabParam]);
 
   useEffect(() => { fetchFixtures(); }, [fetchFixtures]);
 
@@ -203,6 +220,9 @@ export default function Matchs() {
 
   // When a league is picked, also enrich its name from the loaded fixtures
   // so the filter chip shows a real label even if the sidebar passed a stub.
+  // Picking a league while on the date-based Matchs tab feels intent-mismatched
+  // (you wanted to see THAT league's schedule, not today's) — auto-switch to
+  // Calendrier so the next-50 upcoming fixtures show immediately.
   const pickLeague = (league) => {
     if (!league) { setSelectedLeague(null); return; }
     const found = allFixtures.find((f) => f.league?.id === league.id)?.league;
@@ -213,6 +233,7 @@ export default function Matchs() {
       flag: league.flag || null,
       season: league.season || found?.season || (new Date().getFullYear() - 1),
     });
+    if (tabParam === 'matchs') setTab('calendrier');
     setSidebarOpenMobile(false);
   };
 
@@ -233,11 +254,18 @@ export default function Matchs() {
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h1 className="font-display text-4xl text-white tracking-wide leading-none">
-                {tabParam === 'classements' ? <>Ligues & <span className="text-brand-400">classements</span></> : <>Tous les <span className="text-brand-400">matchs</span></>}
+                {tabParam === 'classements' ? <>Ligues & <span className="text-brand-400">classements</span></>
+                  : tabParam === 'calendrier' ? <>Calendrier <span className="text-brand-400">à venir</span></>
+                  : tabParam === 'resultats' ? <>Résultats <span className="text-brand-400">récents</span></>
+                  : <>Tous les <span className="text-brand-400">matchs</span></>}
               </h1>
               <p className="text-sm text-white/35 font-heading font-medium mt-1 capitalize">
                 {tabParam === 'classements'
                   ? 'Classements et buteurs'
+                  : tabParam === 'calendrier'
+                    ? selectedLeague ? `Prochains matchs · ${selectedLeague.name || ''}` : 'Sélectionne une ligue dans la sidebar'
+                  : tabParam === 'resultats'
+                    ? selectedLeague ? `Derniers résultats · ${selectedLeague.name || ''}` : 'Sélectionne une ligue dans la sidebar'
                   : mode === 'live'
                     ? 'Tous les matchs en direct'
                     : selectedLeague
@@ -263,30 +291,28 @@ export default function Matchs() {
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setTab('matchs')}
-              className={clsx(
-                'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
-                tabParam === 'matchs'
-                  ? 'bg-brand-500/20 border-brand-500/40 text-brand-300'
-                  : 'border-white/10 text-white/40 hover:text-white/70'
-              )}
-            >
-              <List className="w-4 h-4" />Matchs
-            </button>
-            <button
-              onClick={() => setTab('classements')}
-              className={clsx(
-                'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
-                tabParam === 'classements'
-                  ? 'bg-brand-500/20 border-brand-500/40 text-brand-300'
-                  : 'border-white/10 text-white/40 hover:text-white/70'
-              )}
-            >
-              <BarChart2 className="w-4 h-4" />Classements
-            </button>
+          {/* Tabs — horizontally scrollable on mobile so Calendrier/Résultats
+              don't push Classements off-screen on narrow widths. */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {[
+              { id: 'matchs',      label: 'Matchs',      Icon: List },
+              { id: 'calendrier',  label: 'Calendrier',  Icon: Calendar },
+              { id: 'resultats',   label: 'Résultats',   Icon: History },
+              { id: 'classements', label: 'Classements', Icon: BarChart2 },
+            ].map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={clsx(
+                  'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all whitespace-nowrap flex-shrink-0',
+                  tabParam === id
+                    ? 'bg-brand-500/20 border-brand-500/40 text-brand-300'
+                    : 'border-white/10 text-white/40 hover:text-white/70'
+                )}
+              >
+                <Icon className="w-4 h-4" />{label}
+              </button>
+            ))}
           </div>
 
           <AnimatePresence mode="wait">
@@ -328,10 +354,10 @@ export default function Matchs() {
                   </div>
                 )}
 
-                {/* Date navigator — hidden when a league filter is active
-                    since we then show ALL upcoming matches for that league,
-                    not a specific day. */}
-                {!selectedLeague && (
+                {/* Date navigator — only relevant on the date-based Matchs
+                    tab when no league filter is active. Calendrier/Résultats
+                    use next/last-N fetches so the date picker doesn't apply. */}
+                {!selectedLeague && tabParam === 'matchs' && (
                 <div className="flex flex-col gap-2">
                   <div className={clsx(
                     'flex items-stretch gap-1 p-1 bg-dark-800 rounded-xl border transition-colors',
@@ -418,8 +444,17 @@ export default function Matchs() {
                   </div>
                 )}
 
-                {/* Content */}
-                {loading ? (
+                {/* Empty state: Calendrier/Résultats need a league filter.
+                    Direct the user to the right sidebar / mobile drawer. */}
+                {(tabParam === 'calendrier' || tabParam === 'resultats') && !selectedLeague ? (
+                  <EmptyState
+                    title="Sélectionne une ligue"
+                    subtitle={tabParam === 'calendrier'
+                      ? 'Le calendrier affiche les prochains matchs d’une ligue ou compétition. Choisis-en une dans la liste à droite.'
+                      : 'Les résultats affichent les derniers matchs d’une ligue ou compétition. Choisis-en une dans la liste à droite.'}
+                    icon={tabParam === 'calendrier' ? '📅' : '🏁'}
+                  />
+                ) : loading ? (
                   <div className="space-y-3">
                     {[...Array(4)].map((_, gi) => (
                       <div key={gi} className="football-card overflow-hidden">
