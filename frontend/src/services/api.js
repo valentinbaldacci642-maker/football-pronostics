@@ -134,6 +134,10 @@ export const fixturesApi = {
   getById: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}`, fresh ? { params: { fresh: 1 } } : undefined),
   getByDate: (date, league) => api.get('/fixtures', { params: { date, league, timezone: tz } }),
   getByLeagueSeason: (league, season) => api.get('/fixtures', { params: { league, season, timezone: tz } }),
+  // Used when the user filters the Matchs page by league: show the next
+  // N upcoming fixtures rather than only today's, so a league with no
+  // game today still surfaces its real schedule (e.g. Coupe de France).
+  getUpcomingByLeague: (league, count = 50) => api.get('/fixtures', { params: { league, next: count, timezone: tz } }),
   getByTeam: (teamId, { last, next, season } = {}) => api.get('/fixtures', { params: { team: teamId, last, next, season } }),
   getStatistics: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}/statistics`, fresh ? { params: { fresh: 1 } } : undefined),
   getEvents: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}/events`, fresh ? { params: { fresh: 1 } } : undefined),

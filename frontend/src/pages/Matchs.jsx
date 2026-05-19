@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Zap, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   BarChart2, List, Trophy, X,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import MatchCard from '../components/match/MatchCard';
+import MatchRow from '../components/match/MatchRow';
 import CountriesSidebar from '../components/match/CountriesSidebar';
 import StandingsView from '../components/leagues/StandingsView';
-import { SkeletonCard, EmptyState, ErrorState } from '../components/ui/Loading';
+import { EmptyState, ErrorState } from '../components/ui/Loading';
 import { fixturesApi } from '../services/api';
 import { useLivePolling, isLiveStatus } from '../hooks/useLivePolling';
 import { format } from 'date-fns';
@@ -63,33 +63,42 @@ function groupByLeague(fixtures) {
 }
 
 function LeagueGroup({ league, matches, defaultExpanded = false }) {
+  // Flashscore-style list: the league acts as a section header with its
+  // own collapsible block of rows underneath. Defaults to expanded so the
+  // user doesn't have to click each league to see the matches.
   const [expanded, setExpanded] = useState(defaultExpanded);
   const isPriority = PRIORITY_LEAGUE_IDS.includes(league?.id);
-  const visible = expanded ? matches : matches.slice(0, 3);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-      <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-3 w-full group">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="football-card overflow-hidden"
+    >
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-2.5 w-full px-4 py-2.5 bg-white/[0.03] hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+      >
         {league?.logo ? (
-          <img src={league.logo} alt="" className="w-5 h-5 object-contain" />
+          <img src={league.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
         ) : (
-          <div className="w-5 h-5 rounded bg-dark-600 text-[10px] text-white/30 flex items-center justify-center">⚽</div>
+          <div className="w-4 h-4 rounded bg-dark-600 text-[10px] text-white/30 flex items-center justify-center flex-shrink-0">⚽</div>
         )}
-        <span className={clsx('text-sm font-heading font-bold tracking-wide', isPriority ? 'text-white/80' : 'text-white/45')}>
+        {league?.country && <span className="text-[11px] text-white/35 font-heading font-semibold uppercase tracking-wider truncate">{league.country}:</span>}
+        <span className={clsx('text-xs font-heading font-bold tracking-wide truncate', isPriority ? 'text-white/90' : 'text-white/65')}>
           {league?.name}
         </span>
-        {league?.country && <span className="text-xs text-white/25">{league.country}</span>}
-        <div className="flex-1 border-t border-white/5" />
-        <span className="text-xs text-white/30 mr-1">{matches.length} match{matches.length > 1 ? 's' : ''}</span>
-        {expanded ? <ChevronUp className="w-3.5 h-3.5 text-white/20" /> : <ChevronDown className="w-3.5 h-3.5 text-white/20" />}
+        <div className="flex-1" />
+        <span className="text-[10px] text-white/30 font-mono">{matches.length}</span>
+        {expanded ? <ChevronUp className="w-3.5 h-3.5 text-white/30" /> : <ChevronDown className="w-3.5 h-3.5 text-white/30" />}
       </button>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {visible.map((fixture) => <MatchCard key={fixture.fixture.id} fixture={fixture} />)}
-      </div>
-      {!expanded && matches.length > 3 && (
-        <button onClick={() => setExpanded(true)} className="text-xs text-white/30 hover:text-white/60 transition-colors w-full text-center py-1">
-          + {matches.length - 3} match{matches.length - 3 > 1 ? 's' : ''} de plus
-        </button>
+
+      {expanded && (
+        <div>
+          {matches.map((fixture) => (
+            <MatchRow key={fixture.fixture.id} fixture={fixture} />
+          ))}
+        </div>
       )}
     </motion.div>
   );
@@ -122,6 +131,25 @@ export default function Matchs() {
   const [error, setError] = useState(null);
   const [liveCount, setLiveCount] = useState(0);
   const [sidebarOpenMobile, setSidebarOpenMobile] = useState(false);
+  const dateInputRef = useRef(null);
+
+  // On desktop, clicking a transparent <input type="date"> overlay does
+  // not reliably trigger the native picker — Chrome/Edge need an explicit
+  // showPicker() call. We call it on label click as a fallback so the
+  // user can click the visible label text to open the picker. On mobile
+  // the native overlay already works, so showPicker() is just a no-op
+  // after the input gains focus.
+  const openDatePicker = () => {
+    const el = dateInputRef.current;
+    if (!el) return;
+    try {
+      if (typeof el.showPicker === 'function') el.showPicker();
+      else el.focus();
+    } catch (_) {
+      // Older browsers: showPicker may throw if not user-initiated. The
+      // overlay handles the click fallback path.
+    }
+  };
 
   const leagueParam = searchParams.get('league');
   useEffect(() => {
@@ -134,17 +162,25 @@ export default function Matchs() {
   }, [leagueParam]);
 
   const selectedLeagueId = selectedLeague?.id ?? null;
-  const fixtures = selectedLeagueId
-    ? allFixtures.filter((f) => f.league?.id === selectedLeagueId)
-    : allFixtures;
+  // Server-side filter when a league is active (upcoming N matches),
+  // otherwise the API returns one day's fixtures and we show them all.
+  const fixtures = allFixtures;
 
   const fetchFixtures = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = mode === 'live'
-        ? await fixturesApi.getLive()
-        : await fixturesApi.getByDate(selectedDate);
+      let result;
+      if (mode === 'live') {
+        result = await fixturesApi.getLive();
+      } else if (selectedLeagueId) {
+        // League selected → ALL upcoming fixtures for it, not just today's.
+        // Lets users see a league's full schedule (e.g. Coupe de France
+        // even when no game today).
+        result = await fixturesApi.getUpcomingByLeague(selectedLeagueId, 50);
+      } else {
+        result = await fixturesApi.getByDate(selectedDate);
+      }
       const all = result?.response || [];
       setAllFixtures(all);
       if (mode === 'live') setLiveCount(all.length);
@@ -153,7 +189,7 @@ export default function Matchs() {
     } finally {
       setLoading(false);
     }
-  }, [mode, selectedDate]);
+  }, [mode, selectedDate, selectedLeagueId]);
 
   useEffect(() => { fetchFixtures(); }, [fetchFixtures]);
 
@@ -204,7 +240,9 @@ export default function Matchs() {
                   ? 'Classements et buteurs'
                   : mode === 'live'
                     ? 'Tous les matchs en direct'
-                    : format(new Date(selectedDate + 'T00:00:00'), "EEEE d MMMM yyyy", { locale: fr })}
+                    : selectedLeague
+                      ? `Matchs à venir · ${selectedLeague.name || 'Ligue sélectionnée'}`
+                      : format(new Date(selectedDate + 'T00:00:00'), "EEEE d MMMM yyyy", { locale: fr })}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -290,7 +328,10 @@ export default function Matchs() {
                   </div>
                 )}
 
-                {/* Date navigator */}
+                {/* Date navigator — hidden when a league filter is active
+                    since we then show ALL upcoming matches for that league,
+                    not a specific day. */}
+                {!selectedLeague && (
                 <div className="flex flex-col gap-2">
                   <div className={clsx(
                     'flex items-stretch gap-1 p-1 bg-dark-800 rounded-xl border transition-colors',
@@ -303,22 +344,33 @@ export default function Matchs() {
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <label className={clsx(
-                      'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all relative',
-                      mode === 'date' ? 'bg-dark-700 text-white shadow-inset-glow' : 'text-white/50 hover:text-white/80'
-                    )}>
+                    <button
+                      type="button"
+                      onClick={openDatePicker}
+                      className={clsx(
+                        'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all relative',
+                        mode === 'date' ? 'bg-dark-700 text-white shadow-inset-glow' : 'text-white/50 hover:text-white/80'
+                      )}
+                    >
                       <Calendar className="w-4 h-4" />
                       <span className="font-heading font-semibold tracking-wide capitalize">{formatDayLabel(selectedDate)}</span>
                       <span className="text-xs text-white/30 font-mono hidden sm:inline">
                         {format(new Date(selectedDate + 'T00:00:00'), 'd MMM', { locale: fr })}
                       </span>
+                      {/* The actual <input type="date"> is overlaid invisibly so
+                          the OS-level picker still attaches to the same hit area.
+                          On desktop the button onClick → showPicker() handles
+                          the case where browsers don't react to overlay clicks. */}
                       <input
+                        ref={dateInputRef}
                         type="date"
                         value={selectedDate}
                         onChange={(e) => { setMode('date'); setSelectedDate(e.target.value); }}
                         className="absolute inset-0 opacity-0 cursor-pointer"
+                        tabIndex={-1}
+                        aria-hidden="true"
                       />
-                    </label>
+                    </button>
                     <button
                       onClick={() => { setMode('date'); setSelectedDate(shiftDate(selectedDate, 1)); }}
                       className="flex items-center justify-center w-10 rounded-lg text-white/50 hover:text-white hover:bg-dark-700 transition-all"
@@ -343,6 +395,7 @@ export default function Matchs() {
                     {liveCount > 0 && <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-mono">{liveCount}</span>}
                   </button>
                 </div>
+                )}
 
                 {/* Active league filter chip */}
                 {selectedLeague && (
@@ -367,13 +420,13 @@ export default function Matchs() {
 
                 {/* Content */}
                 {loading ? (
-                  <div className="space-y-6">
-                    {[...Array(3)].map((_, gi) => (
-                      <div key={gi} className="space-y-3">
-                        <div className="h-5 w-40 bg-white/5 rounded animate-pulse" />
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                          {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
-                        </div>
+                  <div className="space-y-3">
+                    {[...Array(4)].map((_, gi) => (
+                      <div key={gi} className="football-card overflow-hidden">
+                        <div className="h-9 bg-white/[0.04] border-b border-white/[0.04]" />
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="h-14 border-b border-white/[0.03] animate-pulse" />
+                        ))}
                       </div>
                     ))}
                   </div>
@@ -386,13 +439,13 @@ export default function Matchs() {
                     icon="⚽"
                   />
                 ) : (
-                  <div className="space-y-6">
-                    {grouped.map(({ league, matches }, idx) => (
+                  <div className="space-y-3">
+                    {grouped.map(({ league, matches }) => (
                       <LeagueGroup
                         key={league?.id}
                         league={league}
                         matches={matches}
-                        defaultExpanded={idx < 3 || PRIORITY_LEAGUE_IDS.includes(league?.id)}
+                        defaultExpanded={true}
                       />
                     ))}
                   </div>
