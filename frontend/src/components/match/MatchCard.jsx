@@ -49,13 +49,16 @@ export default function MatchCard({ fixture, compact = false, prediction }) {
       )}
     >
       {/* League header */}
-      <div className="flex items-center justify-between px-4 pt-3 pb-2.5 border-b border-white/[0.04]">
-        <div className="flex items-center gap-2">
-          {league?.logo && <img src={league.logo} alt={league.name} className="w-3.5 h-3.5 object-contain opacity-80" />}
-          <span className="text-xs text-white/35 font-heading font-medium truncate max-w-[160px]">{league?.name}</span>
-          {league?.round && <span className="text-xs text-white/15">· {league.round}</span>}
+      <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2.5 border-b border-white/[0.04]">
+        {/* min-w-0 lets flex children shrink, so the round/name truncate
+            instead of pushing the right-side status + favorite star out
+            of the card (happened on long labels like "Qualifying Round - 9"). */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {league?.logo && <img src={league.logo} alt={league.name} className="w-3.5 h-3.5 object-contain opacity-80 flex-shrink-0" />}
+          <span className="text-xs text-white/35 font-heading font-medium truncate">{league?.name}</span>
+          {league?.round && <span className="text-xs text-white/15 truncate">· {league.round}</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {isLive ? (
             <div className="live-indicator">
               <span className="w-1.5 h-1.5 rounded-full bg-danger animate-live-dot" />
