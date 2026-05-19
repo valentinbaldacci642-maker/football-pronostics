@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Flame, Star, Trophy,
+  Flame, Star,
   Calendar, Settings, ChevronRight, Globe2, BookOpen, Newspaper, HelpCircle, Target,
 } from 'lucide-react';
 import { useUIStore } from '../../store';
@@ -11,7 +11,6 @@ const NAV_ITEMS = [
   { to: '/', icon: Target, label: 'Top 10 pronos', exact: true },
   { to: '/value-bets', icon: Flame, label: 'Value bets' },
   { to: '/matchs', icon: Calendar, label: 'Tous les matchs' },
-  { to: '/leagues', icon: Trophy, label: 'Ligues' },
   { to: '/worldcup', icon: Globe2, label: 'Coupe du Monde' },
   { to: '/news', icon: Newspaper, label: 'Actu Football' },
   { to: '/history', icon: BookOpen, label: 'Historique' },
@@ -85,11 +84,11 @@ function SidebarContent({ onClose }) {
       {/* Divider */}
       <div className="pitch-divider" />
 
-      {/* Top Leagues */}
+      {/* Top Leagues — quick links to filter the Matchs page by league */}
       <div className="flex-1">
         <div className="flex items-center justify-between px-3 mb-2">
           <p className="section-subtitle text-[10px]">Ligues Top</p>
-          <NavLink to="/leagues" className="text-xs text-brand-400/70 hover:text-brand-400 font-heading font-semibold transition-colors">Voir tout</NavLink>
+          <NavLink to="/matchs" className="text-xs text-brand-400/70 hover:text-brand-400 font-heading font-semibold transition-colors">Voir tout</NavLink>
         </div>
         <div className="space-y-0.5">
           {TOP_LEAGUES.map((league) => (

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useHistoryStore } from './store';
@@ -14,7 +14,6 @@ import RateLimitBanner from './components/common/RateLimitBanner';
 import Home from './pages/Home';
 import Matchs from './pages/Matchs';
 import MatchDetail from './pages/MatchDetail';
-import Leagues from './pages/Leagues';
 import Favorites from './pages/Favorites';
 import WorldCup from './pages/WorldCup';
 import Team from './pages/Team';
@@ -122,7 +121,8 @@ export default function App() {
               <Route path="/" element={<PageTransition><Home /></PageTransition>} />
               <Route path="/matchs" element={<PageTransition><Matchs /></PageTransition>} />
               <Route path="/match/:id" element={<PageTransition><MatchDetail /></PageTransition>} />
-              <Route path="/leagues" element={<PageTransition><Leagues /></PageTransition>} />
+              {/* Legacy /leagues link → redirect into the merged Matchs page on the Classements tab. */}
+              <Route path="/leagues" element={<Navigate to="/matchs?tab=classements" replace />} />
               <Route path="/favorites" element={<PageTransition><Favorites /></PageTransition>} />
               <Route path="/worldcup" element={<PageTransition><WorldCup /></PageTransition>} />
               <Route path="/team/:id" element={<PageTransition><Team /></PageTransition>} />
