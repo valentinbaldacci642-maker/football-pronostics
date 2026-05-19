@@ -15,7 +15,70 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
 
-const PRIORITY_LEAGUE_IDS = [39, 140, 78, 135, 61, 2, 3, 848, 88, 94, 253, 71, 128];
+// Priority order for the daily list — index 0 = top of the page. International
+// trophies (World Cup, Euro…) come first since they're rare and matter to
+// everyone; then European club competitions; then top 5 domestic; then major
+// national cups; then second-tier European; then the rest. Anything not in
+// this list is sorted by match count below (smaller leagues at the bottom).
+const PRIORITY_LEAGUE_IDS = [
+  // International national-team trophies — when they happen, they're the headline
+  1,    // FIFA World Cup
+  4,    // UEFA Euro Championship
+  9,    // Copa America
+  10,   // Friendlies (international)
+  5,    // UEFA Nations League
+  29,   // World Cup - Qualification (Europe)
+  32,   // World Cup - Qualification (Asia)
+  31,   // World Cup - Qualification (South America)
+  33,   // World Cup - Qualification (Africa)
+  34,   // World Cup - Qualification (CONCACAF)
+
+  // European club competitions
+  2,    // UEFA Champions League
+  3,    // UEFA Europa League
+  848,  // UEFA Conference League
+  531,  // UEFA Super Cup
+
+  // Top 5 European domestic leagues
+  39,   // Premier League
+  140,  // La Liga
+  78,   // Bundesliga
+  135,  // Serie A
+  61,   // Ligue 1
+
+  // Major national cups
+  45,   // FA Cup
+  143,  // Copa del Rey
+  137,  // Coppa Italia
+  81,   // DFB Pokal
+  66,   // Coupe de France
+  48,   // EFL Cup
+
+  // Second tier
+  40,   // Championship (England)
+  62,   // Ligue 2
+  79,   // 2. Bundesliga
+  136,  // Serie B
+  141,  // La Liga 2
+
+  // Other top European leagues
+  88,   // Eredivisie
+  94,   // Primeira Liga
+  144,  // Jupiler Pro League (Belgium)
+  203,  // Süper Lig (Turkey)
+  179,  // Scottish Premiership
+
+  // South American club + national leagues
+  13,   // Copa Libertadores
+  11,   // Copa Sudamericana
+  71,   // Brasileirão Série A
+  128,  // Argentine Liga Profesional
+
+  // Other notable
+  253,  // MLS
+  307,  // Saudi Pro League
+  262,  // Liga MX
+];
 
 function localIso(date) {
   return [
