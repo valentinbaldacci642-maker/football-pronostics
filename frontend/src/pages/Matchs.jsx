@@ -68,9 +68,20 @@ function formatRoundLabel(round) {
   return map[round] || round;
 }
 
-// Bucket fixtures by their league.round, then sort chronologically (asc
-// by earliest kickoff in each round). Result is what the round navigator
-// pages through — index 0 is the oldest round in the dataset.
+// Extract a numeric ordering hint from a round label. Returns null for
+// cup rounds and other non-numbered formats (sort falls back to date).
+function roundNumber(round) {
+  if (!round) return null;
+  const m = round.match(/^(?:Regular Season|Group Stage|1st Round|2nd Round|Playoffs?)\s*-\s*(\d+)$/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// Bucket fixtures by their league.round. Order:
+//   1) If every round in the set has a numeric component (Regular Season - N
+//      style), sort by that number — avoids postponed-match shuffle where
+//      a 'Journée 30' replay kicks off after 'Journée 34'.
+//   2) Otherwise fall back to earliest kickoff in each round (cups,
+//      mixed-format datasets).
 function groupByRound(fixtures) {
   const map = new Map();
   for (const f of fixtures) {
@@ -81,9 +92,10 @@ function groupByRound(fixtures) {
   const arr = Array.from(map.entries()).map(([round, matches]) => {
     matches.sort((a, b) => new Date(a.fixture?.date) - new Date(b.fixture?.date));
     const minDate = matches[0]?.fixture?.date ? new Date(matches[0].fixture.date).getTime() : 0;
-    return { round, matches, minDate };
+    return { round, matches, minDate, num: roundNumber(round) };
   });
-  arr.sort((a, b) => a.minDate - b.minDate);
+  const allNumbered = arr.length > 0 && arr.every((g) => g.num != null);
+  arr.sort((a, b) => allNumbered ? a.num - b.num : a.minDate - b.minDate);
   return arr;
 }
 
@@ -256,10 +268,12 @@ export default function Matchs() {
     setError(null);
     try {
       let result;
-      if (tabParam === 'calendrier' && selectedLeagueId) {
-        result = await fixturesApi.getUpcomingByLeague(selectedLeagueId, 50);
-      } else if (tabParam === 'resultats' && selectedLeagueId) {
-        result = await fixturesApi.getRecentByLeague(selectedLeagueId, 50);
+      if ((tabParam === 'calendrier' || tabParam === 'resultats') && selectedLeagueId) {
+        // Fetch the full season's fixtures so the round navigator can
+        // page through every Journée, not just the last/next 50 matches.
+        // We filter to upcoming vs past client-side below.
+        const season = selectedLeague?.season || (new Date().getFullYear() - 1);
+        result = await fixturesApi.getByLeagueSeason(selectedLeagueId, season);
       } else if (mode === 'live') {
         result = await fixturesApi.getLive();
       } else if (selectedLeagueId) {
@@ -269,11 +283,22 @@ export default function Matchs() {
       } else {
         result = await fixturesApi.getByDate(selectedDate);
       }
-      const all = result?.response || [];
-      // Résultats tab: API may return fixtures sorted earliest-first. Reverse
-      // so the most recent finished match is on top — that's what the user
-      // expects when browsing a "Résultats" page.
-      if (tabParam === 'resultats') all.reverse();
+      let all = result?.response || [];
+
+      // Calendrier = remaining (NS, scheduled, postponed). Résultats =
+      // already-played (FT, AET, PEN, etc.). Live/HT matches show in both
+      // since they're 'currently happening' — useful on both views.
+      if (tabParam === 'calendrier' && selectedLeagueId) {
+        all = all.filter((f) => {
+          const s = f.fixture?.status?.short;
+          return s === 'NS' || s === 'TBD' || s === 'PST' || isLiveStatus(s);
+        });
+      } else if (tabParam === 'resultats' && selectedLeagueId) {
+        all = all.filter((f) => {
+          const s = f.fixture?.status?.short;
+          return ['FT', 'AET', 'PEN', 'AWD', 'WO'].includes(s) || isLiveStatus(s);
+        });
+      }
       setAllFixtures(all);
       if (mode === 'live') setLiveCount(all.length);
     } catch (err) {
@@ -281,7 +306,7 @@ export default function Matchs() {
     } finally {
       setLoading(false);
     }
-  }, [mode, selectedDate, selectedLeagueId, tabParam]);
+  }, [mode, selectedDate, selectedLeagueId, tabParam, selectedLeague?.season]);
 
   useEffect(() => { fetchFixtures(); }, [fetchFixtures]);
 
