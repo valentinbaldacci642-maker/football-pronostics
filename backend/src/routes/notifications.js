@@ -61,15 +61,11 @@ router.get('/scan-new-vbs', authScan, async (req, res) => {
 });
 
 // Standalone favorite-team scan — handy for manual testing / a dedicated
-// UptimeRobot monitor. ?force=1 ignores the daytime hour gate.
+// UptimeRobot monitor. Fires ~2h before kickoff, 24/7.
 router.get('/scan-favorite-teams', authScan, async (req, res) => {
   try {
     const dryRun = req.query.dry === '1';
-    const ignoreHourGate = req.query.force === '1';
-    const date = typeof req.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
-      ? req.query.date
-      : null;
-    const result = await notifications.scanFavoriteTeamsToday({ date, dryRun, ignoreHourGate });
+    const result = await notifications.scanFavoriteTeamsToday({ dryRun });
     res.json(result);
   } catch (e) {
     logger.error('scan-favorite-teams failed: ' + (e?.stack || e?.message || e));
