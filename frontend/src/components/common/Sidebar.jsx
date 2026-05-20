@@ -85,7 +85,6 @@ function SidebarContent({ onClose }) {
             <CloudSun className="w-4 h-4" />
           </div>
           <span className="tracking-wide flex-1">MimiMétéo</span>
-          <span className="text-[9px] font-bold uppercase tracking-wider bg-sky-500/25 text-sky-200 px-1.5 py-0.5 rounded">New</span>
         </NavLink>
       </nav>
 
