@@ -37,7 +37,7 @@ function sanitizeFavoriteTeams(input) {
   return ids;
 }
 
-function registerToken(token, platform = 'unknown', favoriteTeams = []) {
+function registerToken(token, platform = 'unknown', favoriteTeams = [], favoriteMatches = []) {
   if (!token || typeof token !== 'string') return false;
   // FCM registration tokens are ~140-260 chars. Reject anything outside
   // a sane range so an attacker can't fill memory with megabyte tokens.
@@ -51,6 +51,7 @@ function registerToken(token, platform = 'unknown', favoriteTeams = []) {
     platform: safePlatform,
     registeredAt: Date.now(),
     favoriteTeams: sanitizeFavoriteTeams(favoriteTeams),
+    favoriteMatches: sanitizeFavoriteTeams(favoriteMatches), // same shape: positive int IDs
   });
   return true;
 }
@@ -270,7 +271,8 @@ async function sendNewVbsNotification(newVbs) {
 // Lead time before kickoff at which we fire the reminder. Runs 24/7 (incl.
 // night matches) since the user explicitly wants those. The 5-min scan
 // cadence means the notif lands within ~5 min of the 2h-before mark.
-const FAV_LEAD_MS = 2 * 60 * 60 * 1000; // 2 hours
+const FAV_LEAD_MS = 2 * 60 * 60 * 1000;       // teams: 2h before kickoff
+const FAV_MATCH_LEAD_MS = 15 * 60 * 1000;     // matches: 15 min before kickoff
 
 function dateInParis(offsetDays = 0) {
   try {
@@ -330,12 +332,52 @@ async function sendFavoriteTeamNotification(token, favTeam, fixture) {
   }
 }
 
+async function sendFavoriteMatchNotification(token, fixture) {
+  const messaging = getMessaging();
+  if (!messaging) return false;
+  const home = fixture.teams?.home;
+  const away = fixture.teams?.away;
+  const title = 'Ton match commence dans 15 min !';
+  const body = `${home?.name} vs ${away?.name}`;
+  const iconUrl = process.env.NOTIFICATION_ICON_URL
+    || 'https://pronos-foufous-app.vercel.app/pwa-512x512.png';
+
+  try {
+    await messaging.send({
+      token,
+      notification: { title, body },
+      data: {
+        type: 'fav_match_kickoff',
+        fixtureId: String(fixture.fixture?.id),
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'favorite_teams',
+          sound: 'default',
+          imageUrl: iconUrl,
+          tag: `favmatch_${fixture.fixture?.id}`,
+        },
+      },
+    });
+    return true;
+  } catch (e) {
+    const code = e?.code || '';
+    if (code === 'messaging/registration-token-not-registered'
+        || code === 'messaging/invalid-registration-token') {
+      tokens.delete(token);
+    }
+    logger.warn(`favorite-match notif failed: ${e.message}`);
+    return false;
+  }
+}
+
 /**
- * Notify each token ~2h before a favorited team's match kicks off. Runs
- * 24/7 (night matches included). Fetches today + tomorrow fixtures so a
- * match just after midnight is still caught by the 2h window. One notif
- * per (token, fixture, team); the dedup set resets daily (already-started
- * matches can't re-enter the future window, so the reset is safe).
+ * Notify each token ~2h before a favorited team's match kicks off (24/7),
+ * and ~15 min before a favorited *match* kicks off. Fetches today +
+ * tomorrow fixtures (cached) so kickoffs just past midnight are still
+ * caught. One notif per (token, fixture); the dedup set resets daily
+ * (already-started matches can't re-enter the future window).
  */
 async function scanFavoriteTeamsToday({ dryRun = false } = {}) {
   const today = dateInParis(0);
@@ -346,7 +388,9 @@ async function scanFavoriteTeamsToday({ dryRun = false } = {}) {
     lastFavScanDate = today;
   }
 
-  const anyFavorites = Array.from(tokens.values()).some((m) => (m.favoriteTeams || []).length > 0);
+  const anyFavorites = Array.from(tokens.values()).some(
+    (m) => (m.favoriteTeams || []).length > 0 || (m.favoriteMatches || []).length > 0
+  );
   if (!anyFavorites) {
     return { tokensWithFavs: 0, matchesInWindow: 0, sent: 0 };
   }
@@ -361,12 +405,16 @@ async function scanFavoriteTeamsToday({ dryRun = false } = {}) {
 
   const now = Date.now();
   const SCHEDULED = new Set(['NS', 'TBD', 'PST']);
-  // Index team → earliest upcoming (still-scheduled, future) fixture.
+  // Index team → earliest upcoming fixture, and fixtureId → fixture, from
+  // the same scheduled-future pool. teamUpcoming powers the 2h team
+  // reminder; fixtureById powers the 15-min favorited-match reminder.
   const teamUpcoming = new Map();
+  const fixtureById = new Map();
   for (const f of fixtures) {
     const ts = new Date(f.fixture?.date).getTime();
     if (!Number.isFinite(ts) || ts <= now) continue;
     if (f.fixture?.status?.short && !SCHEDULED.has(f.fixture.status.short)) continue;
+    if (f.fixture?.id) fixtureById.set(f.fixture.id, f);
     for (const side of ['home', 'away']) {
       const id = f.teams?.[side]?.id;
       if (!id) continue;
@@ -380,25 +428,41 @@ async function scanFavoriteTeamsToday({ dryRun = false } = {}) {
   let tokensWithFavs = 0;
 
   for (const [token, meta] of tokens) {
-    const favs = meta.favoriteTeams || [];
-    if (favs.length === 0) continue;
+    const favTeams = meta.favoriteTeams || [];
+    const favMatches = meta.favoriteMatches || [];
+    if (favTeams.length === 0 && favMatches.length === 0) continue;
     tokensWithFavs++;
-    for (const teamId of favs) {
+
+    // ── Favorite teams: 2h before kickoff ──
+    for (const teamId of favTeams) {
       const fixture = teamUpcoming.get(teamId);
       if (!fixture) continue;
-      const ts = new Date(fixture.fixture.date).getTime();
-      const untilKickoff = ts - now;
-      // Fire only inside the lead window: between now and 2h before kickoff.
+      const untilKickoff = new Date(fixture.fixture.date).getTime() - now;
       if (untilKickoff <= 0 || untilKickoff > FAV_LEAD_MS) continue;
       matchesInWindow++;
-      const key = `${token}::${fixture.fixture.id}::${teamId}`;
+      const key = `team::${token}::${fixture.fixture.id}::${teamId}`;
       if (notifiedFavKeys.has(key)) continue;
       if (dryRun) continue;
       const home = fixture.teams?.home;
       const away = fixture.teams?.away;
       const favTeam = home?.id === teamId ? home : away;
-      const ok = await sendFavoriteTeamNotification(token, favTeam, fixture);
-      if (ok) {
+      if (await sendFavoriteTeamNotification(token, favTeam, fixture)) {
+        notifiedFavKeys.add(key);
+        sent++;
+      }
+    }
+
+    // ── Favorite matches: 15 min before kickoff ──
+    for (const fixtureId of favMatches) {
+      const fixture = fixtureById.get(fixtureId);
+      if (!fixture) continue;
+      const untilKickoff = new Date(fixture.fixture.date).getTime() - now;
+      if (untilKickoff <= 0 || untilKickoff > FAV_MATCH_LEAD_MS) continue;
+      matchesInWindow++;
+      const key = `match::${token}::${fixtureId}`;
+      if (notifiedFavKeys.has(key)) continue;
+      if (dryRun) continue;
+      if (await sendFavoriteMatchNotification(token, fixture)) {
         notifiedFavKeys.add(key);
         sent++;
       }

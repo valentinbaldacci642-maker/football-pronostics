@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { App as CapacitorApp } from '@capacitor/app';
-import { useHistoryStore, useFavoriteTeamsStore } from './store';
+import { useHistoryStore, useFavoriteTeamsStore, useFavoritesStore } from './store';
 import { resolveFinishedMatches } from './utils/resolveResults';
 import { initCloudSync } from './services/cloudSync';
 import { initPushNotifications, syncFavoriteTeamsToBackend } from './services/pushNotifications';
@@ -37,17 +37,18 @@ export default function App() {
   // re-sending the same token is a no-op server-side. Web → skipped.
   useEffect(() => { initPushNotifications().catch(() => {}); }, []);
 
-  // Keep the backend's per-token favorite-team list in sync so 'your team
-  // plays today' notifs reflect the user's current favorites. Debounced to
-  // coalesce rapid toggles. The store subscription fires on every change.
+  // Keep the backend's per-token favorites (teams + matches) in sync so the
+  // reminder notifs reflect the user's current favorites. Debounced to
+  // coalesce rapid toggles. Both store subscriptions feed the same sync.
   useEffect(() => {
     let timer = null;
     const schedule = () => {
       clearTimeout(timer);
       timer = setTimeout(() => { syncFavoriteTeamsToBackend().catch(() => {}); }, 1500);
     };
-    const unsub = useFavoriteTeamsStore.subscribe(schedule);
-    return () => { clearTimeout(timer); unsub(); };
+    const unsubTeams = useFavoriteTeamsStore.subscribe(schedule);
+    const unsubMatches = useFavoritesStore.subscribe(schedule);
+    return () => { clearTimeout(timer); unsubTeams(); unsubMatches(); };
   }, []);
 
   // Backend warm-up : Render free tier endort l'instance après ~15min

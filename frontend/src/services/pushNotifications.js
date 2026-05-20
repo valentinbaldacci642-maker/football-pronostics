@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { notificationsApi } from './api';
-import { useFavoriteTeamsStore } from '../store';
+import { useFavoriteTeamsStore, useFavoritesStore } from '../store';
 
 // Static import so Capacitor can wire the plugin bridge at JS init time.
 // On web the plugin's stub no-ops, so we gate the *runtime* behavior on
@@ -15,6 +15,17 @@ function currentFavoriteTeamIds() {
   try {
     return (useFavoriteTeamsStore.getState().favoriteTeams || [])
       .map((t) => t.id)
+      .filter((id) => Number.isFinite(id));
+  } catch (_) {
+    return [];
+  }
+}
+
+// Read the current favorite match (fixture) IDs from the persisted store.
+function currentFavoriteMatchIds() {
+  try {
+    return (useFavoritesStore.getState().favorites || [])
+      .map((id) => Number(id))
       .filter((id) => Number.isFinite(id));
   } catch (_) {
     return [];
@@ -89,7 +100,9 @@ export async function initPushNotifications() {
     localStorage.setItem(LS_TOKEN_KEY, token);
 
     try {
-      await notificationsApi.register(token, Capacitor.getPlatform(), currentFavoriteTeamIds());
+      await notificationsApi.register(
+        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds()
+      );
     } catch (e) {
       // Backend down → don't block the app, retry next launch
       console.warn('[push] register backend call failed:', e?.message);
@@ -130,10 +143,10 @@ export async function enablePushNotifications() {
 }
 
 /**
- * Re-send the current favorite team list to the backend using the stored
- * token. Called whenever the user adds/removes a favorite so the 'plays
- * today' notifications stay in sync without a full re-registration. No-op
- * on web or when notifications are off / no token yet.
+ * Re-send the current favorite teams + matches to the backend using the
+ * stored token. Called whenever the user adds/removes a favorite team or
+ * match so the reminder notifications stay in sync without a full
+ * re-registration. No-op on web or when notifications are off / no token.
  */
 export async function syncFavoriteTeamsToBackend() {
   if (!Capacitor.isNativePlatform()) return;
@@ -141,7 +154,9 @@ export async function syncFavoriteTeamsToBackend() {
   const token = localStorage.getItem(LS_TOKEN_KEY);
   if (!token) return;
   try {
-    await notificationsApi.register(token, Capacitor.getPlatform(), currentFavoriteTeamIds());
+    await notificationsApi.register(
+      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds()
+    );
   } catch (e) {
     console.warn('[push] favorite sync failed:', e?.message);
   }
