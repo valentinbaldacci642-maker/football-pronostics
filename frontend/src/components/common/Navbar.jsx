@@ -1,16 +1,20 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import clsx from 'clsx';
-import { teamsApi } from '../../services/api';
+import { teamsApi, playersApi } from '../../services/api';
 import { useBankrollStore, useHistoryStore } from '../../store';
 
 export default function Navbar() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState([]);        // teams
+  const [playerResults, setPlayerResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const navigate = useNavigate();
+  // Guard against out-of-order async responses: only the latest query's
+  // results are applied.
+  const seqRef = useRef(0);
 
   // 2 bankrolls live, une par bookmaker. Affichées en pill séparées si au
   // moins une initiale > 0. Cachées sur la page Help.
@@ -28,17 +32,27 @@ export default function Navbar() {
   const handleSearch = async (e) => {
     const val = e.target.value;
     setQuery(val);
-    if (val.length < 3) { setResults([]); return; }
+    if (val.length < 3) { setResults([]); setPlayerResults([]); return; }
+    const seq = ++seqRef.current;
     setSearching(true);
     try {
-      const data = await teamsApi.search(val);
-      setResults(data?.response?.slice(0, 6) || []);
+      // Teams + players in parallel. allSettled so one failing doesn't kill
+      // the other (player search needs ≥3 chars of a last name).
+      const [teamsRes, playersRes] = await Promise.allSettled([
+        teamsApi.search(val),
+        playersApi.search(val),
+      ]);
+      if (seq !== seqRef.current) return; // a newer query superseded this one
+      setResults(teamsRes.status === 'fulfilled' ? (teamsRes.value?.response?.slice(0, 5) || []) : []);
+      setPlayerResults(playersRes.status === 'fulfilled' ? (playersRes.value?.response?.slice(0, 5) || []) : []);
     } catch {
-      setResults([]);
+      if (seq === seqRef.current) { setResults([]); setPlayerResults([]); }
     } finally {
-      setSearching(false);
+      if (seq === seqRef.current) setSearching(false);
     }
   };
+
+  const closeSearch = () => { setQuery(''); setResults([]); setPlayerResults([]); };
 
   return (
     <header className="fixed top-0 left-0 right-0 lg:left-64 z-40 flex items-center px-3 md:px-6 gap-3"
@@ -81,26 +95,51 @@ export default function Navbar() {
             onChange={handleSearch}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-            placeholder="Chercher une équipe..."
+            placeholder="Chercher une équipe ou un joueur..."
             className="w-full bg-dark-700 border border-white/[0.07] rounded-xl pl-9 pr-9 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-brand-500/40 transition-all duration-200 font-heading"
           />
         </div>
 
-        {results.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-2 glass-card shadow-stadium overflow-hidden z-50">
-            {results.map((r, i) => (
-              <button
-                key={r.team.id}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.06] transition-colors text-left group"
-                onClick={() => { setQuery(''); setResults([]); navigate(`/team/${r.team.id}`); }}
-              >
-                <img src={r.team.logo} alt="" className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" onError={(e) => e.target.style.display = 'none'} />
-                <div>
-                  <p className="text-sm font-heading font-semibold text-white/80 group-hover:text-white transition-colors">{r.team.name}</p>
-                  <p className="text-xs text-white/30 font-mono">{r.team.country}</p>
-                </div>
-              </button>
-            ))}
+        {(results.length > 0 || playerResults.length > 0) && (
+          <div className="absolute top-full left-0 right-0 mt-2 glass-card shadow-stadium overflow-hidden z-50 max-h-[70vh] overflow-y-auto">
+            {results.length > 0 && (
+              <>
+                <p className="px-4 pt-2.5 pb-1 text-[10px] font-heading font-bold uppercase tracking-wider text-white/30">Équipes</p>
+                {results.map((r) => (
+                  <button
+                    key={`t-${r.team.id}`}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.06] transition-colors text-left group"
+                    onClick={() => { closeSearch(); navigate(`/team/${r.team.id}`); }}
+                  >
+                    <img src={r.team.logo} alt="" className="w-6 h-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" onError={(e) => e.target.style.display = 'none'} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-heading font-semibold text-white/80 group-hover:text-white transition-colors truncate">{r.team.name}</p>
+                      <p className="text-xs text-white/30 font-mono">{r.team.country}</p>
+                    </div>
+                  </button>
+                ))}
+              </>
+            )}
+            {playerResults.length > 0 && (
+              <>
+                <p className="px-4 pt-2.5 pb-1 text-[10px] font-heading font-bold uppercase tracking-wider text-white/30 border-t border-white/[0.05]">Joueurs</p>
+                {playerResults.map((r) => (
+                  <button
+                    key={`p-${r.player.id}`}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.06] transition-colors text-left group"
+                    onClick={() => { closeSearch(); navigate(`/player/${r.player.id}`); }}
+                  >
+                    <img src={r.player.photo} alt="" className="w-6 h-6 rounded-full object-cover bg-dark-700 flex-shrink-0" onError={(e) => { e.target.src = 'https://media.api-sports.io/football/players/0.png'; }} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-heading font-semibold text-white/80 group-hover:text-white transition-colors truncate">{r.player.name}</p>
+                      <p className="text-xs text-white/30 font-mono truncate">
+                        {[r.player.nationality, r.player.position].filter(Boolean).join(' · ') || 'Joueur'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>

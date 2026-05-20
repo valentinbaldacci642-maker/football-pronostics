@@ -307,7 +307,10 @@ class ApiFootballService {
   }
 
   async searchPlayers(name) {
-    return this.request('/players', { search: name }, config.cache.ttlTeams);
+    // /players?search= requires a league/team field. /players/profiles
+    // searches by last name globally (no team needed) — the right endpoint
+    // for a navbar player search. Returns { player: {...} } entries.
+    return this.request('/players/profiles', { search: name }, config.cache.ttlTeams);
   }
 
   // Liste des saisons jouées par un joueur (utile pour afficher un picker

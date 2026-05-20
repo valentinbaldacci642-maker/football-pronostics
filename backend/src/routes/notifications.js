@@ -42,18 +42,23 @@ router.get('/scan-new-vbs', authScan, async (req, res) => {
       : null;
     const result = await notifications.scanAndNotify({ minEdge, date, dryRun });
 
-    // Piggyback the favorite-team 'plays today' scan on the same UptimeRobot
-    // tick. It's cheap (one cached fixtures-by-date call) and self-dedups
-    // per day, so running it every 5 min only ever sends one notif per
-    // favorite team per day. Failures here must not break the VB scan.
+    // Piggyback the favorite scans on the same UptimeRobot tick. Both are
+    // cheap (cached fixture calls) and self-dedup, so running every 5 min is
+    // fine. Failures here must not break the VB scan.
     let favorites = null;
+    let live = null;
     try {
       favorites = await notifications.scanFavoriteTeamsToday({ dryRun });
     } catch (favErr) {
       logger.warn('favorite-teams scan failed: ' + (favErr?.message || favErr));
     }
+    try {
+      live = await notifications.scanLiveFavorites({ dryRun });
+    } catch (liveErr) {
+      logger.warn('live-favorites scan failed: ' + (liveErr?.message || liveErr));
+    }
 
-    res.json({ ...result, favorites });
+    res.json({ ...result, favorites, live });
   } catch (e) {
     logger.error('scan-new-vbs failed: ' + (e?.stack || e?.message || e));
     res.status(500).json({ error: 'Scan failed', message: e?.message });

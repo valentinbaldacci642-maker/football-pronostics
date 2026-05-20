@@ -134,6 +134,9 @@ export const fixturesApi = {
   getById: (id, { fresh = false } = {}) => api.get(`/fixtures/${id}`, fresh ? { params: { fresh: 1 } } : undefined),
   getByDate: (date, league) => api.get('/fixtures', { params: { date, league, timezone: tz } }),
   getByLeagueSeason: (league, season) => api.get('/fixtures', { params: { league, season, timezone: tz } }),
+  // Batch fetch fixtures by ID. API-Football wants a dash-joined list,
+  // max 20 ids per call. Used by the home 'Mes favoris' block.
+  getByIds: (ids) => api.get('/fixtures', { params: { ids: ids.join('-'), timezone: tz } }),
   // Used when the user filters the Matchs page by league: show the next
   // N upcoming fixtures rather than only today's, so a league with no
   // game today still surfaces its real schedule (e.g. Coupe de France).

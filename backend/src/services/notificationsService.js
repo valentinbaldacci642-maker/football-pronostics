@@ -14,6 +14,10 @@ const notifiedVbKeys = new Set();  // "fixtureId::market::selection"
 // keys naturally reset each day. Cleared wholesale when the date rolls over.
 const notifiedFavKeys = new Set();
 let lastFavScanDate = null;
+// Live match state for kickoff / goal / final notifs, only for fixtures a
+// token cares about. fixtureId → { status, gh, ga }. Wiped on restart →
+// at worst one live event is missed right after a deploy.
+const liveState = new Map();
 let lastScanAt = 0;
 let lastSentCount = 0;
 
@@ -85,6 +89,8 @@ function extractVbs(pronostics) {
         fixtureId,
         homeTeam: p.fixture.teams?.home?.name || '',
         awayTeam: p.fixture.teams?.away?.name || '',
+        homeTeamId: p.fixture.teams?.home?.id || null,
+        awayTeamId: p.fixture.teams?.away?.id || null,
         leagueName: p.fixture.league?.name || '',
         market: vb.market,
         selection: vb.selection,
@@ -141,6 +147,10 @@ async function scanAndNotify({ minEdge = 6, date = null, dryRun = false } = {}) 
   for (const v of newVbs) notifiedVbKeys.add(v.key);
 
   const sent = await sendNewVbsNotification(newVbs);
+  // Targeted highlight: if a new VB involves a token's favorited team, send
+  // that token an extra '💰 Value bet sur <équipe>' alert. Piggybacks on
+  // the already-deduped newVbs list, so no separate dedup is needed.
+  const favVbSent = await notifyFavoriteTeamVbs(newVbs);
   lastSentCount = sent;
   return {
     scannedAt: lastScanAt,
@@ -149,7 +159,43 @@ async function scanAndNotify({ minEdge = 6, date = null, dryRun = false } = {}) 
     newVbs: newVbs.length,
     tokenCount: tokens.size,
     sent,
+    favVbSent,
   };
+}
+
+// For each new VB, notify tokens that favorited either team with a
+// personal '💰 Value bet sur <équipe>' alert.
+async function notifyFavoriteTeamVbs(newVbs) {
+  if (!getMessaging()) return 0;
+  // teamId → Set<token>
+  const teamToTokens = new Map();
+  for (const [token, meta] of tokens) {
+    for (const tid of (meta.favoriteTeams || [])) {
+      if (!teamToTokens.has(tid)) teamToTokens.set(tid, new Set());
+      teamToTokens.get(tid).add(token);
+    }
+  }
+  if (teamToTokens.size === 0) return 0;
+
+  let sent = 0;
+  for (const vb of newVbs) {
+    for (const teamId of [vb.homeTeamId, vb.awayTeamId]) {
+      if (!teamId) continue;
+      const recipients = teamToTokens.get(teamId);
+      if (!recipients || recipients.size === 0) continue;
+      const favName = teamId === vb.homeTeamId ? vb.homeTeam : vb.awayTeam;
+      const edgeStr = vb.edge != null ? ` (edge ${vb.edge.toFixed(1)}%)` : '';
+      const oddStr = vb.odd != null ? ` @ ${vb.odd.toFixed(2)}` : '';
+      sent += await notifyTokens(recipients, {
+        title: `💰 Value bet sur ${favName}`,
+        body: `${vb.homeTeam} vs ${vb.awayTeam} · ${vb.selection}${oddStr}${edgeStr}`,
+        type: 'fav_team_vb',
+        fixtureId: vb.fixtureId,
+        tag: `favvb_${vb.fixtureId}_${vb.market}_${vb.selection}`.replace(/[^a-zA-Z0-9_]/g, '_'),
+      });
+    }
+  }
+  return sent;
 }
 
 // French day labels for compact relative formatting
@@ -472,6 +518,139 @@ async function scanFavoriteTeamsToday({ dryRun = false } = {}) {
   return { date: today, tokensWithFavs, matchesInWindow, sent, dryRun };
 }
 
+// ─── Live notifications: kickoff / goal / final result ──────────────────────
+
+// Send a single push to a set of tokens. Prunes dead tokens. Returns count.
+async function notifyTokens(recipients, { title, body, type, fixtureId, tag }) {
+  const messaging = getMessaging();
+  if (!messaging) return 0;
+  const iconUrl = process.env.NOTIFICATION_ICON_URL
+    || 'https://pronos-foufous-app.vercel.app/pwa-512x512.png';
+  let sent = 0;
+  for (const token of recipients) {
+    try {
+      await messaging.send({
+        token,
+        notification: { title, body },
+        data: { type, fixtureId: String(fixtureId) },
+        android: {
+          priority: 'high',
+          notification: { channelId: 'favorite_teams', sound: 'default', imageUrl: iconUrl, tag },
+        },
+      });
+      sent++;
+    } catch (e) {
+      const code = e?.code || '';
+      if (code === 'messaging/registration-token-not-registered'
+          || code === 'messaging/invalid-registration-token') {
+        tokens.delete(token);
+      }
+    }
+  }
+  return sent;
+}
+
+const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'SUSP', 'INT']);
+const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN']);
+
+/**
+ * Detect kickoff / goals / final results for fixtures involving a favorited
+ * team or match, and push to the relevant tokens. Diffs against liveState
+ * so it only fires on transitions. Runs on every UptimeRobot tick (~5 min
+ * latency on live events — the free-tier ceiling).
+ */
+async function scanLiveFavorites({ dryRun = false } = {}) {
+  // Reverse indexes: which tokens care about each team / match.
+  const teamToTokens = new Map();
+  const matchToTokens = new Map();
+  for (const [token, meta] of tokens) {
+    for (const tid of (meta.favoriteTeams || [])) {
+      if (!teamToTokens.has(tid)) teamToTokens.set(tid, new Set());
+      teamToTokens.get(tid).add(token);
+    }
+    for (const fid of (meta.favoriteMatches || [])) {
+      if (!matchToTokens.has(fid)) matchToTokens.set(fid, new Set());
+      matchToTokens.get(fid).add(token);
+    }
+  }
+  if (teamToTokens.size === 0 && matchToTokens.size === 0) {
+    return { events: 0, sent: 0 };
+  }
+
+  // Live fixtures (freshest) + today's (covers finals + not-yet-started).
+  const [liveData, todayData] = await Promise.all([
+    apiFootball.getLiveFixtures(),
+    apiFootball.getFixturesByDate(dateInParis(0)),
+  ]);
+  const byId = new Map();
+  for (const f of (todayData?.response || [])) if (f.fixture?.id) byId.set(f.fixture.id, f);
+  for (const f of (liveData?.response || [])) if (f.fixture?.id) byId.set(f.fixture.id, f); // live wins
+
+  let events = 0;
+  let sent = 0;
+
+  for (const [fid, f] of byId) {
+    const h = f.teams?.home;
+    const a = f.teams?.away;
+    const recipients = new Set();
+    for (const t of (teamToTokens.get(h?.id) || [])) recipients.add(t);
+    for (const t of (teamToTokens.get(a?.id) || [])) recipients.add(t);
+    for (const t of (matchToTokens.get(fid) || [])) recipients.add(t);
+    if (recipients.size === 0) continue;
+
+    const status = f.fixture?.status?.short;
+    const gh = f.goals?.home ?? 0;
+    const ga = f.goals?.away ?? 0;
+    const prev = liveState.get(fid);
+    const score = `${h?.name} ${gh} - ${ga} ${a?.name}`;
+
+    // Kickoff: was scheduled, now live.
+    if (prev && (prev.status === 'NS' || prev.status === 'TBD') && LIVE_STATUSES.has(status)) {
+      events++;
+      if (!dryRun) {
+        sent += await notifyTokens(recipients, {
+          title: "C'est parti !",
+          body: `${h?.name} vs ${a?.name}`,
+          type: 'live_kickoff', fixtureId: fid, tag: `kickoff_${fid}`,
+        });
+      }
+    } else if (prev && LIVE_STATUSES.has(prev.status) && LIVE_STATUSES.has(status)
+               && (gh + ga) > (prev.gh + prev.ga)) {
+      // Goal: total score increased while live.
+      events++;
+      if (!dryRun) {
+        sent += await notifyTokens(recipients, {
+          title: `⚽ But ! ${gh} - ${ga}`,
+          body: score,
+          type: 'live_goal', fixtureId: fid, tag: `goal_${fid}_${gh}_${ga}`,
+        });
+      }
+    }
+
+    // Final: was not finished, now finished.
+    if (prev && !FINAL_STATUSES.has(prev.status) && FINAL_STATUSES.has(status)) {
+      events++;
+      if (!dryRun) {
+        sent += await notifyTokens(recipients, {
+          title: `Terminé · ${gh} - ${ga}`,
+          body: score,
+          type: 'live_final', fixtureId: fid, tag: `final_${fid}`,
+        });
+      }
+    }
+
+    liveState.set(fid, { status, gh, ga });
+  }
+
+  // Bound liveState growth: drop entries for fixtures that are now final
+  // (no further transitions expected).
+  for (const [fid, st] of liveState) {
+    if (FINAL_STATUSES.has(st.status) && !byId.has(fid)) liveState.delete(fid);
+  }
+
+  return { events, sent, dryRun };
+}
+
 function getStatus() {
   return {
     tokenCount: tokens.size,
@@ -486,6 +665,7 @@ function getStatus() {
 function resetNotifiedKeys() {
   notifiedVbKeys.clear();
   notifiedFavKeys.clear();
+  liveState.clear();
   lastFavScanDate = null;
 }
 
@@ -494,6 +674,7 @@ module.exports = {
   unregisterToken,
   scanAndNotify,
   scanFavoriteTeamsToday,
+  scanLiveFavorites,
   getStatus,
   resetNotifiedKeys,
 };

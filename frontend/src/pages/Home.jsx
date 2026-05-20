@@ -13,6 +13,7 @@ import { useHistoryStore, useFavoritesStore, useBankrollStore, EDGE_MODE_THRESHO
 import { kellyStake } from '../utils/kelly';
 import { formatStake } from '../utils/formatStake';
 import { detectStreaksForFixture } from '../utils/streak';
+import FavoritesBlock from '../components/common/FavoritesBlock';
 
 function getConfidenceConfig(score) {
   if (score >= 70) return {
@@ -582,6 +583,9 @@ export default function Home() {
           </button>
         ))}
       </div>
+
+      {/* Mes favoris — équipes + matchs favoris à venir (masqué si aucun) */}
+      <FavoritesBlock />
 
       {/* Stats */}
       {!loading && topPronostics.length > 0 && (
