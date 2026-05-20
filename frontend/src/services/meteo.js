@@ -5,7 +5,10 @@
 import axios from 'axios';
 
 const GEO_URL = 'https://geocoding-api.open-meteo.com/v1/search';
-const FORECAST_URL = 'https://api.open-meteo.com/v1/meteofrance';
+// best_match: auto-picks the best model per location (Météo-France AROME/
+// ARPEGE for France near-term) AND gives a full 14-day HOURLY range — the
+// dedicated /meteofrance endpoint only returns ~4 days of hourly data.
+const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 
 // ─── City search ────────────────────────────────────────────────────────────
 export async function searchCity(name) {
@@ -38,7 +41,7 @@ export async function getForecast(lat, lon) {
         'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m',
       ].join(','),
       hourly: [
-        'temperature_2m', 'precipitation_probability', 'precipitation',
+        'temperature_2m', 'apparent_temperature', 'precipitation_probability', 'precipitation',
         'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'uv_index', 'cape',
       ].join(','),
       daily: [

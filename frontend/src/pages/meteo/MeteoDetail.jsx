@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, MapPin } from 'lucide-react';
 import {
   getForecast, capeRisk, severeStormRisk, windRisk,
-  rainviewerUrl, blitzortungUrl, windyUrl,
+  blitzortungUrl, windyUrl,
 } from '../../services/meteo';
 import MapEmbed from '../../components/meteo/MapEmbed';
 
@@ -121,7 +121,7 @@ function PluieView({ lat, lon, data }) {
 
   return (
     <div className="space-y-4">
-      <MapEmbed title="Radar pluie en direct · RainViewer" src={rainviewerUrl(lat, lon, 8)} height={400} note="live" />
+      <MapEmbed title="Radar pluie · Windy" src={windyUrl(lat, lon, 'rain')} height={400} note="live" />
 
       {(daily.time || []).length > 0 && (
         <div className="glass-card p-4">

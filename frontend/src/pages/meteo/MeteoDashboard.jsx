@@ -6,7 +6,7 @@ import {
   Thermometer, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, ChevronRight,
 } from 'lucide-react';
 import {
-  getForecast, wmo, windRisk, rainRisk, uvRisk, capeRisk,
+  getForecast, wmo, windRisk, rainRisk, uvRisk, capeRisk, severeStormRisk,
 } from '../../services/meteo';
 
 const PAGE_BG = 'radial-gradient(1200px 600px at 50% -10%, #0a1628 0%, #050a12 60%)';
@@ -205,7 +205,8 @@ function Content({ data, qs }) {
   );
 }
 
-// Hour-by-hour breakdown for one day: hour, sky, temp, precip % + mm, wind+gusts, UV.
+// Hour-by-hour breakdown for one day: sky (emoji + text), temp + feels-like,
+// precip % + mm, wind + gusts, UV, storm risk + severe-storm risk (CAPE).
 function HourlyDay({ hourly, dateStr }) {
   const times = hourly.time || [];
   const rows = [];
@@ -214,45 +215,67 @@ function HourlyDay({ hourly, dateStr }) {
     rows.push({
       h: new Date(times[i]).getHours(),
       temp: hourly.temperature_2m?.[i],
+      feels: hourly.apparent_temperature?.[i],
       prob: hourly.precipitation_probability?.[i],
       mm: hourly.precipitation?.[i],
       code: hourly.weather_code?.[i],
       wind: hourly.wind_speed_10m?.[i],
       gust: hourly.wind_gusts_10m?.[i],
       uv: hourly.uv_index?.[i],
+      cape: hourly.cape?.[i],
     });
   }
-  if (rows.length === 0) return null;
+  if (rows.length === 0) {
+    return <div className="bg-dark-900/40 px-4 py-3 text-xs text-white/35 italic">Détail horaire indisponible pour ce jour.</div>;
+  }
+  const r0 = Math.round;
 
   return (
     <div className="bg-dark-900/40 px-2 py-1 overflow-x-auto">
-      <table className="w-full text-xs min-w-[480px]">
+      <table className="w-full text-xs min-w-[620px]">
         <thead>
           <tr className="text-white/30 font-heading">
-            <th className="text-left py-1.5 px-2 font-semibold">Heure</th>
-            <th className="px-1"></th>
+            <th className="text-left py-1.5 px-2 font-semibold">H</th>
+            <th className="text-left py-1.5 px-2 font-semibold">Ciel</th>
             <th className="text-right py-1.5 px-2 font-semibold">Temp</th>
             <th className="text-right py-1.5 px-2 font-semibold">Pluie</th>
             <th className="text-right py-1.5 px-2 font-semibold">Vent</th>
-            <th className="text-right py-1.5 px-2 font-semibold">UV</th>
+            <th className="text-center py-1.5 px-2 font-semibold">UV</th>
+            <th className="text-center py-1.5 px-2 font-semibold">Orage</th>
+            <th className="text-center py-1.5 px-2 font-semibold">Violent</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.h} className="border-t border-white/[0.03]">
-              <td className="py-1.5 px-2 text-white/55 font-mono">{String(r.h).padStart(2, '0')}h</td>
-              <td className="px-1 text-center">{wmo(r.code).emoji}</td>
-              <td className="py-1.5 px-2 text-right text-white/85 font-mono">{Math.round(r.temp)}°</td>
-              <td className="py-1.5 px-2 text-right font-mono">
-                <span className="text-sky-400">{r.prob ?? 0}%</span>
-                {r.mm > 0 && <span className="text-white/40 ml-1">{r.mm.toFixed(1)}mm</span>}
-              </td>
-              <td className="py-1.5 px-2 text-right text-white/55 font-mono">
-                {Math.round(r.wind)} <span className="text-white/30">({Math.round(r.gust)})</span>
-              </td>
-              <td className="py-1.5 px-2 text-right text-white/55 font-mono">{Math.round(r.uv ?? 0)}</td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const w = wmo(r.code);
+            const orage = capeRisk(r.cape);
+            const violent = severeStormRisk(r.cape ?? 0, r.code);
+            return (
+              <tr key={r.h} className="border-t border-white/[0.03]">
+                <td className="py-1.5 px-2 text-white/55 font-mono whitespace-nowrap">{String(r.h).padStart(2, '0')}h</td>
+                <td className="py-1.5 px-2">
+                  <span className="flex items-center gap-1.5">
+                    <span>{w.emoji}</span>
+                    <span className="text-white/70 whitespace-nowrap">{w.label}</span>
+                  </span>
+                </td>
+                <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">
+                  <span className="text-white/85">{r0(r.temp)}°</span>
+                  {r.feels != null && <span className="text-white/35 ml-1">({r0(r.feels)}°)</span>}
+                </td>
+                <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">
+                  <span className="text-sky-400">{r.prob ?? 0}%</span>
+                  {r.mm > 0 && <span className="text-white/40 ml-1">{r.mm.toFixed(1)}</span>}
+                </td>
+                <td className="py-1.5 px-2 text-right text-white/55 font-mono whitespace-nowrap">
+                  {r0(r.wind)} <span className="text-white/30">({r0(r.gust)})</span>
+                </td>
+                <td className="py-1.5 px-2 text-center text-white/55 font-mono">{r0(r.uv ?? 0)}</td>
+                <td className="py-1.5 px-2 text-center"><span className={`font-heading font-semibold ${orage.text}`}>{orage.label}</span></td>
+                <td className="py-1.5 px-2 text-center"><span className={`font-heading font-semibold ${violent.text}`}>{violent.label}</span></td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
