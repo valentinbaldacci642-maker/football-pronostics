@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, Star,
-  Calendar, Settings, ChevronRight, Globe2, BookOpen, Newspaper, HelpCircle, Target,
+  Calendar, Settings, Globe2, BookOpen, Newspaper, HelpCircle, Target,
 } from 'lucide-react';
 import { useUIStore } from '../../store';
 import clsx from 'clsx';
@@ -16,17 +16,6 @@ const NAV_ITEMS = [
   { to: '/history', icon: BookOpen, label: 'Historique' },
   { to: '/favorites', icon: Star, label: 'Favoris' },
   { to: '/help', icon: HelpCircle, label: 'Aide' },
-];
-
-const TOP_LEAGUES = [
-  { id: 39, name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', color: '#7c3aed' },
-  { id: 140, name: 'La Liga', flag: '🇪🇸', color: '#dc2626' },
-  { id: 78, name: 'Bundesliga', flag: '🇩🇪', color: '#d97706' },
-  { id: 135, name: 'Serie A', flag: '🇮🇹', color: '#2563eb' },
-  { id: 61, name: 'Ligue 1', flag: '🇫🇷', color: '#16a34a' },
-  { id: 2, name: 'Champions League', flag: '🏆', color: '#b45309' },
-  { id: 3, name: 'Europa League', flag: '🇪🇺', color: '#ea580c' },
-  { id: 848, name: 'Conference League', flag: '🌍', color: '#0ea5e9' },
 ];
 
 function SidebarContent({ onClose }) {
@@ -81,30 +70,8 @@ function SidebarContent({ onClose }) {
         ))}
       </nav>
 
-      {/* Divider */}
-      <div className="pitch-divider" />
-
-      {/* Top Leagues — quick links to filter the Matchs page by league */}
-      <div className="flex-1">
-        <div className="flex items-center justify-between px-3 mb-2">
-          <p className="section-subtitle text-[10px]">Ligues Top</p>
-          <NavLink to="/matchs" className="text-xs text-brand-400/70 hover:text-brand-400 font-heading font-semibold transition-colors">Voir tout</NavLink>
-        </div>
-        <div className="space-y-0.5">
-          {TOP_LEAGUES.map((league) => (
-            <NavLink
-              key={league.id}
-              to={`/matchs?league=${league.id}`}
-              onClick={onClose}
-              className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-white/40 hover:text-white hover:bg-white/[0.05] transition-all group cursor-pointer"
-            >
-              <span className="text-sm leading-none w-5 text-center">{league.flag}</span>
-              <span className="flex-1 truncate font-heading font-medium text-xs tracking-wide group-hover:text-white/90">{league.name}</span>
-              <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity" />
-            </NavLink>
-          ))}
-        </div>
-      </div>
+      {/* Spacer pushes the settings cog to the bottom */}
+      <div className="flex-1" />
 
       {/* Footer — settings shortcut only */}
       <div className="mt-4">
