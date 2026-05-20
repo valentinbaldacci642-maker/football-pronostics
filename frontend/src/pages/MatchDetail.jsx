@@ -12,6 +12,7 @@ import { GoalsHistogram } from '../components/match/ProbabilityChart';
 import ScorerPredictions from '../components/match/ScorerPredictions';
 import LiveOddsBanner from '../components/match/LiveOddsBanner';
 import ValueBetsKelly from '../components/match/ValueBetsKelly';
+import MiniStandings from '../components/match/MiniStandings';
 import { LoadingPage, ErrorState } from '../components/ui/Loading';
 import { formatMatchDate, getMatchStatus, getScoreDisplay } from '../utils/format';
 import clsx from 'clsx';
@@ -199,6 +200,13 @@ export default function MatchDetail() {
                 awayTeam={away?.name}
               />
             )}
+            <MiniStandings
+              leagueId={league?.id}
+              season={league?.season}
+              homeId={home?.id}
+              awayId={away?.id}
+              leagueName={league?.name}
+            />
           </div>
         )}
 
