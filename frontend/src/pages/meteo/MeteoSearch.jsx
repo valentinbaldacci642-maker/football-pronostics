@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Search, MapPin, Navigation, Clock, Loader2 } from 'lucide-react';
-import { searchCity, getRecentCities, addRecentCity } from '../../services/meteo';
+import { ArrowLeft, Search, MapPin, Navigation, Clock, Loader2, ShieldAlert, ExternalLink, Zap } from 'lucide-react';
+import { searchCity, getRecentCities, addRecentCity, blitzortungUrl, VIGILANCE_URL } from '../../services/meteo';
+import MapEmbed from '../../components/meteo/MapEmbed';
 
 const PAGE_BG = 'radial-gradient(1200px 600px at 50% -10%, #0a1628 0%, #050a12 60%)';
 
@@ -128,6 +129,37 @@ export default function MeteoSearch() {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* France-wide live maps (only when not actively searching) */}
+        {results.length === 0 && (
+          <div className="mt-8 space-y-4">
+            {/* Vigilance Météo-France — official map opens in a new tab (page blocks iframes). */}
+            <a
+              href={VIGILANCE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass-card p-4 flex items-center gap-3 hover:border-amber-500/30 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                <ShieldAlert className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-heading font-semibold text-white/85">Vigilance Météo-France</p>
+                <p className="text-xs text-white/40">Carte officielle des vigilances en cours</p>
+              </div>
+              <ExternalLink className="w-4 h-4 text-white/30 flex-shrink-0" />
+            </a>
+
+            {/* Blitzortung live lightning — France */}
+            <div>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                <span className="text-[11px] font-heading font-bold uppercase tracking-wider text-white/40">Impacts foudre en direct · France</span>
+              </div>
+              <MapEmbed src={blitzortungUrl(46.6, 2.4, 5)} height={360} note="Blitzortung · live" />
             </div>
           </div>
         )}

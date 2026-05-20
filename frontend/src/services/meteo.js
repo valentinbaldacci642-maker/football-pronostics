@@ -32,14 +32,14 @@ export async function getForecast(lat, lon) {
       latitude: lat,
       longitude: lon,
       timezone: 'auto',
-      forecast_days: 7,
+      forecast_days: 14,
       current: [
         'temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'is_day',
         'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m',
       ].join(','),
       hourly: [
         'temperature_2m', 'precipitation_probability', 'precipitation',
-        'weather_code', 'wind_speed_10m',
+        'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'uv_index', 'cape',
       ].join(','),
       daily: [
         'weather_code', 'temperature_2m_max', 'temperature_2m_min',
@@ -128,6 +128,49 @@ export function stormRisk(code, precipProb) {
   if (code === 82 || (precipProb != null && precipProb >= 60)) return RISK.MODERE;
   return RISK.FAIBLE;
 }
+
+// CAPE-based storm risk (J/kg), same scale as MimiMétéo's MUCAPE tiles.
+export function capeRisk(cape) {
+  if (cape == null) return RISK.FAIBLE;
+  if (cape >= 3000) return RISK.EXTREME;
+  if (cape >= 1500) return RISK.ELEVE;
+  if (cape >= 500) return RISK.MODERE;
+  return RISK.FAIBLE;
+}
+
+// Severe-storm potential: high CAPE + a thunderstorm actually forecast.
+export function severeStormRisk(cape, code) {
+  const stormy = code === 95 || code === 96 || code === 99 || code === 82;
+  if (cape >= 2500 && (code === 96 || code === 99)) return RISK.EXTREME;
+  if (cape >= 2000 && stormy) return RISK.ELEVE;
+  if (cape >= 1200 && stormy) return RISK.MODERE;
+  if (cape >= 2500) return RISK.MODERE;
+  return RISK.FAIBLE;
+}
+
+// ─── Live-map embed URLs (all iframe-friendly, no key) ───────────────────────
+// RainViewer animated rain radar centred on the city.
+export function rainviewerUrl(lat, lon, zoom = 8) {
+  return `https://www.rainviewer.com/map.html?loc=${lat},${lon},${zoom}`
+    + '&oFa=0&oC=0&oU=0&oCS=1&oF=0&oAP=1&c=3&o=83&lm=1&layer=radar&sm=1&sn=1&hu=false';
+}
+
+// Blitzortung live lightning map centred on a point (France-wide if zoomed out).
+export function blitzortungUrl(lat, lon, zoom = 8) {
+  return `https://map.blitzortung.org/#${zoom}/${lat}/${lon}`;
+}
+
+// Windy embed for wind / CAPE overlays.
+export function windyUrl(lat, lon, overlay = 'wind', zoom = 7) {
+  return `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}`
+    + `&detailLat=${lat}&detailLon=${lon}&zoom=${zoom}&level=surface&overlay=${overlay}`
+    + '&product=ecmwf&menu=&message=&marker=true&calendar=&pressure=&type=map'
+    + '&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1';
+}
+
+// Official Météo-France vigilance map (opens in a new tab — the page blocks
+// iframing and the embeddable data needs a token).
+export const VIGILANCE_URL = 'https://vigilance.meteofrance.fr/fr';
 
 // ─── Recent cities (localStorage, max 6) ─────────────────────────────────────
 const LS_RECENT = 'mimimeteo.recent';
