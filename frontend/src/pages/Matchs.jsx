@@ -362,6 +362,23 @@ export default function Matchs() {
           return ['FT', 'AET', 'PEN', 'AWD', 'WO'].includes(s) || isLiveStatus(s);
         });
       }
+
+      // Overlay fresh live data on the Matchs tab. getByDate/getUpcomingByLeague
+      // are cached ~20 min, so in-play minute & score freeze. The live endpoint
+      // is cached only 60s, so we splice its fresher copies over any matching
+      // fixture id. Skipped for past dates (no live matches there).
+      const isTodayView = selectedDate === localIso(new Date());
+      if (tabParam === 'matchs' && mode !== 'live' && (isTodayView || selectedLeagueId)) {
+        try {
+          const liveRes = await fixturesApi.getLive();
+          const liveById = new Map();
+          for (const lf of (liveRes?.response || [])) {
+            if (lf.fixture?.id) liveById.set(lf.fixture.id, lf);
+          }
+          if (liveById.size > 0) all = all.map((f) => liveById.get(f.fixture?.id) || f);
+        } catch (_) { /* keep cached data if the live fetch fails */ }
+      }
+
       setAllFixtures(all);
       if (mode === 'live') setLiveCount(all.length);
     } catch (err) {
