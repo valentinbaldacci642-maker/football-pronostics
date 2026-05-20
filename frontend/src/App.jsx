@@ -2,10 +2,10 @@ import { useEffect } from 'react';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { App as CapacitorApp } from '@capacitor/app';
-import { useHistoryStore } from './store';
+import { useHistoryStore, useFavoriteTeamsStore } from './store';
 import { resolveFinishedMatches } from './utils/resolveResults';
 import { initCloudSync } from './services/cloudSync';
-import { initPushNotifications } from './services/pushNotifications';
+import { initPushNotifications, syncFavoriteTeamsToBackend } from './services/pushNotifications';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
 import BottomNav from './components/common/BottomNav';
@@ -36,6 +36,19 @@ export default function App() {
   // Register FCM push notifications on native (Android). Idempotent —
   // re-sending the same token is a no-op server-side. Web → skipped.
   useEffect(() => { initPushNotifications().catch(() => {}); }, []);
+
+  // Keep the backend's per-token favorite-team list in sync so 'your team
+  // plays today' notifs reflect the user's current favorites. Debounced to
+  // coalesce rapid toggles. The store subscription fires on every change.
+  useEffect(() => {
+    let timer = null;
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { syncFavoriteTeamsToBackend().catch(() => {}); }, 1500);
+    };
+    const unsub = useFavoriteTeamsStore.subscribe(schedule);
+    return () => { clearTimeout(timer); unsub(); };
+  }, []);
 
   // Backend warm-up : Render free tier endort l'instance après ~15min
   // d'inactivité, ce qui produit un cold start de 30-60s sur le premier

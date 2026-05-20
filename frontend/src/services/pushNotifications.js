@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { notificationsApi } from './api';
+import { useFavoriteTeamsStore } from '../store';
 
 // Static import so Capacitor can wire the plugin bridge at JS init time.
 // On web the plugin's stub no-ops, so we gate the *runtime* behavior on
@@ -8,6 +9,17 @@ import { notificationsApi } from './api';
 
 const LS_KEY = 'pushNotifs.enabled';
 const LS_TOKEN_KEY = 'pushNotifs.lastToken';
+
+// Read the current favorite team IDs from the persisted store.
+function currentFavoriteTeamIds() {
+  try {
+    return (useFavoriteTeamsStore.getState().favoriteTeams || [])
+      .map((t) => t.id)
+      .filter((id) => Number.isFinite(id));
+  } catch (_) {
+    return [];
+  }
+}
 
 export function isNotificationsEnabled() {
   // Default ON for native platforms, OFF for web (no FCM channel).
@@ -40,6 +52,20 @@ export async function initPushNotifications() {
     }
     if (!granted) return { ok: false, reason: 'permission-denied' };
 
+    // Create the notification channels we target from the backend FCM
+    // payloads. On Android 8+ a notification whose channelId doesn't exist
+    // may be dropped, so we register them up front. Idempotent.
+    try {
+      await Push.createChannel({
+        id: 'value_bets', name: 'Value bets',
+        description: 'Nouveaux value bets détectés', importance: 4, visibility: 1,
+      });
+      await Push.createChannel({
+        id: 'favorite_teams', name: 'Équipes favorites',
+        description: 'Quand une équipe favorite joue aujourd’hui', importance: 4, visibility: 1,
+      });
+    } catch (_) { /* channels API unavailable on some devices — ignore */ }
+
     // The 'registration' listener fires with the FCM device token.
     // It's the only place to grab it — there's no synchronous getter.
     const tokenPromise = new Promise((resolve, reject) => {
@@ -63,7 +89,7 @@ export async function initPushNotifications() {
     localStorage.setItem(LS_TOKEN_KEY, token);
 
     try {
-      await notificationsApi.register(token, Capacitor.getPlatform());
+      await notificationsApi.register(token, Capacitor.getPlatform(), currentFavoriteTeamIds());
     } catch (e) {
       // Backend down → don't block the app, retry next launch
       console.warn('[push] register backend call failed:', e?.message);
@@ -101,4 +127,22 @@ export async function disablePushNotifications() {
 export async function enablePushNotifications() {
   setNotificationsEnabled(true);
   return initPushNotifications();
+}
+
+/**
+ * Re-send the current favorite team list to the backend using the stored
+ * token. Called whenever the user adds/removes a favorite so the 'plays
+ * today' notifications stay in sync without a full re-registration. No-op
+ * on web or when notifications are off / no token yet.
+ */
+export async function syncFavoriteTeamsToBackend() {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!isNotificationsEnabled()) return;
+  const token = localStorage.getItem(LS_TOKEN_KEY);
+  if (!token) return;
+  try {
+    await notificationsApi.register(token, Capacitor.getPlatform(), currentFavoriteTeamIds());
+  } catch (e) {
+    console.warn('[push] favorite sync failed:', e?.message);
+  }
 }

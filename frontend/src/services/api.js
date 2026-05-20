@@ -214,7 +214,10 @@ export const newsApi = {
 };
 
 export const notificationsApi = {
-  register: (token, platform) => api.post('/notifications/register', { token, platform }),
+  // favoriteTeams: array of API-Football team IDs so the backend can notify
+  // when one plays today. Optional — omitted/empty means VB notifs only.
+  register: (token, platform, favoriteTeams = []) =>
+    api.post('/notifications/register', { token, platform, favoriteTeams }),
   unregister: (token) => api.post('/notifications/unregister', { token }),
   status: () => api.get('/notifications/status'),
 };

@@ -1,5 +1,6 @@
 const { getMessaging } = require('./firebaseAdmin');
 const pronosticsService = require('./pronosticsService');
+const apiFootball = require('./apiFootball');
 const logger = require('../utils/logger');
 
 // In-memory state. Render free tier stays warm via UptimeRobot ping so
@@ -7,8 +8,12 @@ const logger = require('../utils/logger');
 // at worst the next scan re-notifies one batch of already-known VBs.
 // Frontend re-registers its token on every app launch, so token loss
 // after a restart self-heals quickly.
-const tokens = new Map();          // token → { platform, registeredAt }
+const tokens = new Map();          // token → { platform, registeredAt, favoriteTeams: number[] }
 const notifiedVbKeys = new Set();  // "fixtureId::market::selection"
+// "token::date::teamId" — favorite-team 'plays today' notifs, date-scoped so
+// keys naturally reset each day. Cleared wholesale when the date rolls over.
+const notifiedFavKeys = new Set();
+let lastFavScanDate = null;
 let lastScanAt = 0;
 let lastSentCount = 0;
 
@@ -19,7 +24,20 @@ let lastSentCount = 0;
 const MAX_TOKENS = 10_000;
 const ALLOWED_PLATFORMS = new Set(['android', 'ios', 'web', 'unknown']);
 
-function registerToken(token, platform = 'unknown') {
+// Sanitize the client-supplied favorite team list: numbers only, deduped,
+// capped so a token can't store an unbounded array.
+function sanitizeFavoriteTeams(input) {
+  if (!Array.isArray(input)) return [];
+  const ids = [];
+  for (const v of input) {
+    const n = typeof v === 'number' ? v : parseInt(v, 10);
+    if (Number.isInteger(n) && n > 0 && !ids.includes(n)) ids.push(n);
+    if (ids.length >= 100) break;
+  }
+  return ids;
+}
+
+function registerToken(token, platform = 'unknown', favoriteTeams = []) {
   if (!token || typeof token !== 'string') return false;
   // FCM registration tokens are ~140-260 chars. Reject anything outside
   // a sane range so an attacker can't fill memory with megabyte tokens.
@@ -29,7 +47,11 @@ function registerToken(token, platform = 'unknown') {
     const oldest = tokens.keys().next().value;
     if (oldest) tokens.delete(oldest);
   }
-  tokens.set(token, { platform: safePlatform, registeredAt: Date.now() });
+  tokens.set(token, {
+    platform: safePlatform,
+    registeredAt: Date.now(),
+    favoriteTeams: sanitizeFavoriteTeams(favoriteTeams),
+  });
   return true;
 }
 
@@ -243,10 +265,147 @@ async function sendNewVbsNotification(newVbs) {
   return sent;
 }
 
+// ─── Favorite-team 'plays today' notifications ──────────────────────────────
+
+// Current hour in Europe/Paris (the user base is FR). Used to avoid firing
+// 'your team plays today' notifs in the middle of the night even though the
+// scan runs every 5 min around the clock.
+function parisHour() {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Paris', hour: '2-digit', hour12: false,
+    }).formatToParts(new Date());
+    return parseInt(parts.find((p) => p.type === 'hour').value, 10);
+  } catch (_) {
+    return new Date().getUTCHours();
+  }
+}
+
+function todayParisDate() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
+  } catch (_) {
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
+async function sendFavoriteTeamNotification(token, favTeam, fixture) {
+  const messaging = getMessaging();
+  if (!messaging) return false;
+  const home = fixture.teams?.home;
+  const away = fixture.teams?.away;
+  const kickoff = formatKickoff(fixture.fixture?.date);
+  const title = `${favTeam.name} joue aujourd'hui ⚽`;
+  const bodyParts = [`${home?.name} vs ${away?.name}`];
+  if (kickoff) bodyParts.push(kickoff);
+  if (fixture.league?.name) bodyParts.push(fixture.league.name);
+  const body = bodyParts.join(' · ');
+  const iconUrl = process.env.NOTIFICATION_ICON_URL
+    || 'https://pronos-foufous-app.vercel.app/pwa-512x512.png';
+
+  try {
+    await messaging.send({
+      token,
+      notification: { title, body },
+      data: {
+        type: 'fav_team_today',
+        fixtureId: String(fixture.fixture?.id),
+        teamId: String(favTeam.id),
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'favorite_teams',
+          sound: 'default',
+          imageUrl: iconUrl,
+          tag: `favteam_${fixture.fixture?.id}_${favTeam.id}`,
+        },
+      },
+    });
+    return true;
+  } catch (e) {
+    const code = e?.code || '';
+    if (code === 'messaging/registration-token-not-registered'
+        || code === 'messaging/invalid-registration-token') {
+      tokens.delete(token);
+    }
+    logger.warn(`favorite-team notif failed: ${e.message}`);
+    return false;
+  }
+}
+
+/**
+ * Scan today's fixtures and notify each token whose favorited team plays.
+ * One notification per (token, fixture, team) per day. Gated to daytime
+ * Paris hours so users aren't pinged at 3am. dryRun returns the plan
+ * without sending.
+ */
+async function scanFavoriteTeamsToday({ date = null, dryRun = false, ignoreHourGate = false } = {}) {
+  const today = date || todayParisDate();
+
+  // Reset the per-day dedup set when the date changes.
+  if (lastFavScanDate !== today) {
+    notifiedFavKeys.clear();
+    lastFavScanDate = today;
+  }
+
+  // Collect every favorited team across all tokens — skip the API call
+  // entirely if nobody has favorites.
+  const anyFavorites = Array.from(tokens.values()).some((m) => (m.favoriteTeams || []).length > 0);
+  if (!anyFavorites) {
+    return { date: today, tokensWithFavs: 0, matchesFound: 0, sent: 0 };
+  }
+
+  const hour = parisHour();
+  const withinWindow = ignoreHourGate || (hour >= 8 && hour <= 22);
+
+  // One cached call for the whole day's fixtures, then index team → fixture.
+  const data = await apiFootball.getFixturesByDate(today);
+  const fixtures = data?.response || [];
+  const teamFixture = new Map();
+  for (const f of fixtures) {
+    const h = f.teams?.home;
+    const a = f.teams?.away;
+    if (h?.id && !teamFixture.has(h.id)) teamFixture.set(h.id, f);
+    if (a?.id && !teamFixture.has(a.id)) teamFixture.set(a.id, f);
+  }
+
+  let sent = 0;
+  let matchesFound = 0;
+  let tokensWithFavs = 0;
+
+  for (const [token, meta] of tokens) {
+    const favs = meta.favoriteTeams || [];
+    if (favs.length === 0) continue;
+    tokensWithFavs++;
+    for (const teamId of favs) {
+      const fixture = teamFixture.get(teamId);
+      if (!fixture) continue;
+      matchesFound++;
+      const key = `${token}::${today}::${teamId}`;
+      if (notifiedFavKeys.has(key)) continue;
+      if (dryRun || !withinWindow) continue;
+      const home = fixture.teams?.home;
+      const away = fixture.teams?.away;
+      const favTeam = home?.id === teamId ? home : away;
+      const ok = await sendFavoriteTeamNotification(token, favTeam, fixture);
+      if (ok) {
+        notifiedFavKeys.add(key);
+        sent++;
+      }
+    }
+  }
+
+  return { date: today, hour, withinWindow, tokensWithFavs, matchesFound, sent, dryRun };
+}
+
 function getStatus() {
   return {
     tokenCount: tokens.size,
     notifiedKeysCount: notifiedVbKeys.size,
+    notifiedFavKeysCount: notifiedFavKeys.size,
     lastScanAt,
     lastSentCount,
     fcmConfigured: getMessaging() != null,
@@ -255,12 +414,15 @@ function getStatus() {
 
 function resetNotifiedKeys() {
   notifiedVbKeys.clear();
+  notifiedFavKeys.clear();
+  lastFavScanDate = null;
 }
 
 module.exports = {
   registerToken,
   unregisterToken,
   scanAndNotify,
+  scanFavoriteTeamsToday,
   getStatus,
   resetNotifiedKeys,
 };
