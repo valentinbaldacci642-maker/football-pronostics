@@ -54,11 +54,14 @@ export default function Team() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-6 overflow-x-hidden">
-      {/* Back */}
-      <Link to="/leagues" className="flex items-center gap-2 text-white/40 hover:text-white/70 text-sm transition-colors w-fit">
+      {/* Back — go to the previous page when possible, else fall back to Matchs */}
+      <button
+        onClick={() => (window.history.length > 1 ? window.history.back() : window.location.assign('/matchs'))}
+        className="flex items-center gap-2 text-white/40 hover:text-white/70 text-sm transition-colors w-fit"
+      >
         <ArrowLeft className="w-4 h-4" />
         Retour
-      </Link>
+      </button>
 
       {/* Header */}
       <div className="glass-card p-6">
@@ -122,12 +125,12 @@ export default function Team() {
         )}
         {tab === 'resultats' && (
           <motion.div key="resultats" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-            <ResultsTab teamId={id} />
+            <ResultsTab teamId={id} isNational={!!team.national} />
           </motion.div>
         )}
         {tab === 'calendrier' && (
           <motion.div key="calendrier" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-            <CalendrierTab teamId={id} />
+            <CalendrierTab teamId={id} isNational={!!team.national} />
           </motion.div>
         )}
         {tab === 'blessures' && (
@@ -239,7 +242,7 @@ function CompetitionDivider({ league }) {
   );
 }
 
-function ResultsTab({ teamId }) {
+function ResultsTab({ teamId, isNational = false }) {
   const [fixtures, setFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -248,8 +251,13 @@ function ResultsTab({ teamId }) {
     const load = async () => {
       setLoading(true);
       try {
-        // All season fixtures (across competitions). Filter to played matches client-side.
-        const data = await fixturesApi.getByTeam(teamId, { season: getCurrentSeason() });
+        // National teams aren't indexed by the European season convention
+        // (their fixtures span calendar years across WC/Euro/Nations/friendlies),
+        // so a season query returns nothing. Use last=N which works across all
+        // competitions and years. Clubs keep the full-season fetch.
+        const data = isNational
+          ? await fixturesApi.getByTeam(teamId, { last: 40 })
+          : await fixturesApi.getByTeam(teamId, { season: getCurrentSeason() });
         const list = (data?.response || [])
           .filter((f) => FINISHED_STATUSES.includes(f.fixture?.status?.short))
           .sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
@@ -261,7 +269,7 @@ function ResultsTab({ teamId }) {
       }
     };
     load();
-  }, [teamId]);
+  }, [teamId, isNational]);
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
   if (error) return <ErrorState message={error} />;
@@ -327,7 +335,7 @@ function ResultsTab({ teamId }) {
   );
 }
 
-function CalendrierTab({ teamId }) {
+function CalendrierTab({ teamId, isNational = false }) {
   const [fixtures, setFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -336,8 +344,11 @@ function CalendrierTab({ teamId }) {
     const load = async () => {
       setLoading(true);
       try {
-        // All season fixtures (across competitions). Filter to upcoming client-side.
-        const data = await fixturesApi.getByTeam(teamId, { season: getCurrentSeason() });
+        // See ResultsTab: national teams need next=N (cross-year, all comps)
+        // rather than a season query, which returns nothing for them.
+        const data = isNational
+          ? await fixturesApi.getByTeam(teamId, { next: 40 })
+          : await fixturesApi.getByTeam(teamId, { season: getCurrentSeason() });
         const list = (data?.response || [])
           .filter((f) => UPCOMING_STATUSES.includes(f.fixture?.status?.short))
           .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
@@ -349,7 +360,7 @@ function CalendrierTab({ teamId }) {
       }
     };
     load();
-  }, [teamId]);
+  }, [teamId, isNational]);
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
   if (error) return <ErrorState message={error} />;
