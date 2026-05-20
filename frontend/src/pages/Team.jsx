@@ -301,7 +301,7 @@ function ResultsTab({ teamId, isNational = false }) {
         return (
           <Fragment key={fixture.id}>
             {showDivider && <CompetitionDivider league={league} />}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.05] last:border-b-0">
+            <Link to={`/match/${fixture.id}`} className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.05] last:border-b-0 hover:bg-white/[0.04] transition-colors">
               <span className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-display font-bold flex-shrink-0 ${resultColor}`}>
                 {resultLabel}
               </span>
@@ -327,7 +327,7 @@ function ResultsTab({ teamId, isNational = false }) {
                   {format(parseISO(fixture.date), 'd MMM yyyy', { locale: fr })}
                 </p>
               </div>
-            </div>
+            </Link>
           </Fragment>
         );
       })}
@@ -380,7 +380,7 @@ function CalendrierTab({ teamId, isNational = false }) {
         return (
           <Fragment key={fixture.id}>
             {showDivider && <CompetitionDivider league={league} />}
-            <div className="flex items-center gap-4 px-4 py-3 border-b border-white/[0.05] last:border-b-0">
+            <Link to={`/match/${fixture.id}`} className="flex items-center gap-4 px-4 py-3 border-b border-white/[0.05] last:border-b-0 hover:bg-white/[0.04] transition-colors">
               <div className="w-10 h-10 rounded-xl bg-dark-700 p-1.5 flex-shrink-0 flex items-center justify-center">
                 <img src={opponent.logo} alt={opponent.name} className="w-full h-full object-contain" onError={e => e.target.style.display='none'} />
               </div>
@@ -393,7 +393,7 @@ function CalendrierTab({ teamId, isNational = false }) {
                   {format(parseISO(fixture.date), "EEE d MMM · HH'h'mm", { locale: fr })}
                 </p>
               </div>
-            </div>
+            </Link>
           </Fragment>
         );
       })}
