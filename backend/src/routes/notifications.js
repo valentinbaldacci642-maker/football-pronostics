@@ -9,11 +9,11 @@ const adminAuth = require('../middleware/adminAuth');
 const authScan = adminAuth({ allowQueryKey: true });
 
 router.post('/register', (req, res) => {
-  const { token, platform, favoriteTeams } = req.body || {};
+  const { token, platform, favoriteTeams, favoriteMatches, notifPrefs } = req.body || {};
   if (!token || typeof token !== 'string') {
     return res.status(400).json({ error: 'token is required' });
   }
-  const ok = notifications.registerToken(token, platform, favoriteTeams);
+  const ok = notifications.registerToken(token, platform, favoriteTeams, favoriteMatches, notifPrefs);
   res.json({ ok, status: notifications.getStatus() });
 });
 

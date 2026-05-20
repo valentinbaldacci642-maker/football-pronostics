@@ -28,6 +28,26 @@ let lastSentCount = 0;
 const MAX_TOKENS = 10_000;
 const ALLOWED_PLATFORMS = new Set(['android', 'ios', 'web', 'unknown']);
 
+// Per-token notification preferences. Any key absent → treated as enabled,
+// so a stale client that doesn't send prefs keeps getting everything.
+const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'goal', 'final', 'kickoff', 'favTeamVb'];
+
+function sanitizeNotifPrefs(input) {
+  const out = {};
+  if (input && typeof input === 'object') {
+    for (const k of NOTIF_PREF_KEYS) {
+      if (k in input) out[k] = input[k] !== false;
+    }
+  }
+  return out;
+}
+
+// Default-on: only false when explicitly disabled by the client.
+function prefOn(token, key) {
+  const meta = tokens.get(token);
+  return !meta || !meta.notifPrefs || meta.notifPrefs[key] !== false;
+}
+
 // Sanitize the client-supplied favorite team list: numbers only, deduped,
 // capped so a token can't store an unbounded array.
 function sanitizeFavoriteTeams(input) {
@@ -41,7 +61,7 @@ function sanitizeFavoriteTeams(input) {
   return ids;
 }
 
-function registerToken(token, platform = 'unknown', favoriteTeams = [], favoriteMatches = []) {
+function registerToken(token, platform = 'unknown', favoriteTeams = [], favoriteMatches = [], notifPrefs = null) {
   if (!token || typeof token !== 'string') return false;
   // FCM registration tokens are ~140-260 chars. Reject anything outside
   // a sane range so an attacker can't fill memory with megabyte tokens.
@@ -51,11 +71,15 @@ function registerToken(token, platform = 'unknown', favoriteTeams = [], favorite
     const oldest = tokens.keys().next().value;
     if (oldest) tokens.delete(oldest);
   }
+  // Preserve existing prefs if the client didn't send any this call.
+  const prev = tokens.get(token);
+  const prefs = notifPrefs != null ? sanitizeNotifPrefs(notifPrefs) : (prev?.notifPrefs || {});
   tokens.set(token, {
     platform: safePlatform,
     registeredAt: Date.now(),
     favoriteTeams: sanitizeFavoriteTeams(favoriteTeams),
     favoriteMatches: sanitizeFavoriteTeams(favoriteMatches), // same shape: positive int IDs
+    notifPrefs: prefs,
   });
   return true;
 }
@@ -170,6 +194,7 @@ async function notifyFavoriteTeamVbs(newVbs) {
   // teamId → Set<token>
   const teamToTokens = new Map();
   for (const [token, meta] of tokens) {
+    if (!prefOn(token, 'favTeamVb')) continue;
     for (const tid of (meta.favoriteTeams || [])) {
       if (!teamToTokens.has(tid)) teamToTokens.set(tid, new Set());
       teamToTokens.get(tid).add(token);
@@ -230,7 +255,8 @@ async function sendNewVbsNotification(newVbs) {
     logger.warn(`scanAndNotify: ${newVbs.length} new VBs but FCM not configured — skipping send`);
     return 0;
   }
-  const recipients = listTokens();
+  // Only tokens that haven't disabled generic value-bet notifs.
+  const recipients = listTokens().filter((t) => prefOn(t, 'vb'));
   if (recipients.length === 0) return 0;
 
   // One notification PER VB so the user sees each match individually
@@ -480,7 +506,7 @@ async function scanFavoriteTeamsToday({ dryRun = false } = {}) {
     tokensWithFavs++;
 
     // ── Favorite teams: 2h before kickoff ──
-    for (const teamId of favTeams) {
+    if (prefOn(token, 'favTeam')) for (const teamId of favTeams) {
       const fixture = teamUpcoming.get(teamId);
       if (!fixture) continue;
       const untilKickoff = new Date(fixture.fixture.date).getTime() - now;
@@ -499,7 +525,7 @@ async function scanFavoriteTeamsToday({ dryRun = false } = {}) {
     }
 
     // ── Favorite matches: 15 min before kickoff ──
-    for (const fixtureId of favMatches) {
+    if (prefOn(token, 'favMatch')) for (const fixtureId of favMatches) {
       const fixture = fixtureById.get(fixtureId);
       if (!fixture) continue;
       const untilKickoff = new Date(fixture.fixture.date).getTime() - now;
@@ -604,11 +630,15 @@ async function scanLiveFavorites({ dryRun = false } = {}) {
     const prev = liveState.get(fid);
     const score = `${h?.name} ${gh} - ${ga} ${a?.name}`;
 
+    // Per-event recipient filtering by preference.
+    const forPref = (key) => [...recipients].filter((t) => prefOn(t, key));
+
     // Kickoff: was scheduled, now live.
     if (prev && (prev.status === 'NS' || prev.status === 'TBD') && LIVE_STATUSES.has(status)) {
+      const r = forPref('kickoff');
       events++;
-      if (!dryRun) {
-        sent += await notifyTokens(recipients, {
+      if (!dryRun && r.length) {
+        sent += await notifyTokens(r, {
           title: "C'est parti !",
           body: `${h?.name} vs ${a?.name}`,
           type: 'live_kickoff', fixtureId: fid, tag: `kickoff_${fid}`,
@@ -617,9 +647,10 @@ async function scanLiveFavorites({ dryRun = false } = {}) {
     } else if (prev && LIVE_STATUSES.has(prev.status) && LIVE_STATUSES.has(status)
                && (gh + ga) > (prev.gh + prev.ga)) {
       // Goal: total score increased while live.
+      const r = forPref('goal');
       events++;
-      if (!dryRun) {
-        sent += await notifyTokens(recipients, {
+      if (!dryRun && r.length) {
+        sent += await notifyTokens(r, {
           title: `⚽ But ! ${gh} - ${ga}`,
           body: score,
           type: 'live_goal', fixtureId: fid, tag: `goal_${fid}_${gh}_${ga}`,
@@ -629,9 +660,10 @@ async function scanLiveFavorites({ dryRun = false } = {}) {
 
     // Final: was not finished, now finished.
     if (prev && !FINAL_STATUSES.has(prev.status) && FINAL_STATUSES.has(status)) {
+      const r = forPref('final');
       events++;
-      if (!dryRun) {
-        sent += await notifyTokens(recipients, {
+      if (!dryRun && r.length) {
+        sent += await notifyTokens(r, {
           title: `Terminé · ${gh} - ${ga}`,
           body: score,
           type: 'live_final', fixtureId: fid, tag: `final_${fid}`,

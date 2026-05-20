@@ -9,6 +9,34 @@ import { useFavoriteTeamsStore, useFavoritesStore } from '../store';
 
 const LS_KEY = 'pushNotifs.enabled';
 const LS_TOKEN_KEY = 'pushNotifs.lastToken';
+const LS_PREFS_KEY = 'pushNotifs.prefs';
+
+// Per-type notification preferences. All default ON. Keys must match the
+// backend NOTIF_PREF_KEYS.
+export const NOTIF_TYPES = [
+  { key: 'vb',        label: 'Value bets',          desc: 'Nouveau value bet ≥ 6% détecté' },
+  { key: 'favTeamVb', label: 'Value bet sur mon équipe', desc: 'Un value bet tombe sur une équipe favorite' },
+  { key: 'favTeam',   label: 'Équipe favorite joue', desc: '2h avant un match d’une équipe favorite' },
+  { key: 'favMatch',  label: 'Match favori',         desc: '15 min avant un match mis en favori' },
+  { key: 'kickoff',   label: 'Coup d’envoi',         desc: 'Au coup d’envoi d’un match suivi' },
+  { key: 'goal',      label: 'But en direct',        desc: 'À chaque but d’un match suivi' },
+  { key: 'final',     label: 'Résultat final',       desc: 'Score final d’un match suivi' },
+];
+
+export function getNotifPrefs() {
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(LS_PREFS_KEY) || '{}'); } catch (_) { stored = {}; }
+  const out = {};
+  for (const { key } of NOTIF_TYPES) out[key] = stored[key] !== false; // default true
+  return out;
+}
+
+export function setNotifPref(key, value) {
+  const prefs = getNotifPrefs();
+  prefs[key] = !!value;
+  try { localStorage.setItem(LS_PREFS_KEY, JSON.stringify(prefs)); } catch (_) { /* ignore */ }
+  return prefs;
+}
 
 // Read the current favorite team IDs from the persisted store.
 function currentFavoriteTeamIds() {
@@ -101,7 +129,7 @@ export async function initPushNotifications() {
 
     try {
       await notificationsApi.register(
-        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds()
+        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs()
       );
     } catch (e) {
       // Backend down → don't block the app, retry next launch
@@ -155,7 +183,7 @@ export async function syncFavoriteTeamsToBackend() {
   if (!token) return;
   try {
     await notificationsApi.register(
-      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds()
+      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs()
     );
   } catch (e) {
     console.warn('[push] favorite sync failed:', e?.message);

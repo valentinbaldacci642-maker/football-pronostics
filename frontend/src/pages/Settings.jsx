@@ -4,7 +4,10 @@ import { motion } from 'framer-motion';
 import { Settings as SettingsIcon, SlidersHorizontal, User, Cloud, LogOut, Loader2, CheckCircle2, Bell, BellOff } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore, signIn, signUp, signOut, pullFromCloud, pushToCloud } from '../services/cloudSync';
-import { isNotificationsEnabled, enablePushNotifications, disablePushNotifications } from '../services/pushNotifications';
+import {
+  isNotificationsEnabled, enablePushNotifications, disablePushNotifications,
+  NOTIF_TYPES, getNotifPrefs, setNotifPref, syncFavoriteTeamsToBackend,
+} from '../services/pushNotifications';
 
 const TABS = [
   { id: 'general', label: 'Paramètres généraux', icon: SlidersHorizontal },
@@ -127,7 +130,53 @@ function GeneralTab() {
           {statusMsg.text}
         </p>
       )}
+
+      {/* Per-type toggles — only meaningful when notifs are on */}
+      {notifsEnabled && isNative && <NotifTypeToggles />}
     </section>
+  );
+}
+
+function NotifTypeToggles() {
+  const [prefs, setPrefs] = useState(() => getNotifPrefs());
+
+  const toggle = (key) => {
+    const next = setNotifPref(key, !prefs[key]);
+    setPrefs({ ...next });
+    // Debounce-free: a single tap is rare enough; push the new prefs now.
+    syncFavoriteTeamsToBackend().catch(() => {});
+  };
+
+  return (
+    <div className="pt-4 border-t border-white/[0.06] space-y-1">
+      <p className="text-xs font-heading font-semibold text-white/40 uppercase tracking-wider mb-2">
+        Types de notifications
+      </p>
+      {NOTIF_TYPES.map(({ key, label, desc }) => (
+        <div key={key} className="flex items-center justify-between gap-3 py-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-heading font-semibold text-white/80">{label}</p>
+            <p className="text-xs text-white/40 leading-snug">{desc}</p>
+          </div>
+          <button
+            onClick={() => toggle(key)}
+            className={clsx(
+              'relative w-11 h-6 rounded-full transition-colors flex-shrink-0',
+              prefs[key] ? 'bg-brand-500/60' : 'bg-white/10',
+            )}
+            aria-pressed={prefs[key]}
+          >
+            <div className={clsx(
+              'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all',
+              prefs[key] ? 'left-[1.375rem]' : 'left-0.5',
+            )} />
+          </button>
+        </div>
+      ))}
+      <p className="text-[11px] text-white/30 italic pt-1">
+        Les changements s'appliquent au prochain scan (≤ 5 min).
+      </p>
+    </div>
   );
 }
 
