@@ -84,7 +84,7 @@ export default function Navbar() {
       }}
     >
       <Link
-        to="/"
+        to="/pronos"
         className={clsx(
           'items-center gap-2 lg:hidden flex-shrink-0',
           searchFocused ? 'hidden' : 'flex'

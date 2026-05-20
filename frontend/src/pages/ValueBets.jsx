@@ -549,7 +549,7 @@ export default function ValueBets() {
               demain ou clique Actualiser plus tard, le marché évolue.
             </p>
           </div>
-          <Link to="/" className="inline-flex items-center gap-2 btn-ghost mt-2">
+          <Link to="/pronos" className="inline-flex items-center gap-2 btn-ghost mt-2">
             Voir tous les pronos <ChevronRight className="w-4 h-4" />
           </Link>
         </div>

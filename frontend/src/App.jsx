@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate, Outlet } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useHistoryStore, useFavoriteTeamsStore, useFavoritesStore } from './store';
@@ -11,6 +11,8 @@ import Sidebar from './components/common/Sidebar';
 import BottomNav from './components/common/BottomNav';
 import PageTransition from './components/common/PageTransition';
 import RateLimitBanner from './components/common/RateLimitBanner';
+import Hub from './pages/Hub';
+import Meteo from './pages/meteo/Meteo';
 import Home from './pages/Home';
 import Matchs from './pages/Matchs';
 import MatchDetail from './pages/MatchDetail';
@@ -24,8 +26,33 @@ import Help from './pages/Help';
 import ValueBets from './pages/ValueBets';
 import Settings from './pages/Settings';
 
-export default function App() {
+// Football section chrome (sidebar + navbar + bottom nav). Persists across
+// football route changes; only the page content (Outlet) animates.
+function FootballLayout() {
   const location = useLocation();
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+        <Navbar />
+        <RateLimitBanner />
+        <main
+          className="flex-1 px-4 md:px-6 lg:px-8 pb-24 lg:pb-8"
+          style={{ paddingTop: 'calc(80px + env(safe-area-inset-top, 0px))' }}
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <PageTransition key={location.pathname}>
+              <Outlet />
+            </PageTransition>
+          </AnimatePresence>
+        </main>
+      </div>
+      <BottomNav />
+    </div>
+  );
+}
+
+export default function App() {
   const entries = useHistoryStore((s) => s.entries);
   const resolveResult = useHistoryStore((s) => s.resolveResult);
 
@@ -121,36 +148,30 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
-        <Navbar />
-        <RateLimitBanner />
-        <main
-          className="flex-1 px-4 md:px-6 lg:px-8 pb-24 lg:pb-8"
-          style={{ paddingTop: 'calc(80px + env(safe-area-inset-top, 0px))' }}
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            <Routes location={location} key={location.pathname}>
-              <Route path="/" element={<PageTransition><Home /></PageTransition>} />
-              <Route path="/matchs" element={<PageTransition><Matchs /></PageTransition>} />
-              <Route path="/match/:id" element={<PageTransition><MatchDetail /></PageTransition>} />
-              {/* Legacy /leagues link → redirect into the merged Matchs page on the Classements tab. */}
-              <Route path="/leagues" element={<Navigate to="/matchs?tab=classements" replace />} />
-              <Route path="/favorites" element={<PageTransition><Favorites /></PageTransition>} />
-              <Route path="/worldcup" element={<PageTransition><WorldCup /></PageTransition>} />
-              <Route path="/team/:id" element={<PageTransition><Team /></PageTransition>} />
-              <Route path="/player/:id" element={<PageTransition><Player /></PageTransition>} />
-              <Route path="/history" element={<PageTransition><History /></PageTransition>} />
-              <Route path="/news" element={<PageTransition><News /></PageTransition>} />
-              <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
-              <Route path="/value-bets" element={<PageTransition><ValueBets /></PageTransition>} />
-              <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
-            </Routes>
-          </AnimatePresence>
-        </main>
-      </div>
-      <BottomNav />
-    </div>
+    <Routes>
+      {/* Umbrella hub + standalone weather section (no football chrome) */}
+      <Route path="/" element={<Hub />} />
+      <Route path="/meteo/*" element={<Meteo />} />
+
+      {/* Football section — shares the sidebar/navbar layout */}
+      <Route element={<FootballLayout />}>
+        <Route path="/pronos" element={<Home />} />
+        <Route path="/matchs" element={<Matchs />} />
+        <Route path="/match/:id" element={<MatchDetail />} />
+        {/* Legacy /leagues link → redirect into the merged Matchs page on the Classements tab. */}
+        <Route path="/leagues" element={<Navigate to="/matchs?tab=classements" replace />} />
+        <Route path="/favorites" element={<Favorites />} />
+        <Route path="/worldcup" element={<WorldCup />} />
+        <Route path="/team/:id" element={<Team />} />
+        <Route path="/player/:id" element={<Player />} />
+        <Route path="/history" element={<History />} />
+        <Route path="/news" element={<News />} />
+        <Route path="/help" element={<Help />} />
+        <Route path="/value-bets" element={<ValueBets />} />
+        <Route path="/settings" element={<Settings />} />
+        {/* Old home path → football home */}
+        <Route path="/home" element={<Navigate to="/pronos" replace />} />
+      </Route>
+    </Routes>
   );
 }

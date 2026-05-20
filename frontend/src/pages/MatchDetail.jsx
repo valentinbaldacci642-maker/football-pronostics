@@ -30,7 +30,7 @@ export default function MatchDetail() {
     if (window.history.length > 1) {
       navigate(-1);
     } else {
-      navigate('/');
+      navigate('/pronos');
     }
   };
   const { fixture, stats, events, lineups, loading, error } = useFixtureDetail(id);

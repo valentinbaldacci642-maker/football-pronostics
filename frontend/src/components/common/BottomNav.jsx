@@ -4,7 +4,7 @@ import { useUIStore } from '../../store';
 import clsx from 'clsx';
 
 const TABS = [
-  { to: '/',           icon: Target,   label: 'Top 10 pronos', exact: true },
+  { to: '/pronos',     icon: Target,   label: 'Top 10 pronos', exact: true },
   { to: '/value-bets', icon: Flame,    label: 'Value bets'                 },
   { to: '/matchs',     icon: Calendar, label: 'Matchs'                     },
   { to: '/favorites',  icon: Star,     label: 'Favoris'                    },

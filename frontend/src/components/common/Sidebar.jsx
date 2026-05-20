@@ -1,14 +1,14 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Flame, Star,
+  Flame, Star, ChevronLeft, CloudSun,
   Calendar, Settings, Globe2, BookOpen, Newspaper, HelpCircle, Target,
 } from 'lucide-react';
 import { useUIStore } from '../../store';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
-  { to: '/', icon: Target, label: 'Top 10 pronos', exact: true },
+  { to: '/pronos', icon: Target, label: 'Top 10 pronos', exact: true },
   { to: '/value-bets', icon: Flame, label: 'Value bets' },
   { to: '/matchs', icon: Calendar, label: 'Tous les matchs' },
   { to: '/worldcup', icon: Globe2, label: 'Coupe du Monde' },
@@ -25,8 +25,13 @@ function SidebarContent({ onClose }) {
       className="flex flex-col h-full pt-5 px-3 overflow-y-auto overscroll-contain pb-5 lg:pb-5"
       style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}
     >
-      {/* Logo */}
-      <NavLink to="/" onClick={onClose} className="flex items-center gap-3 mb-6 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors">
+      {/* Back to the SiteDesFoufous hub */}
+      <NavLink to="/" onClick={onClose} className="flex items-center gap-1.5 mb-2 px-3 text-[11px] font-heading font-semibold text-white/30 hover:text-white/60 transition-colors">
+        <ChevronLeft className="w-3 h-3" /> SiteDesFoufous
+      </NavLink>
+
+      {/* Logo → football home */}
+      <NavLink to="/pronos" onClick={onClose} className="flex items-center gap-3 mb-6 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors">
         <div className="relative">
           <img src="/ball.webp" alt="logo" className="w-10 h-10 rounded-xl object-cover flex-shrink-0" style={{ filter: 'drop-shadow(0 0 8px rgba(34,197,94,0.4))' }} />
           <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-brand-500 rounded-full border-2 border-dark-800" />
@@ -68,6 +73,20 @@ function SidebarContent({ onClose }) {
             )}
           </NavLink>
         ))}
+
+        {/* MimiMétéo — separate project, highlighted in sky to stand apart */}
+        <NavLink
+          to="/meteo"
+          onClick={onClose}
+          className="flex items-center gap-3 px-3 py-2.5 mt-2 rounded-xl text-sm font-heading font-semibold transition-all duration-200 cursor-pointer border border-sky-500/30 bg-gradient-to-r from-sky-500/15 to-sky-500/5 text-sky-300 hover:from-sky-500/25 hover:to-sky-500/10 hover:text-sky-200"
+          style={{ boxShadow: '0 0 16px rgba(56,189,248,0.15)' }}
+        >
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-sky-500/20 text-sky-300">
+            <CloudSun className="w-4 h-4" />
+          </div>
+          <span className="tracking-wide flex-1">MimiMétéo</span>
+          <span className="text-[9px] font-bold uppercase tracking-wider bg-sky-500/25 text-sky-200 px-1.5 py-0.5 rounded">New</span>
+        </NavLink>
       </nav>
 
       {/* Spacer pushes the settings cog to the bottom */}
