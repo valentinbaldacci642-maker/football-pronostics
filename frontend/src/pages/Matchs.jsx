@@ -179,7 +179,7 @@ function groupByLeague(fixtures) {
   });
 }
 
-function LeagueGroup({ league, matches, defaultExpanded = false }) {
+function LeagueGroup({ league, matches, defaultExpanded = false, showDate = false }) {
   // Flashscore-style list: the league acts as a section header with its
   // own collapsible block of rows underneath. Defaults to expanded so the
   // user doesn't have to click each league to see the matches.
@@ -213,7 +213,7 @@ function LeagueGroup({ league, matches, defaultExpanded = false }) {
       {expanded && (
         <div>
           {matches.map((fixture) => (
-            <MatchRow key={fixture.fixture.id} fixture={fixture} />
+            <MatchRow key={fixture.fixture.id} fixture={fixture} showDate={showDate} />
           ))}
         </div>
       )}
@@ -678,6 +678,7 @@ export default function Matchs() {
                         league={league}
                         matches={matches}
                         defaultExpanded={true}
+                        showDate={roundsEnabled}
                       />
                     ))}
                   </div>

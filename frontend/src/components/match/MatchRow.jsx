@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import clsx from 'clsx';
+import { format, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { useFavoritesStore } from '../../store';
 import { formatTime, getMatchStatus, getScoreDisplay } from '../../utils/format';
 
@@ -15,7 +17,7 @@ import { formatTime, getMatchStatus, getScoreDisplay } from '../../utils/format'
  * The two team lines share the same time/star cell on the left so the
  * row reads as ONE match without forcing an extra column for the dash.
  */
-export default function MatchRow({ fixture }) {
+export default function MatchRow({ fixture, showDate = false }) {
   const { toggle, isFavorite } = useFavoritesStore();
   const { teams, fixture: fix } = fixture;
   const home = teams?.home;
@@ -46,6 +48,13 @@ export default function MatchRow({ fixture }) {
     leftLabel = status.label || '—';
   }
 
+  // Compact date label (e.g. "sam 17/05") shown on Calendrier / Résultats
+  // where a round spans several days; the Matchs (today) view leaves it off.
+  let dateLabel = null;
+  if (showDate && fix?.date) {
+    try { dateLabel = format(parseISO(fix.date), 'EEE d/MM', { locale: fr }); } catch (_) { dateLabel = null; }
+  }
+
   return (
     <Link
       to={`/match/${id}`}
@@ -54,8 +63,8 @@ export default function MatchRow({ fixture }) {
         isLive && 'bg-danger/[0.03]'
       )}
     >
-      {/* Favorite star + time column */}
-      <div className="flex items-center gap-2 pl-3 pr-3 py-2 flex-shrink-0 w-[88px]">
+      {/* Favorite star + date/time column */}
+      <div className={clsx('flex items-center gap-2 pl-3 pr-3 py-2 flex-shrink-0', showDate ? 'w-[112px]' : 'w-[88px]')}>
         <button
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(id); }}
           className={clsx(
@@ -66,12 +75,17 @@ export default function MatchRow({ fixture }) {
         >
           <Star className="w-3.5 h-3.5" fill={isFav ? 'currentColor' : 'none'} />
         </button>
-        <span className={clsx(
-          'text-xs font-mono tabular-nums',
-          isLive ? 'text-danger font-bold' : isFinished ? 'text-white/30' : 'text-white/55'
-        )}>
-          {leftLabel}
-        </span>
+        <div className="flex flex-col leading-tight min-w-0">
+          {dateLabel && (
+            <span className="text-[10px] font-heading text-white/35 capitalize truncate">{dateLabel}</span>
+          )}
+          <span className={clsx(
+            'text-xs font-mono tabular-nums',
+            isLive ? 'text-danger font-bold' : isFinished ? 'text-white/30' : 'text-white/55'
+          )}>
+            {leftLabel}
+          </span>
+        </div>
       </div>
 
       {/* Two team rows stacked. Each line: logo + name on left, score on right. */}
