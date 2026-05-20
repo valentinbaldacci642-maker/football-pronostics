@@ -44,7 +44,24 @@ export default function Navbar() {
       ]);
       if (seq !== seqRef.current) return; // a newer query superseded this one
       setResults(teamsRes.status === 'fulfilled' ? (teamsRes.value?.response?.slice(0, 5) || []) : []);
-      setPlayerResults(playersRes.status === 'fulfilled' ? (playersRes.value?.response?.slice(0, 5) || []) : []);
+
+      // Players: /players/profiles returns up to 24 homonyms with abbreviated
+      // names, unranked — so a well-known player (e.g. Mason Greenwood) can
+      // sit 14th. Rebuild a full name from firstname+lastname, rank the
+      // most-complete profiles first (active players have position/nat/age),
+      // and show more of them so they're actually findable.
+      const rawPlayers = playersRes.status === 'fulfilled' ? (playersRes.value?.response || []) : [];
+      const players = rawPlayers
+        .map((r) => {
+          const p = r.player || {};
+          const first = p.firstname ? String(p.firstname).split(' ')[0] : '';
+          const displayName = first && p.lastname ? `${first} ${p.lastname}` : p.name;
+          const completeness = (p.position ? 1 : 0) + (p.nationality ? 1 : 0) + (p.age != null ? 1 : 0) + (p.number != null ? 1 : 0);
+          return { ...r, displayName, completeness };
+        })
+        .sort((a, b) => (b.completeness - a.completeness) || (a.player.id - b.player.id))
+        .slice(0, 10);
+      setPlayerResults(players);
     } catch {
       if (seq === seqRef.current) { setResults([]); setPlayerResults([]); }
     } finally {
@@ -131,7 +148,7 @@ export default function Navbar() {
                   >
                     <img src={r.player.photo} alt="" className="w-6 h-6 rounded-full object-cover bg-dark-700 flex-shrink-0" onError={(e) => { e.target.src = 'https://media.api-sports.io/football/players/0.png'; }} />
                     <div className="min-w-0">
-                      <p className="text-sm font-heading font-semibold text-white/80 group-hover:text-white transition-colors truncate">{r.player.name}</p>
+                      <p className="text-sm font-heading font-semibold text-white/80 group-hover:text-white transition-colors truncate">{r.displayName || r.player.name}</p>
                       <p className="text-xs text-white/30 font-mono truncate">
                         {[r.player.nationality, r.player.position].filter(Boolean).join(' · ') || 'Joueur'}
                       </p>
