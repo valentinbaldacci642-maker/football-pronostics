@@ -291,7 +291,7 @@ async function sendFavoriteTeamNotification(token, favTeam, fixture) {
   const away = fixture.teams?.away;
   const kickoff = formatKickoff(fixture.fixture?.date);
   // Fires ~2h before kickoff but worded as 'joue aujourd'hui' per user pref.
-  const title = `${favTeam.name} joue aujourd'hui ⚽`;
+  const title = `${favTeam.name} joue aujourd'hui`;
   const bodyParts = [`${home?.name} vs ${away?.name}`];
   if (kickoff) bodyParts.push(kickoff);
   if (fixture.league?.name) bodyParts.push(fixture.league.name);
