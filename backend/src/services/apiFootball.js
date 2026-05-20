@@ -306,6 +306,13 @@ class ApiFootballService {
     return this.request('/players', { id: playerId, season }, config.cache.ttlTeams);
   }
 
+  // Basic profile (name, photo, birth, nationality, position…) without
+  // season stats. Fallback for players the /players?id=&season= query has
+  // no data for, so the player page can still render a header.
+  async getPlayerProfile(playerId) {
+    return this.request('/players/profiles', { player: playerId }, config.cache.ttlLeagues);
+  }
+
   async searchPlayers(name) {
     // /players?search= requires a league/team field. /players/profiles
     // searches by last name globally (no team needed) — the right endpoint

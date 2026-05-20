@@ -21,6 +21,12 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/:id/profile', async (req, res, next) => {
+  try {
+    res.json(await api.getPlayerProfile(req.params.id));
+  } catch (err) { next(err); }
+});
+
 router.get('/:id/seasons', async (req, res, next) => {
   try {
     res.json(await api.getPlayerSeasons(req.params.id));

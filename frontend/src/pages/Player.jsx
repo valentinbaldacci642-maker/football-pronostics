@@ -63,10 +63,22 @@ export default function Player() {
           playersApi.getSidelined(id),
         ]);
         if (cancelled) return;
-        if (p.status === 'fulfilled') setPlayerData(p.value?.response?.[0] || null);
+        let resolved = p.status === 'fulfilled' ? (p.value?.response?.[0] || null) : null;
+        // Fallback: some players (esp. from the global search) have no
+        // season stats. Fetch the basic profile so the page still renders
+        // a header instead of 'Joueur introuvable'.
+        if (!resolved) {
+          try {
+            const prof = await playersApi.getProfile(id);
+            const pp = prof?.response?.[0]?.player;
+            if (pp) resolved = { player: pp, statistics: [] };
+          } catch (_) { /* keep null → error state */ }
+        }
+        if (cancelled) return;
+        setPlayerData(resolved);
         if (tr.status === 'fulfilled') setTransfers(tr.value?.response || []);
         if (sl.status === 'fulfilled') setSidelined(sl.value?.response || []);
-        if (p.status === 'rejected') setError(p.reason?.message || 'Erreur chargement joueur');
+        if (!resolved && p.status === 'rejected') setError(p.reason?.message || 'Erreur chargement joueur');
       } finally {
         if (!cancelled) setLoading(false);
       }
