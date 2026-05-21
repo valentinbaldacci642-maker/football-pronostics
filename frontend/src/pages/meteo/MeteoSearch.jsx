@@ -61,7 +61,7 @@ export default function MeteoSearch() {
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[460px] rounded-full blur-3xl" style={{ background: 'rgba(56,189,248,0.22)' }} />
       </div>
 
-      <div className="relative max-w-5xl mx-auto px-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
+      <div className="relative max-w-7xl mx-auto px-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
         <Link to="/" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
           <ArrowLeft className="w-4 h-4" /> SiteDesFoufous
         </Link>
@@ -152,21 +152,21 @@ export default function MeteoSearch() {
                   <CloudRain className="w-3.5 h-3.5" />
                   <span className="text-[11px] font-heading font-bold uppercase tracking-wider">Radar pluie</span>
                 </div>
-                <MapEmbed src={windyUrl(46.6, 2.4, 'rain', 5)} height={300} note="Windy · live" />
+                <MapEmbed src={windyUrl(46.6, 2.4, 'rain', 5)} height={560} note="Windy · live" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-2 px-1 text-emerald-300">
                   <Wind className="w-3.5 h-3.5" />
                   <span className="text-[11px] font-heading font-bold uppercase tracking-wider">Vent</span>
                 </div>
-                <MapEmbed src={windyUrl(46.6, 2.4, 'wind', 5)} height={300} note="Windy · live" />
+                <MapEmbed src={windyUrl(46.6, 2.4, 'wind', 5)} height={560} note="Windy · live" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300">
                   <Zap className="w-3.5 h-3.5" />
                   <span className="text-[11px] font-heading font-bold uppercase tracking-wider">Impacts foudre</span>
                 </div>
-                <MapEmbed src={blitzortungUrl(46.6, 2.4, 5)} height={300} note="Blitzortung · live" />
+                <MapEmbed src={blitzortungUrl(46.6, 2.4, 5)} height={560} note="Blitzortung · live" />
               </div>
             </div>
           </motion.div>
