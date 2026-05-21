@@ -166,7 +166,7 @@ export default function MeteoSearch() {
                   <Snowflake className="w-3.5 h-3.5" />
                   <span className="text-[11px] font-heading font-bold uppercase tracking-wider">Neige</span>
                 </div>
-                <MapEmbed src={windyUrl(46.6, 2.4, 'snow', 5)} height={520} note="Windy · live" />
+                <MapEmbed src={windyUrl(46.6, 2.4, 'snowAccu', 5)} height={520} note="Windy · accumulation" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300">

@@ -97,8 +97,7 @@ function HourRow({ h }) {
   );
 }
 
-function DayCard({ day, isToday, index }) {
-  const [expanded, setExpanded] = useState(false);
+function dayRisks(day) {
   const maxHourPrecip = day.hours.length ? Math.max(...day.hours.map((h) => h.precipMm)) : day.precipMm;
   const windR = windRisk(day.gustKmh);
   const precipR = rainRisk(maxHourPrecip);
@@ -108,51 +107,87 @@ function DayCard({ day, isToday, index }) {
   const violentR = day.hours.length
     ? day.hours.reduce((a, h) => maxRisk(a, severeStormRisk(h.wmoCode)), RISK.FAIBLE)
     : severeStormRisk(day.code);
-  // Card accent = the day's worst risk, for an at-a-glance left strip.
   const top = [windR, precipR, orageR, violentR].reduce((a, b) => maxRisk(a, b), RISK.FAIBLE);
+  return { windR, precipR, orageR, violentR, top };
+}
 
+function Pill({ risk, children }) {
+  return (
+    <span className="inline-block rounded-md px-2 py-0.5 text-[11px] font-bold whitespace-nowrap"
+      style={{ backgroundColor: risk.bgHex, color: risk.color, border: `1px solid ${risk.color}55` }}>
+      {children}
+    </span>
+  );
+}
+
+function ForecastRow({ day, isToday }) {
+  const [expanded, setExpanded] = useState(false);
+  const { windR, precipR, orageR, violentR, top } = dayRisks(day);
+  const showViolent = violentR.key !== 'FAIBLE';
+  return (
+    <>
+      <tr onClick={() => setExpanded((e) => !e)} className="cursor-pointer border-t border-white/[0.06] hover:bg-white/[0.04] transition-colors align-middle">
+        <td className="pl-3 pr-2 py-2.5 relative">
+          <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full" style={{ background: top.color, opacity: 0.85 }} />
+          <span className="font-heading font-bold capitalize text-sm" style={{ color: isToday ? '#7dd3fc' : '#e2e8f0' }}>
+            {isToday ? "Auj." : fmtDate(day.date)}
+          </span>
+        </td>
+        <td className="px-2 text-center text-lg" title={day.desc}>{day.emoji}</td>
+        <td className="px-2 text-right whitespace-nowrap">
+          <span className="font-display text-base" style={{ color: tempColor(day.tempMax) }}>{day.tempMax}°</span>
+          <span className="text-xs ml-1" style={{ color: tempColor(day.tempMin), opacity: 0.85 }}>{day.tempMin}°</span>
+        </td>
+        <td className="px-2 text-right whitespace-nowrap">
+          <span className="font-semibold text-sm" style={{ color: windR.color }}>{day.windKmh}</span>
+          <span className="text-white/40 text-xs"> ↑{day.gustKmh}</span>
+          <span className="text-white/35 text-[10px] ml-1">{dirToCompass(day.windDir)}</span>
+        </td>
+        <td className="px-2 text-right whitespace-nowrap">
+          <span className="font-semibold text-sm" style={{ color: precipR.color }}>{day.precipProb}%</span>
+          <span className="text-white/45 text-xs ml-1">{day.precipMm.toFixed(1)}mm</span>
+        </td>
+        <td className="px-2 text-center">
+          <span className="font-semibold text-sm" style={{ color: uvRisk(day.uvMax).color }}>{day.uvMax}</span>
+        </td>
+        <td className="pr-3 pl-2 py-2.5 text-right">
+          <Pill risk={orageR}>{showViolent ? `⚡ ${violentR.label}` : orageText(orageR)}</Pill>
+        </td>
+      </tr>
+      {expanded && day.hours.length > 0 && (
+        <tr>
+          <td colSpan={7} className="px-3 pb-3 pt-1" style={{ background: 'rgba(0,0,0,0.18)' }}>
+            {day.hours.map((h) => <HourRow key={h.hour} h={h} />)}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function ForecastTable({ days }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index * 0.025, 0.3) }}
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       className="rounded-2xl overflow-hidden backdrop-blur-md"
-      style={{
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: isToday ? `0 0 0 1px ${top.color}55, 0 8px 30px rgba(0,0,0,0.25)` : '0 4px 18px rgba(0,0,0,0.2)',
-      }}
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 30px rgba(0,0,0,0.25)' }}
     >
-      <button onClick={() => setExpanded((e) => !e)} className="w-full text-left p-3.5 relative">
-        <span className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full" style={{ background: top.color, opacity: 0.85 }} />
-        <div className="flex items-start justify-between gap-2 pl-2">
-          <div className="min-w-0">
-            <p className="text-sm font-heading font-bold capitalize" style={{ color: isToday ? '#7dd3fc' : '#e2e8f0' }}>
-              {isToday ? "Aujourd'hui" : fmtDate(day.date)}
-            </p>
-            <p className="text-xs mt-0.5 flex items-center gap-1.5 text-white/45">
-              <span className="text-base">{day.emoji}</span>{day.desc}
-            </p>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <p className="font-display text-lg leading-none">
-              <span style={{ color: tempColor(day.tempMax) }}>{day.tempMax}°</span>
-              <span className="text-sm ml-1.5" style={{ color: tempColor(day.tempMin), opacity: 0.85 }}>{day.tempMin}°</span>
-            </p>
-            <span className="text-[10px] text-white/30">{expanded ? '▲ moins' : '▼ heures'}</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-1.5 mt-2.5 pl-2">
-          <InfoBadge icon="💨" risk={windR} text={`${day.windKmh} (↑${day.gustKmh}) km/h ${dirToCompass(day.windDir)}`} />
-          <InfoBadge icon="🌧️" risk={precipR} text={`${day.precipProb}% · ${day.precipMm.toFixed(1)}mm`} />
-          {day.uvMax >= 3 && <InfoBadge icon="☀️" risk={uvRisk(day.uvMax)} text={`UV ${day.uvMax}`} />}
-          <InfoBadge icon="⛈️" risk={orageR} text={orageText(orageR)} />
-          <InfoBadge icon="🌩️" risk={violentR} text={violentText(violentR)} />
-        </div>
-      </button>
-      {expanded && day.hours.length > 0 && (
-        <div className="px-3.5 pb-3 pl-[18px]">{day.hours.map((h) => <HourRow key={h.hour} h={h} />)}</div>
-      )}
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="text-[10px] uppercase tracking-wider text-white/40 font-heading">
+            <th className="text-left pl-3 pr-2 py-2.5 font-bold">Jour</th>
+            <th className="px-2 py-2.5 font-bold">Ciel</th>
+            <th className="px-2 py-2.5 text-right font-bold">Temp.</th>
+            <th className="px-2 py-2.5 text-right font-bold">Vent</th>
+            <th className="px-2 py-2.5 text-right font-bold">Pluie</th>
+            <th className="px-2 py-2.5 text-center font-bold">UV</th>
+            <th className="pr-3 pl-2 py-2.5 text-right font-bold">Orage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {days.map((day, i) => <ForecastRow key={day.date} day={day} isToday={i === 0} />)}
+        </tbody>
+      </table>
     </motion.div>
   );
 }
@@ -273,14 +308,12 @@ export default function MeteoDashboard() {
               </div>
             </motion.div>
 
-            {/* Forecast (narrow, left) + big live city maps (right) */}
-            <div className="mt-7 lg:grid lg:grid-cols-[400px_minmax(0,1fr)] lg:gap-6 lg:items-start">
-              {/* Left — 14-day forecast */}
+            {/* Forecast table (left half) + live city maps 2x2 (right half) */}
+            <div className="mt-7 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+              {/* Left — 14-day forecast table */}
               <div>
                 <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">PRÉVISIONS 14 JOURS</p>
-                <div className="space-y-3">
-                  {days.map((day, i) => <DayCard key={day.date} day={day} isToday={i === 0} index={i} />)}
-                </div>
+                <ForecastTable days={days} />
               </div>
 
               {/* Right — big live maps centred on the city */}
@@ -297,7 +330,7 @@ export default function MeteoDashboard() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige</span></div>
-                    <MapEmbed src={windyUrl(lat, lon, 'snow', 8)} height={300} note="Windy · live" />
+                    <MapEmbed src={windyUrl(lat, lon, 'snowAccu', 8)} height={300} note="Windy · accumulation" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Impacts foudre</span></div>
