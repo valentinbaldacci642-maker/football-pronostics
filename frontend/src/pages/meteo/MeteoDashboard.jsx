@@ -178,7 +178,7 @@ function ForecastRow({ day, isToday, tempUnit, windUnit }) {
         </td>
         <td className="px-1 sm:px-2 text-right whitespace-nowrap">
           <span className="font-semibold text-[13px] sm:text-sm" style={{ color: precipR.color }}>{day.precipProb}%</span>
-          <span className="hidden sm:inline text-white/45 text-xs ml-1">{day.precipMm.toFixed(1)}mm</span>
+          <span className="text-white/45 text-[10px] sm:text-xs ml-0.5 sm:ml-1">{day.precipMm.toFixed(1)}mm</span>
         </td>
         <td className="px-1 sm:px-2 text-center">
           <span className="font-semibold text-[13px] sm:text-sm" style={{ color: uvRisk(day.uvMax).color }}>{day.uvMax}</span>
