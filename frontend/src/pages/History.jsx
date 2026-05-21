@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks, RotateCcw, RefreshCw, Save, Download, MessageSquare } from 'lucide-react';
+import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks, RotateCcw, RefreshCw, Save, Download, MessageSquare, Trash2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useHistoryStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
 import { resolveFinishedMatches } from '../utils/resolveResults';
@@ -831,6 +831,15 @@ function BetCard({ bet }) {
   const clearBetResult = useHistoryStore((s) => s.clearBetResult);
   const duplicateBet = useHistoryStore((s) => s.duplicateBet);
   const setBetClosingOdd = useHistoryStore((s) => s.setBetClosingOdd);
+  const setBetMise = useHistoryStore((s) => s.setBetMise);
+
+  // Annuler un pari placé par erreur : remet la mise à 0 → la mise est
+  // remboursée (la bankroll dispo remonte) et le pari sort des "Paris en cours".
+  const handleCancelBet = () => {
+    if (!bet.betKey) return;
+    if (!window.confirm(`Annuler ce pari (${bet.homeTeam} vs ${bet.awayTeam}) et récupérer la mise de ${bet.mise.toFixed(2)}€ ?`)) return;
+    setBetMise(bet.fixtureId, bet.betKey, 0);
+  };
   const [cashoutInput, setCashoutInput] = useState('');
   const [showCashoutInput, setShowCashoutInput] = useState(false);
   const [closingInput, setClosingInput] = useState(bet.closingOdd != null ? String(bet.closingOdd) : '');
@@ -961,6 +970,14 @@ function BetCard({ bet }) {
                     title="Dupliquer ce pari (si tu l'as placé plusieurs fois)"
                   >
                     +1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelBet}
+                    className="flex items-center gap-1 text-xs text-danger/70 hover:text-danger font-heading font-semibold px-2 py-1 rounded-md border border-danger/30 hover:bg-danger/10 transition-all"
+                    title="Annuler ce pari et récupérer la mise"
+                  >
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 </>
               ) : (
