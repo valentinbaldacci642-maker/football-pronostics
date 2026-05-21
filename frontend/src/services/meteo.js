@@ -45,13 +45,59 @@ function overlayArrays(dst, src, keys) {
 }
 
 // ─── Forecast ─────────────────────────────────────────────────────────────────
+// Open-Meteo is free/keyless but rate-limited (HTTP 429), which bites when a few
+// people browse at once. We cache each city's forecast in localStorage for
+// ~10 min, retry transient failures with backoff, and fall back to a stale
+// cache rather than surfacing an error.
+const FORECAST_TTL = 10 * 60 * 1000;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const fcKey = (lat, lon) => `meteo_fc_${lat.toFixed(3)}_${lon.toFixed(3)}`;
+
+function readForecastCache(lat, lon, allowStale = false) {
+  try {
+    const raw = localStorage.getItem(fcKey(lat, lon));
+    if (!raw) return null;
+    const { t, data } = JSON.parse(raw);
+    if (!allowStale && Date.now() - t > FORECAST_TTL) return null;
+    return data;
+  } catch { return null; }
+}
+function writeForecastCache(lat, lon, data) {
+  try { localStorage.setItem(fcKey(lat, lon), JSON.stringify({ t: Date.now(), data })); } catch { /* quota/full — ignore */ }
+}
+
+export async function getForecast(lat, lon) {
+  const fresh = readForecastCache(lat, lon);
+  if (fresh) return fresh;
+
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const data = await fetchForecast(lat, lon);
+      writeForecastCache(lat, lon, data);
+      return data;
+    } catch (e) {
+      lastErr = e;
+      const status = e?.response?.status;
+      const retriable = status === 429 || status === 503 || status >= 500 || status === undefined;
+      if (!retriable) throw e;
+      const stale = readForecastCache(lat, lon, true);
+      if (stale) return stale; // better an old forecast than an error
+      await sleep(700 * (attempt + 1));
+    }
+  }
+  const stale = readForecastCache(lat, lon, true);
+  if (stale) return stale;
+  throw lastErr;
+}
+
 // Three sources merged for the best possible result:
 //   • ECMWF IFS (base, 14 days): the best medium-range global model — temp,
 //     precip, precip-probability, wind+gusts, CAPE. (No UV.)
 //   • best_match: only used to fill UV (ECMWF doesn't output it).
 //   • Météo-France (AROME/ARPEGE seamless, ~4 days): overlaid on the near
 //     term for phone-accurate temps/sky/wind/precip.
-export async function getForecast(lat, lon) {
+async function fetchForecast(lat, lon) {
   const common = { latitude: lat, longitude: lon, timezone: 'auto', forecast_days: 14 };
   const [ecmwfRes, uvRes, mfRes] = await Promise.all([
     axios.get(FORECAST_URL, {
