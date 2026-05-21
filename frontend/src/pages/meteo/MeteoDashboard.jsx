@@ -15,6 +15,7 @@ const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'a
 // Meteociel HD radars (fixed France-wide views — no per-city centring available).
 const METEOCIEL_RAIN_HD = 'https://www.meteociel.fr/observations-meteo/radarzoom.php?x=8229.39&y=8647.89&ech=11&zoom=3';
 const METEOCIEL_SNOW = 'https://www.meteociel.fr/observations-meteo/radarzoom.php?&x=7709.94&y=7625.72&zoom=2.1&ech=0&snow=1';
+const METEOCIEL_FOUDRE = 'https://www.meteociel.fr/observations-meteo/foudre-direct.php';
 
 function fmtDate(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
@@ -272,9 +273,11 @@ export default function MeteoDashboard() {
   const [tempUnit, setTempUnit] = useState(() => localStorage.getItem('meteo_tempUnit') || 'C');
   const [windUnit, setWindUnit] = useState(() => localStorage.getItem('meteo_windUnit') || 'kmh');
   const [mapSize, setMapSize] = useState(() => Number(localStorage.getItem('meteo_mapSize')) || 250);
+  const [mapWidth, setMapWidth] = useState(() => Number(localStorage.getItem('meteo_mapWidth')) || 520);
   useEffect(() => { localStorage.setItem('meteo_tempUnit', tempUnit); }, [tempUnit]);
   useEffect(() => { localStorage.setItem('meteo_windUnit', windUnit); }, [windUnit]);
   useEffect(() => { localStorage.setItem('meteo_mapSize', String(mapSize)); }, [mapSize]);
+  useEffect(() => { localStorage.setItem('meteo_mapWidth', String(mapWidth)); }, [mapWidth]);
 
   const load = () => {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) { setError('Coordonnées invalides'); setLoading(false); return; }
@@ -360,17 +363,26 @@ export default function MeteoDashboard() {
 
               {/* Right — big live maps centred on the city */}
               <div className="mt-8 lg:mt-0">
-                <div className="flex items-center justify-between gap-3 mb-2.5">
+                <div className="flex items-center justify-between gap-3 mb-2.5 flex-wrap">
                   <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45">EN DIRECT · {name.toUpperCase()}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Taille cartes</span>
-                    <input type="range" min={150} max={650} step={10} value={mapSize}
-                      onChange={(e) => setMapSize(Number(e.target.value))}
-                      className="w-32 accent-sky-400 cursor-pointer" />
-                    <span className="text-[10px] font-mono text-white/40 w-9 text-right">{mapSize}</span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Hauteur</span>
+                      <input type="range" min={150} max={700} step={10} value={mapSize}
+                        onChange={(e) => setMapSize(Number(e.target.value))}
+                        className="w-28 accent-sky-400 cursor-pointer" />
+                      <span className="text-[10px] font-mono text-white/40 w-9 text-right">{mapSize}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Largeur</span>
+                      <input type="range" min={280} max={1100} step={20} value={mapWidth}
+                        onChange={(e) => setMapWidth(Number(e.target.value))}
+                        className="w-28 accent-sky-400 cursor-pointer" />
+                      <span className="text-[10px] font-mono text-white/40 w-9 text-right">{mapWidth}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${mapWidth}px), 1fr))` }}>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-sky-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Radar pluie</span></div>
                     <MapEmbed src={windyUrl(lat, lon, 'rain', 8)} height={mapSize} note="Windy · live" />
@@ -380,16 +392,20 @@ export default function MeteoDashboard() {
                     <MapEmbed src={windyUrl(lat, lon, 'wind', 8)} height={mapSize} note="Windy · live" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-1.5 mb-2 px-1 text-blue-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Pluie HD</span></div>
-                    <MapEmbed src={METEOCIEL_RAIN_HD} height={mapSize} scale={0.55} note="Meteociel · live" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige</span></div>
-                    <MapEmbed src={METEOCIEL_SNOW} height={mapSize} scale={0.5} panY={-110} note="Meteociel · live" />
-                  </div>
-                  <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Impacts foudre</span></div>
                     <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={mapSize} note="Blitzortung · live" />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div className="flex items-center gap-1.5 mb-2 px-1 text-blue-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Pluie HD · Meteociel</span></div>
+                    <MapEmbed src={METEOCIEL_RAIN_HD} height={mapSize} scale={0.9} panX={-150} panY={-120} note="Meteociel · live" />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige · Meteociel</span></div>
+                    <MapEmbed src={METEOCIEL_SNOW} height={mapSize} scale={0.9} panX={-150} panY={-150} note="Meteociel · live" />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div className="flex items-center gap-1.5 mb-2 px-1 text-yellow-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Foudre en direct · Meteociel</span></div>
+                    <MapEmbed src={METEOCIEL_FOUDRE} height={mapSize} scale={0.9} panY={-120} panX={-150} note="Meteociel · live" />
                   </div>
                 </div>
               </div>

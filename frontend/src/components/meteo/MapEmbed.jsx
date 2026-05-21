@@ -1,9 +1,10 @@
 // Generic iframe wrapper for the weather live maps (RainViewer, Blitzortung,
 // Windy, Meteociel). Rounded card with a title bar.
 // `scale` < 1 zooms the embedded page out so a large page fits inside a short
-// card; `panY` (negative px) shifts the content up to skip a page header.
-export default function MapEmbed({ title, src, height = 320, note, scale = 1, panY = 0 }) {
-  const scaled = scale !== 1 || panY !== 0;
+// card; `panY`/`panX` (negative px) shift the content up/left to skip a page
+// header or sidebar.
+export default function MapEmbed({ title, src, height = 320, note, scale = 1, panY = 0, panX = 0 }) {
+  const scaled = scale !== 1 || panY !== 0 || panX !== 0;
   return (
     <div className="glass-card overflow-hidden">
       {title && (
@@ -20,8 +21,8 @@ export default function MapEmbed({ title, src, height = 320, note, scale = 1, pa
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
             style={{
-              position: 'absolute', top: panY, left: 0, border: 0,
-              width: `${100 / scale}%`,
+              position: 'absolute', top: panY, left: panX, border: 0,
+              width: `calc(${100 / scale}% + ${Math.abs(panX) / scale}px)`,
               height: `${(height - panY) / scale}px`,
               transform: `scale(${scale})`,
               transformOrigin: 'top left',
