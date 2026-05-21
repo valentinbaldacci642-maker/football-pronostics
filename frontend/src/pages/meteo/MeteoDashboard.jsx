@@ -397,15 +397,15 @@ export default function MeteoDashboard() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-blue-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Pluie HD · Meteociel</span></div>
-                    <MapEmbed src={METEOCIEL_RAIN_HD} height={mapSize} canvasCrop={{ x: 667, y: 345, size: 768, frameW: 1900 }} note="Meteociel · plein écran" />
+                    <MapEmbed src={METEOCIEL_RAIN_HD} height={mapSize} canvasCrop={{ x: 659, y: 345, w: 768, h: 808, frameW: 1900, fit: 'width' }} note="Meteociel · animation" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige · Meteociel</span></div>
-                    <MapEmbed src={METEOCIEL_SNOW} height={mapSize} canvasCrop={{ x: 667, y: 345, size: 768, frameW: 1900 }} note="Meteociel · plein écran" />
+                    <MapEmbed src={METEOCIEL_SNOW} height={mapSize} canvasCrop={{ x: 659, y: 345, w: 768, h: 808, frameW: 1900, fit: 'width' }} note="Meteociel · animation" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-yellow-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Foudre en direct · Meteociel</span></div>
-                    <MapEmbed src={METEOCIEL_FOUDRE} height={mapSize} canvasCrop={{ x: 648, y: 322, size: 768, frameW: 1900 }} note="Meteociel · plein écran" />
+                    <MapEmbed src={METEOCIEL_FOUDRE} height={mapSize} canvasCrop={{ x: 648, y: 322, w: 768, h: 768, frameW: 1900, fit: 'cover' }} note="Meteociel · plein écran" />
                   </div>
                 </div>
               </div>

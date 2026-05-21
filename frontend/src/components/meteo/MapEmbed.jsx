@@ -1,41 +1,57 @@
 import { useRef, useState, useEffect } from 'react';
 
-// Crops the embedded page to its radar canvas only (Meteociel "plein écran"
-// look) and scales it to COVER the card — fills width & height, no dark
-// margins. The page is rendered at a fixed logical width (frameW) so the canvas
-// position (x, y) is deterministic; the visible card width is measured at
-// runtime to compute the cover scale.
+// Crops the embedded page to a fixed region (radar canvas, optionally including
+// the playback controls below it) — the Meteociel "plein écran" look. The page
+// is rendered at a fixed logical width (frameW) so the region (x, y, w, h) is
+// deterministic; the live card width is measured to compute the scale.
+//   fit='cover'  → fills the card (fixed height), crops overflow, centred.
+//   fit='width'  → fills the card width with no side margins; the card height
+//                  is derived so the whole region (incl. controls) stays
+//                  visible and interactive.
 function CanvasCropFrame({ src, title, height, crop }) {
-  const { x, y, size, frameW } = crop;
+  const { x, y, w, h, frameW, fit = 'cover' } = crop;
   const ref = useRef(null);
-  const [w, setW] = useState(0);
+  const [cw, setCw] = useState(0);
   useEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
-    const update = () => setW(el.clientWidth);
+    const update = () => setCw(el.clientWidth);
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const s = (w ? Math.max(w, height) : height) / size; // cover the card
-  const left = (w - size * s) / 2 - x * s;
-  const top = (height - size * s) / 2 - y * s;
+
+  const iframe = (s, left, top) => (
+    <iframe
+      src={src}
+      title={title || 'carte'}
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+      style={{
+        position: 'absolute', left, top, border: 0,
+        width: `${frameW}px`,
+        height: `${y + h + 80}px`,
+        transform: `scale(${s})`,
+        transformOrigin: 'top left',
+      }}
+    />
+  );
+
+  if (fit === 'width') {
+    const s = cw ? cw / w : 1;
+    const boxH = cw ? Math.round(h * s) : height;
+    return (
+      <div ref={ref} style={{ height: boxH, overflow: 'hidden', position: 'relative', background: '#0b1220' }}>
+        {iframe(s, -x * s, -y * s)}
+      </div>
+    );
+  }
+
+  const s = (cw ? Math.max(cw, height) : height) / w; // cover
   return (
     <div ref={ref} style={{ height, overflow: 'hidden', position: 'relative', background: '#0b1220' }}>
-      <iframe
-        src={src}
-        title={title || 'carte'}
-        loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
-        style={{
-          position: 'absolute', left, top, border: 0,
-          width: `${frameW}px`,
-          height: `${y + size + 60}px`,
-          transform: `scale(${s})`,
-          transformOrigin: 'top left',
-        }}
-      />
+      {iframe(s, (cw - w * s) / 2 - x * s, (height - h * s) / 2 - y * s)}
     </div>
   );
 }
