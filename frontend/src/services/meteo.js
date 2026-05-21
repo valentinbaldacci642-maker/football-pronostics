@@ -42,12 +42,12 @@ export async function getForecast(lat, lon) {
       ].join(','),
       hourly: [
         'temperature_2m', 'apparent_temperature', 'precipitation_probability', 'precipitation',
-        'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'uv_index', 'cape',
+        'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'uv_index', 'cape',
       ].join(','),
       daily: [
         'weather_code', 'temperature_2m_max', 'temperature_2m_min',
         'precipitation_sum', 'precipitation_probability_max',
-        'wind_speed_10m_max', 'wind_gusts_10m_max', 'uv_index_max',
+        'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'uv_index_max',
         'sunrise', 'sunset',
       ].join(','),
     },
@@ -96,21 +96,28 @@ export function isStormCode(code) {
   return code === 95 || code === 96 || code === 99 || code === 82;
 }
 
-// ─── Risk levels (shared color code with MimiMétéo) ──────────────────────────
+// ─── Risk levels — exact colours & thresholds from the original MimiMétéo ─────
+// color = accent/text, bgHex = dark filled background (used by badges/tiles).
 export const RISK = {
-  FAIBLE:  { label: 'Faible',  color: '#22c55e', bg: 'bg-green-500/15',  text: 'text-green-400',  border: 'border-green-500/30' },
-  MODERE:  { label: 'Modéré',  color: '#f59e0b', bg: 'bg-amber-500/15',  text: 'text-amber-400',  border: 'border-amber-500/30' },
-  ELEVE:   { label: 'Élevé',   color: '#ef4444', bg: 'bg-red-500/15',    text: 'text-red-400',    border: 'border-red-500/30' },
-  EXTREME: { label: 'Extrême', color: '#a855f7', bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/30' },
+  FAIBLE:  { key: 'FAIBLE',  label: 'Faible',  color: '#22c55e', bgHex: '#14532d' },
+  MODERE:  { key: 'MODERE',  label: 'Modéré',  color: '#f59e0b', bgHex: '#431407' },
+  ELEVE:   { key: 'ELEVE',   label: 'Élevé',   color: '#ef4444', bgHex: '#450a0a' },
+  EXTREME: { key: 'EXTREME', label: 'Extrême', color: '#a855f7', bgHex: '#2e1065' },
 };
 
+const ORDER = ['FAIBLE', 'MODERE', 'ELEVE', 'EXTREME'];
+export function maxRisk(a, b) {
+  return ORDER.indexOf(a.key) >= ORDER.indexOf(b.key) ? a : b;
+}
+
 export function windRisk(gustKmh) {
-  if (gustKmh >= 100) return RISK.EXTREME;
-  if (gustKmh >= 80) return RISK.ELEVE;
-  if (gustKmh >= 60) return RISK.MODERE;
+  if (gustKmh >= 90) return RISK.EXTREME;
+  if (gustKmh >= 60) return RISK.ELEVE;
+  if (gustKmh >= 30) return RISK.MODERE;
   return RISK.FAIBLE;
 }
 
+// mm per hour
 export function rainRisk(mm) {
   if (mm >= 30) return RISK.EXTREME;
   if (mm >= 10) return RISK.ELEVE;
@@ -119,20 +126,13 @@ export function rainRisk(mm) {
 }
 
 export function uvRisk(uv) {
-  if (uv >= 11) return RISK.EXTREME;
-  if (uv >= 8) return RISK.ELEVE;
-  if (uv >= 6) return RISK.MODERE;
+  if (uv >= 8) return RISK.EXTREME;
+  if (uv >= 6) return RISK.ELEVE;
+  if (uv >= 3) return RISK.MODERE;
   return RISK.FAIBLE;
 }
 
-export function stormRisk(code, precipProb) {
-  if (code === 96 || code === 99) return RISK.EXTREME;
-  if (code === 95) return RISK.ELEVE;
-  if (code === 82 || (precipProb != null && precipProb >= 60)) return RISK.MODERE;
-  return RISK.FAIBLE;
-}
-
-// CAPE-based storm risk (J/kg), same scale as MimiMétéo's MUCAPE tiles.
+// CAPE (J/kg) → storm risk (MUCAPE scale).
 export function capeRisk(cape) {
   if (cape == null) return RISK.FAIBLE;
   if (cape >= 3000) return RISK.EXTREME;
@@ -141,14 +141,30 @@ export function capeRisk(cape) {
   return RISK.FAIBLE;
 }
 
-// Severe-storm potential: high CAPE + a thunderstorm actually forecast.
-export function severeStormRisk(cape, code) {
-  const stormy = code === 95 || code === 96 || code === 99 || code === 82;
-  if (cape >= 2500 && (code === 96 || code === 99)) return RISK.EXTREME;
-  if (cape >= 2000 && stormy) return RISK.ELEVE;
-  if (cape >= 1200 && stormy) return RISK.MODERE;
-  if (cape >= 2500) return RISK.MODERE;
+// WMO thunderstorm codes → orage risk.
+export function wmoOrageRisk(code) {
+  if (code === 99) return RISK.EXTREME;
+  if (code === 96) return RISK.ELEVE;
+  if (code === 95) return RISK.MODERE;
   return RISK.FAIBLE;
+}
+
+// Combined hourly/daily storm risk: worst of WMO code and CAPE.
+export function stormRisk(code, cape) {
+  return maxRisk(wmoOrageRisk(code), capeRisk(cape ?? 0));
+}
+
+// Severe (violent) storm risk — hail-bearing codes.
+export function severeStormRisk(code) {
+  if (code === 99) return RISK.ELEVE;
+  if (code === 96) return RISK.MODERE;
+  return RISK.FAIBLE;
+}
+
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+export function dirToCompass(deg) {
+  if (deg == null) return '';
+  return COMPASS[Math.round(((deg % 360) / 45)) % 8];
 }
 
 // ─── Live-map embed URLs (all iframe-friendly, no key) ───────────────────────

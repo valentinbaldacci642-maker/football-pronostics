@@ -1,47 +1,138 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, RefreshCw, Star } from 'lucide-react';
 import {
-  ArrowLeft, MapPin, Wind, Droplets, Sun, CloudLightning, Zap,
-  Thermometer, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, ChevronRight,
-} from 'lucide-react';
-import {
-  getForecast, wmo, windRisk, rainRisk, uvRisk, capeRisk, severeStormRisk,
+  getForecast, wmo, windRisk, rainRisk, uvRisk, stormRisk, severeStormRisk, maxRisk,
+  dirToCompass, RISK,
 } from '../../services/meteo';
+import { InfoBadge, RiskTile, orageText, violentText } from '../../components/meteo/RiskUI';
 
-const PAGE_BG = 'radial-gradient(1200px 600px at 50% -10%, #0a1628 0%, #050a12 60%)';
-const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+const DAYS_FR = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
-// Build a query string carrying the city across detail routes.
 function cityQS(params) {
   const q = new URLSearchParams();
   ['lat', 'lon', 'name', 'admin'].forEach((k) => { if (params.get(k)) q.set(k, params.get(k)); });
   return q.toString();
 }
 
-function Tile({ icon: Icon, label, value, risk, to }) {
-  const inner = (
-    <div className={`rounded-2xl border ${risk.border} ${risk.bg} p-3.5 h-full transition-transform hover:scale-[1.02]`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Icon className={`w-4 h-4 ${risk.text}`} />
-          <span className="text-xs font-heading font-semibold text-white/55">{label}</span>
-        </div>
-        <ChevronRight className="w-3.5 h-3.5 text-white/25" />
+function fmtDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]}`;
+}
+
+// Build {day + its hours} structures from the Open-Meteo arrays.
+function buildDays(data) {
+  const daily = data.daily || {};
+  const hourly = data.hourly || {};
+  const hoursByDate = {};
+  (hourly.time || []).forEach((t, i) => {
+    const date = t.slice(0, 10);
+    (hoursByDate[date] = hoursByDate[date] || []).push({
+      hour: new Date(t).getHours(),
+      tempC: Math.round(hourly.temperature_2m?.[i]),
+      feelsLikeC: Math.round(hourly.apparent_temperature?.[i]),
+      windKmh: Math.round(hourly.wind_speed_10m?.[i] ?? 0),
+      gustKmh: Math.round(hourly.wind_gusts_10m?.[i] ?? 0),
+      windDir: hourly.wind_direction_10m?.[i],
+      precipMm: hourly.precipitation?.[i] ?? 0,
+      precipProb: hourly.precipitation_probability?.[i] ?? 0,
+      uvIndex: Math.round(hourly.uv_index?.[i] ?? 0),
+      cape: hourly.cape?.[i] ?? 0,
+      wmoCode: hourly.weather_code?.[i],
+    });
+  });
+  return (daily.time || []).map((date, i) => ({
+    date,
+    tempMin: Math.round(daily.temperature_2m_min?.[i]),
+    tempMax: Math.round(daily.temperature_2m_max?.[i]),
+    desc: wmo(daily.weather_code?.[i]).label,
+    emoji: wmo(daily.weather_code?.[i]).emoji,
+    code: daily.weather_code?.[i],
+    precipMm: daily.precipitation_sum?.[i] ?? 0,
+    precipProb: daily.precipitation_probability_max?.[i] ?? 0,
+    windKmh: Math.round(daily.wind_speed_10m_max?.[i] ?? 0),
+    gustKmh: Math.round(daily.wind_gusts_10m_max?.[i] ?? 0),
+    windDir: daily.wind_direction_10m_dominant?.[i],
+    uvMax: Math.round(daily.uv_index_max?.[i] ?? 0),
+    hours: hoursByDate[date] || [],
+  }));
+}
+
+function HourRow({ h }) {
+  const gust = windRisk(h.gustKmh);
+  const precip = rainRisk(h.precipMm);
+  const orage = maxRisk(stormRisk(h.wmoCode, h.cape), RISK.FAIBLE);
+  const violent = severeStormRisk(h.wmoCode);
+  const w = wmo(h.wmoCode);
+  return (
+    <div className="flex items-start gap-2 py-1.5 border-t border-white/[0.05]">
+      <span className="text-xs font-semibold w-7 flex-shrink-0" style={{ color: '#64748b' }}>{String(h.hour).padStart(2, '0')}h</span>
+      <div className="w-12 flex-shrink-0">
+        <span className="text-[13px] font-semibold" style={{ color: '#94a3b8' }}>{h.tempC}°</span>
+        {h.feelsLikeC !== h.tempC && <span className="block text-[10px]" style={{ color: '#475569' }}>res. {h.feelsLikeC}°</span>}
       </div>
-      <p className="text-lg font-display text-white leading-none">{value}</p>
-      <p className={`text-xs font-heading font-bold mt-1 ${risk.text}`}>{risk.label}</p>
+      <div className="flex-1 flex flex-wrap gap-1">
+        <InfoBadge icon="💨" risk={gust} text={`${h.windKmh} (↑${h.gustKmh}) km/h ${dirToCompass(h.windDir)}`} />
+        <InfoBadge icon="🌧️" risk={precip} text={`${h.precipMm.toFixed(1)} mm · ${h.precipProb}%`} />
+        {h.uvIndex >= 3 && <InfoBadge icon="☀️" risk={uvRisk(h.uvIndex)} text={`UV ${h.uvIndex}`} />}
+        {orage.key !== 'FAIBLE' && <InfoBadge icon="⛈️" risk={orage} text={orageText(orage)} />}
+        {violent.key !== 'FAIBLE' && <InfoBadge icon="🌩️" risk={violent} text={violentText(violent)} />}
+      </div>
     </div>
   );
-  return to ? <Link to={to} className="block">{inner}</Link> : inner;
+}
+
+function DayCard({ day, isToday }) {
+  const [expanded, setExpanded] = useState(false);
+  const maxHourPrecip = day.hours.length ? Math.max(...day.hours.map((h) => h.precipMm)) : day.precipMm;
+  const windR = windRisk(day.gustKmh);
+  const precipR = rainRisk(maxHourPrecip);
+  const orageR = day.hours.length
+    ? day.hours.reduce((acc, h) => maxRisk(acc, stormRisk(h.wmoCode, h.cape)), RISK.FAIBLE)
+    : stormRisk(day.code, 0);
+  const violentR = day.hours.length
+    ? day.hours.reduce((acc, h) => maxRisk(acc, severeStormRisk(h.wmoCode)), RISK.FAIBLE)
+    : severeStormRisk(day.code);
+
+  return (
+    <div className="rounded-xl p-3.5 mb-2" style={{ backgroundColor: '#1e293b', border: isToday ? '1px solid #334155' : 'none' }}>
+      <button onClick={() => setExpanded((e) => !e)} className="w-full text-left">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold capitalize" style={{ color: isToday ? '#60a5fa' : '#94a3b8' }}>
+              {isToday ? "Aujourd'hui" : fmtDate(day.date)}
+            </p>
+            <p className="text-xs mt-0.5 truncate flex items-center gap-1.5" style={{ color: '#475569' }}>
+              <span>{day.emoji}</span>{day.desc}
+            </p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-[15px] font-semibold" style={{ color: '#f1f5f9' }}>{day.tempMin}° / {day.tempMax}°</p>
+            <p className="text-[10px] mt-1" style={{ color: '#475569' }}>{expanded ? '▲' : '▼'}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
+          <InfoBadge icon="💨" risk={windR} text={`${day.windKmh} (↑${day.gustKmh}) km/h ${dirToCompass(day.windDir)}`} />
+          <InfoBadge icon="🌧️" risk={precipR} text={`${day.precipProb}% · ${day.precipMm.toFixed(1)}mm`} />
+          {day.uvMax >= 3 && <InfoBadge icon="☀️" risk={uvRisk(day.uvMax)} text={`UV ${day.uvMax}`} />}
+          <InfoBadge icon="⛈️" risk={orageR} text={orageText(orageR)} />
+          <InfoBadge icon="🌩️" risk={violentR} text={violentText(violentR)} />
+        </div>
+      </button>
+      {expanded && day.hours.length > 0 && (
+        <div className="mt-2">{day.hours.map((h) => <HourRow key={h.hour} h={h} />)}</div>
+      )}
+    </div>
+  );
 }
 
 export default function MeteoDashboard() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const lat = parseFloat(params.get('lat'));
   const lon = parseFloat(params.get('lon'));
   const name = params.get('name') || 'Ville';
-  const admin = params.get('admin') || '';
   const qs = cityQS(params);
 
   const [data, setData] = useState(null);
@@ -55,231 +146,63 @@ export default function MeteoDashboard() {
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [lat, lon]);
 
+  const cur = data?.current || {};
+  const days = data ? buildDays(data) : [];
+  const today = days[0];
+  const orageTile = today
+    ? (today.hours.length ? today.hours.reduce((a, h) => maxRisk(a, stormRisk(h.wmoCode, h.cape)), RISK.FAIBLE) : stormRisk(today.code, 0))
+    : RISK.FAIBLE;
+  const pluieTile = today ? rainRisk(today.hours.length ? Math.max(...today.hours.map((h) => h.precipMm)) : today.precipMm) : RISK.FAIBLE;
+  const ventTile = today ? windRisk(today.gustKmh) : RISK.FAIBLE;
+
   return (
-    <div className="min-h-screen px-5" style={{ background: PAGE_BG, paddingTop: 'calc(1.5rem + env(safe-area-inset-top, 0px))', paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}>
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen" style={{ background: '#0f172a', paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="max-w-2xl mx-auto px-4 pt-4">
+        {/* Top bar */}
         <div className="flex items-center justify-between">
-          <Link to="/meteo" className="inline-flex items-center gap-2 text-white/40 hover:text-white/70 text-sm transition-colors">
+          <Link to="/meteo" className="inline-flex items-center gap-2 text-sm transition-colors" style={{ color: '#94a3b8' }}>
             <ArrowLeft className="w-4 h-4" /> Recherche
           </Link>
-          <button onClick={load} className="p-2 rounded-lg text-white/40 hover:text-white/80 transition-colors" title="Actualiser">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        <div className="mt-4 flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-sky-400" />
-          <h1 className="font-display text-3xl text-white tracking-wide leading-none">{name}</h1>
-          {admin && <span className="text-sm text-white/35">· {admin}</span>}
-        </div>
-
-        {loading && (
-          <div className="mt-8 space-y-3">
-            <div className="h-32 skeleton rounded-2xl" />
-            <div className="grid grid-cols-2 gap-3">{[...Array(4)].map((_, i) => <div key={i} className="h-24 skeleton rounded-2xl" />)}</div>
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(`/meteo/detail?type=pluie&${qs}`)} className="text-[13px] font-bold" style={{ color: '#60a5fa' }}>🌧️ Radar</button>
+            <button onClick={() => navigate(`/meteo/detail?type=foudre&${qs}`)} className="text-[13px] font-bold" style={{ color: '#f59e0b' }}>⚡ Foudre</button>
+            <button onClick={load} className="p-1.5" style={{ color: '#94a3b8' }}><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
           </div>
+        </div>
+
+        {/* Hero */}
+        <div className="flex flex-col items-center py-7">
+          {loading ? (
+            <div className="h-20 w-32 skeleton rounded-2xl" />
+          ) : error ? (
+            <p style={{ color: '#ef4444' }} className="text-sm">{error}</p>
+          ) : (
+            <>
+              <p style={{ fontSize: 64, fontWeight: 200, color: '#f1f5f9', letterSpacing: '-2px', lineHeight: 1 }}>{Math.round(cur.temperature_2m)}°C</p>
+              <p style={{ fontSize: 18, color: '#94a3b8', marginTop: 4 }}>{wmo(cur.weather_code).emoji} {wmo(cur.weather_code).label}</p>
+              <p style={{ fontSize: 14, color: '#475569', marginTop: 6 }}>{name} · ressenti {Math.round(cur.apparent_temperature)}°</p>
+            </>
+          )}
+        </div>
+
+        {!loading && !error && data && (
+          <>
+            {/* Risk tiles */}
+            <p className="text-[11px] font-bold tracking-[1.2px] mt-3 mb-2.5" style={{ color: '#475569' }}>RISQUES ACTUELS</p>
+            <div className="flex flex-wrap gap-2.5">
+              <RiskTile icon="⛈️" label="Orage" risk={orageTile} subtitle={`${Math.round(today?.hours?.reduce((m, h) => Math.max(m, h.cape), 0) || 0)} J/kg CAPE`} onClick={() => navigate(`/meteo/detail?type=orage&${qs}`)} />
+              <RiskTile icon="🌧️" label="Pluie" risk={pluieTile} subtitle={`${(today?.precipMm ?? 0).toFixed(1)} mm/j`} onClick={() => navigate(`/meteo/detail?type=pluie&${qs}`)} />
+              <RiskTile icon="💨" label="Vent" risk={ventTile} subtitle={`${today?.windKmh} (↑${today?.gustKmh}) km/h`} onClick={() => navigate(`/meteo/detail?type=vent&${qs}`)} />
+            </div>
+
+            {/* 14-day forecast */}
+            <p className="text-[11px] font-bold tracking-[1.2px] mt-5 mb-2.5" style={{ color: '#475569' }}>PRÉVISIONS 14 JOURS</p>
+            {days.map((day, i) => <DayCard key={day.date} day={day} isToday={i === 0} />)}
+
+            <p className="text-center text-[11px] mt-2" style={{ color: '#334155' }}>Données Open-Meteo · modèle Météo-France</p>
+          </>
         )}
-
-        {error && !loading && (
-          <div className="glass-card p-8 mt-8 text-center space-y-2">
-            <p className="text-3xl">⚠️</p>
-            <p className="text-white/60 font-heading">{error}</p>
-            <button onClick={load} className="btn-ghost mt-2 inline-flex items-center gap-2"><RefreshCw className="w-4 h-4" /> Réessayer</button>
-          </div>
-        )}
-
-        {data && !loading && <Content data={data} qs={qs} />}
       </div>
-    </div>
-  );
-}
-
-function Content({ data, qs }) {
-  const cur = data.current || {};
-  const daily = data.daily || {};
-  const hourly = data.hourly || {};
-  const { label, emoji } = wmo(cur.weather_code);
-  const [openDay, setOpenDay] = useState(0);
-
-  // Per-day max CAPE from hourly, for the storm tile + day rows.
-  const dayCape = (dateStr) => {
-    const times = hourly.time || [];
-    let max = 0;
-    for (let i = 0; i < times.length; i++) {
-      if (times[i].startsWith(dateStr) && hourly.cape?.[i] != null) max = Math.max(max, hourly.cape[i]);
-    }
-    return max;
-  };
-
-  const todayUv = daily.uv_index_max?.[0] ?? 0;
-  const todayGust = daily.wind_gusts_10m_max?.[0] ?? cur.wind_gusts_10m ?? 0;
-  const todayWind = daily.wind_speed_10m_max?.[0] ?? cur.wind_speed_10m ?? 0;
-  const todayRain = daily.precipitation_sum?.[0] ?? 0;
-  const todayCape = dayCape(daily.time?.[0] || '');
-
-  const wRisk = windRisk(todayGust);
-  const rRisk = rainRisk(todayRain);
-  const uRisk = uvRisk(todayUv);
-  const cRisk = capeRisk(todayCape);
-
-  const alerts = [];
-  if (wRisk.label !== 'Faible') alerts.push(`Vent : rafales jusqu'à ${Math.round(todayGust)} km/h`);
-  if (rRisk.label !== 'Faible') alerts.push(`Pluie : ${todayRain.toFixed(1)} mm attendus`);
-  if (uRisk.label !== 'Faible') alerts.push(`UV élevé : indice ${Math.round(todayUv)}`);
-  if (cRisk.label !== 'Faible') alerts.push(`Risque orageux (CAPE ${Math.round(todayCape)} J/kg)`);
-
-  return (
-    <div className="space-y-5 mt-5">
-      {/* Current hero */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-end gap-2">
-              <span className="font-display text-6xl text-white leading-none">{Math.round(cur.temperature_2m)}°</span>
-              <span className="text-5xl leading-none">{emoji}</span>
-            </div>
-            <p className="text-white/70 font-heading font-semibold mt-2">{label}</p>
-            <p className="text-sm text-white/40 mt-0.5">Ressenti {Math.round(cur.apparent_temperature)}°</p>
-          </div>
-          <div className="text-right space-y-1.5 text-sm">
-            <p className="flex items-center justify-end gap-1.5 text-white/55"><Wind className="w-3.5 h-3.5" /> {Math.round(cur.wind_speed_10m)} <span className="text-white/35">({Math.round(cur.wind_gusts_10m)})</span> km/h</p>
-            <p className="flex items-center justify-end gap-1.5 text-white/55"><Droplets className="w-3.5 h-3.5" /> {cur.relative_humidity_2m}%</p>
-            <p className="flex items-center justify-end gap-1.5 text-white/55"><Sun className="w-3.5 h-3.5" /> UV {Math.round(todayUv)}</p>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] p-4 space-y-1.5">
-          <div className="flex items-center gap-2 text-amber-300 font-heading font-bold text-sm">
-            <AlertTriangle className="w-4 h-4" /> Alertes du jour
-          </div>
-          {alerts.map((a, i) => <p key={i} className="text-xs text-amber-200/80 pl-6">• {a}</p>)}
-        </div>
-      )}
-
-      {/* 4 risk tiles → detail screens (Orage / Pluie / Vent / Foudre) */}
-      <div className="grid grid-cols-2 gap-3">
-        <Tile icon={CloudLightning} label="Orage" value={`${Math.round(todayCape)} J/kg`} risk={cRisk} to={`/meteo/detail?type=orage&${qs}`} />
-        <Tile icon={Droplets} label="Pluie" value={`${todayRain.toFixed(1)} mm`} risk={rRisk} to={`/meteo/detail?type=pluie&${qs}`} />
-        <Tile icon={Wind} label="Vent" value={`${Math.round(todayWind)} (${Math.round(todayGust)})`} risk={wRisk} to={`/meteo/detail?type=vent&${qs}`} />
-        <Tile icon={Zap} label="Foudre" value="En direct" risk={cRisk} to={`/meteo/detail?type=foudre&${qs}`} />
-      </div>
-
-      {/* 14-day forecast with per-day hourly drill-down */}
-      {(daily.time || []).length > 0 && (
-        <div className="glass-card overflow-hidden">
-          <p className="text-xs font-heading font-bold uppercase tracking-wider text-white/40 px-4 pt-4 pb-2">14 jours · clique un jour pour le détail heure par heure</p>
-          <div className="divide-y divide-white/[0.04]">
-            {daily.time.map((t, i) => {
-              const d = new Date(t + 'T12:00:00');
-              const dayLabel = i === 0 ? "Aujourd'hui" : `${DAYS_FR[d.getDay()]} ${d.getDate()}`;
-              const { emoji: dEmoji } = wmo(daily.weather_code?.[i]);
-              const tmax = Math.round(daily.temperature_2m_max?.[i]);
-              const tmin = Math.round(daily.temperature_2m_min?.[i]);
-              const prob = daily.precipitation_probability_max?.[i];
-              const gust = Math.round(daily.wind_gusts_10m_max?.[i] ?? 0);
-              const open = openDay === i;
-              return (
-                <div key={t}>
-                  <button onClick={() => setOpenDay(open ? -1 : i)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03] transition-colors text-left">
-                    <span className="text-sm font-heading text-white/70 w-20 capitalize">{dayLabel}</span>
-                    <span className="text-xl w-7 text-center">{dEmoji}</span>
-                    {prob != null && <span className="text-xs text-sky-400/80 font-mono w-9 text-right">{prob > 0 ? `${prob}%` : ''}</span>}
-                    <div className="flex-1" />
-                    <span className="text-sm font-heading text-white/40 w-7 text-right">{tmin}°</span>
-                    <span className="text-sm font-heading font-bold text-white w-7 text-right">{tmax}°</span>
-                    {open ? <ChevronUp className="w-4 h-4 text-white/30" /> : <ChevronDown className="w-4 h-4 text-white/30" />}
-                  </button>
-                  {open && <HourlyDay hourly={hourly} dateStr={t} />}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <p className="text-center text-[11px] text-white/25 font-heading">Données Open-Meteo · modèle Météo-France</p>
-    </div>
-  );
-}
-
-// Hour-by-hour breakdown for one day: sky (emoji + text), temp + feels-like,
-// precip % + mm, wind + gusts, UV, storm risk + severe-storm risk (CAPE).
-function HourlyDay({ hourly, dateStr }) {
-  const times = hourly.time || [];
-  const rows = [];
-  for (let i = 0; i < times.length; i++) {
-    if (!times[i].startsWith(dateStr)) continue;
-    rows.push({
-      h: new Date(times[i]).getHours(),
-      temp: hourly.temperature_2m?.[i],
-      feels: hourly.apparent_temperature?.[i],
-      prob: hourly.precipitation_probability?.[i],
-      mm: hourly.precipitation?.[i],
-      code: hourly.weather_code?.[i],
-      wind: hourly.wind_speed_10m?.[i],
-      gust: hourly.wind_gusts_10m?.[i],
-      uv: hourly.uv_index?.[i],
-      cape: hourly.cape?.[i],
-    });
-  }
-  if (rows.length === 0) {
-    return <div className="bg-dark-900/40 px-4 py-3 text-xs text-white/35 italic">Détail horaire indisponible pour ce jour.</div>;
-  }
-  const r0 = Math.round;
-
-  return (
-    <div className="bg-dark-900/40 px-2.5 py-2.5 space-y-2.5">
-      {rows.map((r) => {
-        const w = wmo(r.code);
-        const orage = capeRisk(r.cape);
-        const violent = severeStormRisk(r.cape ?? 0, r.code);
-        return (
-          <div key={r.h} className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-3">
-            {/* Header: hour · sky · temp */}
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="font-display text-lg text-white/85 w-12 flex-shrink-0">{String(r.h).padStart(2, '0')}h</span>
-                <span className="text-2xl flex-shrink-0">{w.emoji}</span>
-                <span className="text-sm text-white/75 font-heading truncate">{w.label}</span>
-              </div>
-              <div className="text-right flex-shrink-0 leading-none">
-                <span className="font-display text-2xl text-white">{r0(r.temp)}°</span>
-                {r.feels != null && <span className="block text-[11px] text-white/40 mt-1">ressenti {r0(r.feels)}°</span>}
-              </div>
-            </div>
-
-            {/* Metric boxes */}
-            <div className="grid grid-cols-4 gap-1.5">
-              <Metric label="Pluie" value={`${r.prob ?? 0}%`} sub={`${(r.mm ?? 0).toFixed(1)} mm`} valueClass="text-sky-400" />
-              <Metric label="Vent" value={`${r0(r.wind)}`} sub={`raf. ${r0(r.gust)}`} unit="km/h" valueClass="text-white/85" />
-              <Metric label="UV" value={`${r0(r.uv ?? 0)}`} valueClass="text-white/85" />
-              <Metric label="Orage" value={orage.label} valueClass={orage.text} />
-            </div>
-
-            {/* Severe-storm banner only when it actually matters */}
-            {violent.label !== 'Faible' && (
-              <div className={`mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${violent.bg} ${violent.border} border`}>
-                <span>⚡</span>
-                <span className={`text-xs font-heading font-bold ${violent.text}`}>Risque d'orage violent : {violent.label}</span>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function Metric({ label, value, sub, unit, valueClass = 'text-white/85' }) {
-  return (
-    <div className="rounded-lg bg-white/[0.03] px-1.5 py-2 text-center">
-      <p className="text-[9px] uppercase tracking-wider text-white/35 font-heading font-bold mb-0.5">{label}</p>
-      <p className={`text-sm font-heading font-bold leading-none ${valueClass}`}>{value}</p>
-      {unit && <p className="text-[8px] text-white/25 leading-none mt-0.5">{unit}</p>}
-      {sub && <p className="text-[10px] text-white/40 leading-none mt-1">{sub}</p>}
     </div>
   );
 }

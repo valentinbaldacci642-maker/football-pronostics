@@ -7,6 +7,17 @@ import {
 } from '../../services/meteo';
 import MapEmbed from '../../components/meteo/MapEmbed';
 
+function Badge({ risk, children }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-bold border"
+      style={{ backgroundColor: risk.bgHex, borderColor: risk.color, color: risk.color }}
+    >
+      {children}
+    </span>
+  );
+}
+
 const PAGE_BG = 'radial-gradient(1200px 600px at 50% -10%, #0a1628 0%, #050a12 60%)';
 const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
@@ -16,14 +27,6 @@ const TITLES = {
   foudre: 'Foudre en direct',
   vent: 'Vent & rafales',
 };
-
-function Badge({ risk, children }) {
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-heading font-bold border ${risk.border} ${risk.bg} ${risk.text}`}>
-      {children}
-    </span>
-  );
-}
 
 export default function MeteoDetail() {
   const [params] = useSearchParams();
@@ -87,7 +90,7 @@ function OrageView({ lat, lon, data }) {
   const cape = data ? maxCape(data) : 0;
   const code = data?.daily?.weather_code?.[0];
   const risk = capeRisk(cape);
-  const severe = severeStormRisk(cape, code);
+  const severe = severeStormRisk(code);
   return (
     <div className="space-y-4">
       <div className="glass-card p-5 space-y-4">
