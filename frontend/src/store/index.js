@@ -817,6 +817,8 @@ export const useHistoryStore = create(
         let cashouts = 0;
         let totalMise = 0;
         let totalReturn = 0;
+        // Round each ticket's return to the cent like the bookmaker does.
+        const r2 = (x) => Math.round(x * 100) / 100;
         for (const e of all) {
           // Entry-level pick
           if (Number.isFinite(e.mise) && e.mise > 0 && matchesBook(e)) {
@@ -824,14 +826,14 @@ export const useHistoryStore = create(
             if (e.result === 'win') {
               settled += 1; wins += 1;
               totalMise += e.mise;
-              totalReturn += e.mise * parseFloat(e.actualOdd || e.odd || 1);
+              totalReturn += r2(e.mise * parseFloat(e.actualOdd || e.odd || 1));
             } else if (e.result === 'loss') {
               settled += 1; losses += 1;
               totalMise += e.mise;
             } else if (e.result === 'push') {
               settled += 1;
               totalMise += e.mise;
-              totalReturn += e.mise;
+              totalReturn += r2(e.mise);
             }
           }
           // Per-VB stakes (each one a separate bet)
@@ -842,25 +844,25 @@ export const useHistoryStore = create(
             if (bet.result === 'win') {
               settled += 1; wins += 1;
               totalMise += bet.mise;
-              totalReturn += bet.mise * parseFloat(bet.actualOdd || bet.modelOdd || 1);
+              totalReturn += r2(bet.mise * parseFloat(bet.actualOdd || bet.modelOdd || 1));
             } else if (bet.result === 'loss') {
               settled += 1; losses += 1;
               totalMise += bet.mise;
             } else if (bet.result === 'push') {
               settled += 1;
               totalMise += bet.mise;
-              totalReturn += bet.mise;
+              totalReturn += r2(bet.mise);
             } else if (bet.result === 'cashout') {
               // Les cashouts ne comptent pas dans réussite / wins / losses
               // (catégorie à part). Mais leur valeur monétaire impacte le
               // ROI car on encaisse l'argent.
               cashouts += 1;
               totalMise += bet.mise;
-              totalReturn += Number.isFinite(bet.cashoutReturn) ? bet.cashoutReturn : 0;
+              totalReturn += r2(Number.isFinite(bet.cashoutReturn) ? bet.cashoutReturn : 0);
             }
           }
         }
-        const pnl = totalReturn - totalMise;
+        const pnl = r2(totalReturn - totalMise);
         const rate = settled > 0 ? Math.round((wins / settled) * 100) : null;
         return {
           total,
@@ -893,19 +895,24 @@ export const useHistoryStore = create(
         let settledCount = 0;
         let pendingCount = 0;
 
+        // Bookmakers settle each ticket rounded to the cent. We round every
+        // bet's return the same way so the running bankroll matches the real
+        // balance instead of drifting by sub-cent fractions across many bets.
+        const r2 = (x) => Math.round(x * 100) / 100;
+
         for (const e of all) {
           // Entry-level
           if (Number.isFinite(e.mise) && e.mise > 0 && matchesBook(e)) {
             if (e.result === 'win') {
               totalMise += e.mise;
-              totalReturn += e.mise * parseFloat(e.actualOdd || e.odd || 1);
+              totalReturn += r2(e.mise * parseFloat(e.actualOdd || e.odd || 1));
               settledCount++;
             } else if (e.result === 'loss') {
               totalMise += e.mise;
               settledCount++;
             } else if (e.result === 'push') {
               totalMise += e.mise;
-              totalReturn += e.mise; // stake returned
+              totalReturn += r2(e.mise); // stake returned
               settledCount++;
             } else {
               pendingCommitted += e.mise;
@@ -922,21 +929,21 @@ export const useHistoryStore = create(
               // a winning per-VB bet where user skipped "Ma cote" was counted
               // as push (return = stake, profit = 0) → bankroll sous-évaluée.
               totalMise += bet.mise;
-              totalReturn += bet.mise * parseFloat(bet.actualOdd || bet.modelOdd || 1);
+              totalReturn += r2(bet.mise * parseFloat(bet.actualOdd || bet.modelOdd || 1));
               settledCount++;
             } else if (bet.result === 'loss') {
               totalMise += bet.mise;
               settledCount++;
             } else if (bet.result === 'push') {
               totalMise += bet.mise;
-              totalReturn += bet.mise;
+              totalReturn += r2(bet.mise);
               settledCount++;
             } else if (bet.result === 'cashout') {
               // Cashout: l'utilisateur a cash-out à un montant donné.
               // totalReturn = cashoutReturn (ce que le bookmaker a payé).
               // Le PnL = cashoutReturn - mise, peut être positif ou négatif.
               totalMise += bet.mise;
-              totalReturn += Number.isFinite(bet.cashoutReturn) ? bet.cashoutReturn : 0;
+              totalReturn += r2(Number.isFinite(bet.cashoutReturn) ? bet.cashoutReturn : 0);
               settledCount++;
             } else {
               pendingCommitted += bet.mise;
@@ -944,7 +951,10 @@ export const useHistoryStore = create(
             }
           }
         }
-        const pnl = totalReturn - totalMise;
+        totalMise = r2(totalMise);
+        totalReturn = r2(totalReturn);
+        pendingCommitted = r2(pendingCommitted);
+        const pnl = r2(totalReturn - totalMise);
 
         const roi = totalMise > 0 ? parseFloat((pnl / totalMise * 100).toFixed(1)) : null;
         return {
