@@ -45,33 +45,40 @@ function overlayArrays(dst, src, keys) {
 }
 
 // ─── Forecast ─────────────────────────────────────────────────────────────────
-// best_match gives a full 14-day range of every field (UV, precip prob, CAPE…)
-// but its near-term temperatures can diverge ~2-3°C from Météo-France. So we
-// also pull the Météo-France model (accurate but only ~4 days, no UV/prob) and
-// overlay its temperature/sky/wind/precip over the best_match data where
-// available — best of both: accurate short term + full 14-day coverage.
+// Three sources merged for the best possible result:
+//   • ECMWF IFS (base, 14 days): the best medium-range global model — temp,
+//     precip, precip-probability, wind+gusts, CAPE. (No UV.)
+//   • best_match: only used to fill UV (ECMWF doesn't output it).
+//   • Météo-France (AROME/ARPEGE seamless, ~4 days): overlaid on the near
+//     term for phone-accurate temps/sky/wind/precip.
 export async function getForecast(lat, lon) {
   const common = { latitude: lat, longitude: lon, timezone: 'auto', forecast_days: 14 };
-  const [bmRes, mfRes] = await Promise.all([
+  const [ecmwfRes, uvRes, mfRes] = await Promise.all([
     axios.get(FORECAST_URL, {
       params: {
         ...common,
+        models: 'ecmwf_ifs025',
         current: [
           'temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'is_day',
           'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m',
         ].join(','),
         hourly: [
           'temperature_2m', 'apparent_temperature', 'precipitation_probability', 'precipitation',
-          'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'uv_index', 'cape',
+          'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'cape',
         ].join(','),
         daily: [
           'weather_code', 'temperature_2m_max', 'temperature_2m_min',
           'precipitation_sum', 'precipitation_probability_max',
-          'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'uv_index_max',
+          'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant',
           'sunrise', 'sunset',
         ].join(','),
       },
     }),
+    // UV only — ECMWF has none, so pull it from best_match.
+    axios.get(FORECAST_URL, {
+      params: { ...common, hourly: 'uv_index', daily: 'uv_index_max' },
+    }).catch(() => null),
+    // Météo-France accurate near-term overlay.
     axios.get(MF_URL, {
       params: {
         ...common,
@@ -82,10 +89,18 @@ export async function getForecast(lat, lon) {
     }).catch(() => null),
   ]);
 
-  const data = bmRes.data;
+  const data = ecmwfRes.data;
+
+  // Splice UV from best_match into the ECMWF base.
+  const uv = uvRes?.data;
+  if (uv) {
+    if (data.hourly && uv.hourly) data.hourly.uv_index = uv.hourly.uv_index;
+    if (data.daily && uv.daily) data.daily.uv_index_max = uv.daily.uv_index_max;
+  }
+
+  // Overlay Météo-France for the trusted near term.
   const mf = mfRes?.data;
   if (mf) {
-    // Current: Météo-France is the trusted source for "right now".
     if (mf.current?.temperature_2m != null) {
       for (const k of ['temperature_2m', 'apparent_temperature', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'relative_humidity_2m', 'precipitation']) {
         if (mf.current[k] != null) data.current[k] = mf.current[k];
