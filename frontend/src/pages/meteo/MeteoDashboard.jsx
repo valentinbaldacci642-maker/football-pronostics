@@ -231,40 +231,55 @@ function HourlyDay({ hourly, dateStr }) {
   const r0 = Math.round;
 
   return (
-    <div className="bg-dark-900/40 px-2 py-2 space-y-1.5">
-      {/* Legend — clarify what % and mm mean */}
-      <p className="text-[10px] text-white/30 font-heading px-1">
-        🌧️ <span className="text-sky-400/80">%</span> = probabilité · <span className="text-white/45">mm</span> = quantité · 💨 vent (rafales) · ⛈️ orage / ⚡ violent
-      </p>
+    <div className="bg-dark-900/40 px-2.5 py-2.5 space-y-2.5">
       {rows.map((r) => {
         const w = wmo(r.code);
         const orage = capeRisk(r.cape);
         const violent = severeStormRisk(r.cape ?? 0, r.code);
         return (
-          <div key={r.h} className="rounded-lg bg-white/[0.02] px-3 py-2">
-            {/* Line 1: hour · sky · temp (feels) */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="font-mono text-white/55 text-xs w-9 flex-shrink-0">{String(r.h).padStart(2, '0')}h</span>
-                <span className="flex-shrink-0">{w.emoji}</span>
-                <span className="text-white/70 text-xs truncate">{w.label}</span>
+          <div key={r.h} className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-3">
+            {/* Header: hour · sky · temp */}
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="font-display text-lg text-white/85 w-12 flex-shrink-0">{String(r.h).padStart(2, '0')}h</span>
+                <span className="text-2xl flex-shrink-0">{w.emoji}</span>
+                <span className="text-sm text-white/75 font-heading truncate">{w.label}</span>
               </div>
-              <div className="font-mono text-sm flex-shrink-0">
-                <span className="text-white/90">{r0(r.temp)}°</span>
-                {r.feels != null && <span className="text-white/35 ml-1 text-xs">({r0(r.feels)}°)</span>}
+              <div className="text-right flex-shrink-0 leading-none">
+                <span className="font-display text-2xl text-white">{r0(r.temp)}°</span>
+                {r.feels != null && <span className="block text-[11px] text-white/40 mt-1">ressenti {r0(r.feels)}°</span>}
               </div>
             </div>
-            {/* Line 2: rain · wind · UV · storm */}
-            <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] font-mono flex-wrap">
-              <span className="text-sky-400">🌧️ {r.prob ?? 0}% · {(r.mm ?? 0).toFixed(1)}mm</span>
-              <span className="text-white/50">💨 {r0(r.wind)} ({r0(r.gust)})</span>
-              <span className="text-white/50">UV {r0(r.uv ?? 0)}</span>
-              <span className={orage.text}>⛈️ {orage.label}</span>
-              {violent.label !== 'Faible' && <span className={`${violent.text} font-bold`}>⚡ {violent.label}</span>}
+
+            {/* Metric boxes */}
+            <div className="grid grid-cols-4 gap-1.5">
+              <Metric label="Pluie" value={`${r.prob ?? 0}%`} sub={`${(r.mm ?? 0).toFixed(1)} mm`} valueClass="text-sky-400" />
+              <Metric label="Vent" value={`${r0(r.wind)}`} sub={`raf. ${r0(r.gust)}`} unit="km/h" valueClass="text-white/85" />
+              <Metric label="UV" value={`${r0(r.uv ?? 0)}`} valueClass="text-white/85" />
+              <Metric label="Orage" value={orage.label} valueClass={orage.text} />
             </div>
+
+            {/* Severe-storm banner only when it actually matters */}
+            {violent.label !== 'Faible' && (
+              <div className={`mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${violent.bg} ${violent.border} border`}>
+                <span>⚡</span>
+                <span className={`text-xs font-heading font-bold ${violent.text}`}>Risque d'orage violent : {violent.label}</span>
+              </div>
+            )}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function Metric({ label, value, sub, unit, valueClass = 'text-white/85' }) {
+  return (
+    <div className="rounded-lg bg-white/[0.03] px-1.5 py-2 text-center">
+      <p className="text-[9px] uppercase tracking-wider text-white/35 font-heading font-bold mb-0.5">{label}</p>
+      <p className={`text-sm font-heading font-bold leading-none ${valueClass}`}>{value}</p>
+      {unit && <p className="text-[8px] text-white/25 leading-none mt-0.5">{unit}</p>}
+      {sub && <p className="text-[10px] text-white/40 leading-none mt-1">{sub}</p>}
     </div>
   );
 }
