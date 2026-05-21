@@ -352,8 +352,8 @@ export default function MeteoDashboard() {
 
             {/* Forecast table (compact, left) + big live city maps 2x2 (right) */}
             <div className="mt-7 lg:grid lg:grid-cols-[1fr_2fr] lg:gap-6 lg:items-start">
-              {/* Left — 14-day forecast table */}
-              <div>
+              {/* Left — 14-day forecast table (stays in place while scrolling the maps) */}
+              <div className="lg:sticky lg:top-3 lg:self-start lg:max-h-[calc(100vh-1.5rem)] lg:overflow-y-auto no-scrollbar">
                 <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">PRÉVISIONS 14 JOURS</p>
                 <ForecastTable days={days} tempUnit={tempUnit} windUnit={windUnit} />
               </div>
