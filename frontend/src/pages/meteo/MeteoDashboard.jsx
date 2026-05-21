@@ -265,7 +265,7 @@ function HourlyDay({ hourly, dateStr }) {
                 </td>
                 <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">
                   <span className="text-sky-400">{r.prob ?? 0}%</span>
-                  {r.mm > 0 && <span className="text-white/40 ml-1">{r.mm.toFixed(1)}</span>}
+                  <span className="text-white/40 ml-1">{(r.mm ?? 0).toFixed(1)}mm</span>
                 </td>
                 <td className="py-1.5 px-2 text-right text-white/55 font-mono whitespace-nowrap">
                   {r0(r.wind)} <span className="text-white/30">({r0(r.gust)})</span>

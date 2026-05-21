@@ -151,10 +151,10 @@ function PluieView({ lat, lon, data }) {
           <p className="text-xs font-heading font-bold uppercase tracking-wider text-white/40 mb-3">Aujourd'hui · heure par heure</p>
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             {hourRows.map((r) => (
-              <div key={r.h} className="flex flex-col items-center gap-1 flex-shrink-0 w-11">
+              <div key={r.h} className="flex flex-col items-center gap-1 flex-shrink-0 w-14">
                 <span className="text-[10px] text-white/40 font-mono">{r.h}h</span>
                 <span className="text-xs text-sky-400 font-mono">{r.prob ?? 0}%</span>
-                <span className="text-[10px] text-white/40 font-mono">{(r.mm ?? 0).toFixed(1)}</span>
+                <span className="text-[10px] text-white/45 font-mono">{(r.mm ?? 0).toFixed(1)}mm</span>
               </div>
             ))}
           </div>
