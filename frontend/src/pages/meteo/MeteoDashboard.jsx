@@ -17,6 +17,11 @@ function fmtDate(dateStr) {
   return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]}`;
 }
 
+function fmtDateShort(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return `${DAYS_FR[d.getDay()]} ${d.getDate()}`;
+}
+
 // Atmosphere that reacts to the current sky — committing to a premium,
 // weather-driven look instead of a flat background.
 function skyTheme(code, isDay) {
@@ -79,10 +84,10 @@ function HourRow({ h }) {
   const orage = stormRisk(h.wmoCode, h.cape);
   const violent = severeStormRisk(h.wmoCode);
   return (
-    <div className="flex items-start gap-2 py-1.5 border-t border-white/[0.06]">
-      <span className="text-xs font-mono w-8 flex-shrink-0 pt-0.5 text-white/40">{String(h.hour).padStart(2, '0')}h</span>
+    <div className="flex items-center gap-2 min-h-[46px] py-1.5 border-t border-white/[0.06]">
+      <span className="text-xs font-mono w-8 flex-shrink-0 text-white/40">{String(h.hour).padStart(2, '0')}h</span>
       <span className="text-base w-6 flex-shrink-0 text-center">{wmo(h.wmoCode).emoji}</span>
-      <div className="w-11 flex-shrink-0">
+      <div className="w-11 flex-shrink-0 leading-tight">
         <span className="text-[13px] font-bold" style={{ color: tempColor(h.tempC) }}>{h.tempC}°</span>
         {h.feelsLikeC !== h.tempC && <span className="block text-[10px] text-white/35">{h.feelsLikeC}°</span>}
       </div>
@@ -90,8 +95,8 @@ function HourRow({ h }) {
         <InfoBadge icon="💨" risk={gust} text={`${h.windKmh} (↑${h.gustKmh}) ${dirToCompass(h.windDir)}`} />
         <InfoBadge icon="🌧️" risk={precip} text={`${h.precipMm.toFixed(1)}mm · ${h.precipProb}%`} />
         {h.uvIndex >= 3 && <InfoBadge icon="☀️" risk={uvRisk(h.uvIndex)} text={`UV ${h.uvIndex}`} />}
-        {orage.key !== 'FAIBLE' && <InfoBadge icon="⛈️" risk={orage} text={orageText(orage)} />}
-        {violent.key !== 'FAIBLE' && <InfoBadge icon="🌩️" risk={violent} text={violentText(violent)} />}
+        <InfoBadge icon="⛈️" risk={orage} text={orageText(orage)} />
+        <InfoBadge icon="🌩️" risk={violent} text={violentText(violent)} />
       </div>
     </div>
   );
@@ -127,31 +132,31 @@ function ForecastRow({ day, isToday }) {
   return (
     <>
       <tr onClick={() => setExpanded((e) => !e)} className="cursor-pointer border-t border-white/[0.06] hover:bg-white/[0.04] transition-colors align-middle">
-        <td className="pl-2.5 pr-1.5 py-1.5 relative">
+        <td className="pl-2.5 pr-1 py-1.5 relative whitespace-nowrap">
           <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full" style={{ background: top.color, opacity: 0.85 }} />
           <span className="font-heading font-bold capitalize text-[13px]" style={{ color: isToday ? '#7dd3fc' : '#e2e8f0' }}>
-            {isToday ? "Auj." : fmtDate(day.date)}
+            {isToday ? "Auj." : fmtDateShort(day.date)}
           </span>
         </td>
-        <td className="px-1.5 text-center text-base" title={day.desc}>{day.emoji}</td>
-        <td className="px-1.5 text-right whitespace-nowrap">
+        <td className="px-1 text-center text-base" title={day.desc}>{day.emoji}</td>
+        <td className="px-1 text-right whitespace-nowrap">
           <span className="font-display text-[15px]" style={{ color: tempColor(day.tempMax) }}>{day.tempMax}°</span>
           <span className="text-[11px] ml-0.5" style={{ color: tempColor(day.tempMin), opacity: 0.85 }}>{day.tempMin}°</span>
         </td>
-        <td className="px-1.5 text-right whitespace-nowrap">
+        <td className="px-1 text-right whitespace-nowrap">
           <span className="font-semibold text-[13px]" style={{ color: windR.color }}>{day.windKmh}</span>
           <span className="text-white/40 text-[11px]"> ↑{day.gustKmh}</span>
-          <span className="text-white/35 text-[10px] ml-0.5">km/h {dirToCompass(day.windDir)}</span>
+          <span className="text-white/35 text-[10px] ml-0.5">{dirToCompass(day.windDir)}</span>
         </td>
-        <td className="px-1.5 text-right whitespace-nowrap">
+        <td className="px-1 text-right whitespace-nowrap">
           <span className="font-semibold text-[13px]" style={{ color: precipR.color }}>{day.precipProb}%</span>
           <span className="text-white/45 text-[11px] ml-0.5">{day.precipMm.toFixed(1)}mm</span>
         </td>
-        <td className="px-1.5 text-center">
+        <td className="px-1 text-center">
           <span className="font-semibold text-[13px]" style={{ color: uvRisk(day.uvMax).color }}>{day.uvMax}</span>
         </td>
-        <td className="pr-2.5 pl-1.5 py-1.5 text-right">
-          <Pill risk={orageR}>{showViolent ? `⚡ ${violentR.label}` : orageText(orageR)}</Pill>
+        <td className="pr-2.5 pl-1 py-1.5 text-right">
+          <Pill risk={orageR}>{showViolent ? `⚡ ${violentR.label}` : (orageR.key === 'FAIBLE' ? '—' : orageR.label)}</Pill>
         </td>
       </tr>
       {expanded && day.hours.length > 0 && (
@@ -178,8 +183,8 @@ function ForecastTable({ days }) {
             <th className="text-left pl-2.5 pr-1.5 py-2 font-bold">Jour</th>
             <th className="px-1.5 py-2 font-bold">Ciel</th>
             <th className="px-1.5 py-2 text-right font-bold">Temp.</th>
-            <th className="px-1.5 py-2 text-right font-bold">Vent km/h</th>
-            <th className="px-1.5 py-2 text-right font-bold">Pluie</th>
+            <th className="px-1 py-2 text-right font-bold">Vent km/h</th>
+            <th className="px-1 py-2 text-right font-bold">Pluie</th>
             <th className="px-1.5 py-2 text-center font-bold">UV</th>
             <th className="pr-2.5 pl-1.5 py-2 text-right font-bold">Orage</th>
           </tr>
@@ -309,7 +314,7 @@ export default function MeteoDashboard() {
             </motion.div>
 
             {/* Forecast table (compact, left) + big live city maps 2x2 (right) */}
-            <div className="mt-7 lg:grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:gap-6 lg:items-start">
+            <div className="mt-7 lg:grid lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] lg:gap-6 lg:items-start">
               {/* Left — 14-day forecast table */}
               <div>
                 <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">PRÉVISIONS 14 JOURS</p>
