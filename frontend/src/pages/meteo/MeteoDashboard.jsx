@@ -395,15 +395,15 @@ export default function MeteoDashboard() {
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Impacts foudre</span></div>
                     <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={mapSize} note="Blitzortung · live" />
                   </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
+                  <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-blue-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Pluie HD · Meteociel</span></div>
                     <MapEmbed src={METEOCIEL_RAIN_HD} height={mapSize} canvasCrop={{ x: 667, y: 345, size: 768, frameW: 1900 }} note="Meteociel · plein écran" />
                   </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
+                  <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige · Meteociel</span></div>
                     <MapEmbed src={METEOCIEL_SNOW} height={mapSize} canvasCrop={{ x: 667, y: 345, size: 768, frameW: 1900 }} note="Meteociel · plein écran" />
                   </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
+                  <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-yellow-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Foudre en direct · Meteociel</span></div>
                     <MapEmbed src={METEOCIEL_FOUDRE} height={mapSize} canvasCrop={{ x: 648, y: 322, size: 768, frameW: 1900 }} note="Meteociel · plein écran" />
                   </div>
