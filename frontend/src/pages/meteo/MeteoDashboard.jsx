@@ -228,7 +228,7 @@ export default function MeteoDashboard() {
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full blur-3xl" style={{ background: sky.glow }} />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
+      <div className="relative w-full px-4 sm:px-5" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
         {/* Top bar */}
         <div className="flex items-center justify-between">
           <Link to="/meteo" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
