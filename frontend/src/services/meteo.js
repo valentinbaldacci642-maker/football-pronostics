@@ -224,6 +224,26 @@ export function dirToCompass(deg) {
   return COMPASS[Math.round(((deg % 360) / 45)) % 8];
 }
 
+// Meteociel-style temperature colour scale: cold = violet/blue, mild =
+// green/yellow, hot = orange/red, extreme = crimson.
+export function tempColor(t) {
+  if (t == null || Number.isNaN(t)) return '#94a3b8';
+  if (t <= -10) return '#7c3aed';
+  if (t <= -5) return '#4f46e5';
+  if (t <= 0) return '#2563eb';
+  if (t <= 4) return '#0ea5e9';
+  if (t <= 8) return '#06b6d4';
+  if (t <= 12) return '#14b8a6';
+  if (t <= 15) return '#22c55e';
+  if (t <= 18) return '#84cc16';
+  if (t <= 21) return '#eab308';
+  if (t <= 24) return '#f59e0b';
+  if (t <= 28) return '#f97316';
+  if (t <= 32) return '#ef4444';
+  if (t <= 36) return '#dc2626';
+  return '#be123c';
+}
+
 // ─── Live-map embed URLs (all iframe-friendly, no key) ───────────────────────
 // RainViewer animated rain radar centred on the city.
 export function rainviewerUrl(lat, lon, zoom = 8) {

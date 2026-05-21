@@ -1,21 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap } from 'lucide-react';
 import {
   getForecast, wmo, windRisk, rainRisk, uvRisk, stormRisk, severeStormRisk, maxRisk,
-  dirToCompass, RISK,
+  dirToCompass, RISK, windyUrl, blitzortungUrl, tempColor,
 } from '../../services/meteo';
 import { InfoBadge, orageText, violentText } from '../../components/meteo/RiskUI';
+import MapEmbed from '../../components/meteo/MapEmbed';
 
 const DAYS_FR = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
-function cityQS(params) {
-  const q = new URLSearchParams();
-  ['lat', 'lon', 'name', 'admin'].forEach((k) => { if (params.get(k)) q.set(k, params.get(k)); });
-  return q.toString();
-}
 function fmtDate(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
   return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]}`;
@@ -87,7 +83,7 @@ function HourRow({ h }) {
       <span className="text-xs font-mono w-8 flex-shrink-0 pt-0.5 text-white/40">{String(h.hour).padStart(2, '0')}h</span>
       <span className="text-base w-6 flex-shrink-0 text-center">{wmo(h.wmoCode).emoji}</span>
       <div className="w-11 flex-shrink-0">
-        <span className="text-[13px] font-semibold text-white/85">{h.tempC}°</span>
+        <span className="text-[13px] font-bold" style={{ color: tempColor(h.tempC) }}>{h.tempC}°</span>
         {h.feelsLikeC !== h.tempC && <span className="block text-[10px] text-white/35">{h.feelsLikeC}°</span>}
       </div>
       <div className="flex-1 flex flex-wrap gap-1">
@@ -140,8 +136,8 @@ function DayCard({ day, isToday, index }) {
           </div>
           <div className="text-right flex-shrink-0">
             <p className="font-display text-lg leading-none">
-              <span className="text-white">{day.tempMax}°</span>
-              <span className="text-white/35 text-sm ml-1.5">{day.tempMin}°</span>
+              <span style={{ color: tempColor(day.tempMax) }}>{day.tempMax}°</span>
+              <span className="text-sm ml-1.5" style={{ color: tempColor(day.tempMin), opacity: 0.85 }}>{day.tempMin}°</span>
             </p>
             <span className="text-[10px] text-white/30">{expanded ? '▲ moins' : '▼ heures'}</span>
           </div>
@@ -173,11 +169,10 @@ function QuickStat({ icon: Icon, label, value }) {
   );
 }
 
-function BigTile({ icon: Icon, label, risk, value, sub, onClick }) {
+function BigTile({ icon: Icon, label, risk, value, sub }) {
   return (
-    <button
-      onClick={onClick}
-      className="group relative rounded-2xl p-4 text-left overflow-hidden transition-transform active:scale-[0.98] hover:-translate-y-0.5"
+    <div
+      className="relative rounded-2xl p-4 overflow-hidden"
       style={{
         background: `linear-gradient(160deg, ${risk.color}26 0%, ${risk.color}0d 60%, rgba(255,255,255,0.02) 100%)`,
         border: `1px solid ${risk.color}55`,
@@ -193,18 +188,16 @@ function BigTile({ icon: Icon, label, risk, value, sub, onClick }) {
       <p className="text-sm font-heading font-semibold text-white/80">{label}</p>
       <p className="font-display text-xl text-white mt-0.5">{value}</p>
       {sub && <p className="text-[11px] mt-0.5" style={{ color: risk.color }}>{sub}</p>}
-    </button>
+    </div>
   );
 }
 
 export default function MeteoDashboard() {
   const [params] = useSearchParams();
-  const navigate = useNavigate();
   const lat = parseFloat(params.get('lat'));
   const lon = parseFloat(params.get('lon'));
   const name = params.get('name') || 'Ville';
   const admin = params.get('admin') || '';
-  const qs = cityQS(params);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -235,17 +228,13 @@ export default function MeteoDashboard() {
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full blur-3xl" style={{ background: sky.glow }} />
       </div>
 
-      <div className="relative max-w-5xl mx-auto px-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
+      <div className="relative max-w-6xl mx-auto px-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
         {/* Top bar */}
         <div className="flex items-center justify-between">
           <Link to="/meteo" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" /> Recherche
           </Link>
-          <div className="flex items-center gap-1">
-            <button onClick={() => navigate(`/meteo/detail?type=pluie&${qs}`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-heading font-semibold text-sky-300 hover:bg-white/[0.06] transition-colors"><CloudRain className="w-3.5 h-3.5" />Radar</button>
-            <button onClick={() => navigate(`/meteo/detail?type=foudre&${qs}`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-heading font-semibold text-amber-300 hover:bg-white/[0.06] transition-colors"><Zap className="w-3.5 h-3.5" />Foudre</button>
-            <button onClick={load} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
-          </div>
+          <button onClick={load} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
         </div>
 
         {/* Hero */}
@@ -258,7 +247,7 @@ export default function MeteoDashboard() {
             <>
               <p className="text-xs uppercase tracking-[3px] text-white/50 font-heading mb-1">{name}{admin ? ` · ${admin}` : ''}</p>
               <div className="text-7xl sm:text-8xl leading-none mb-2" style={{ filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.4))' }}>{emoji}</div>
-              <p className="font-display text-white leading-none" style={{ fontSize: 'clamp(64px, 14vw, 104px)', fontWeight: 200, letterSpacing: '-3px' }}>{Math.round(cur.temperature_2m)}°</p>
+              <p className="font-display leading-none" style={{ fontSize: 'clamp(64px, 14vw, 104px)', fontWeight: 200, letterSpacing: '-3px', color: tempColor(Math.round(cur.temperature_2m)) }}>{Math.round(cur.temperature_2m)}°</p>
               <p className="text-lg text-white/75 font-heading mt-1">{label}</p>
             </>
           )}
@@ -278,16 +267,40 @@ export default function MeteoDashboard() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
               <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">RISQUES DU JOUR</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <BigTile icon={Zap} label="Orage" risk={orageTile} value={orageText(orageTile)} sub={`${Math.round(todayCape)} J/kg CAPE`} onClick={() => navigate(`/meteo/detail?type=orage&${qs}`)} />
-                <BigTile icon={CloudRain} label="Pluie" risk={pluieTile} value={`${(today?.precipMm ?? 0).toFixed(1)} mm`} sub={`${today?.precipProb ?? 0}% de probabilité`} onClick={() => navigate(`/meteo/detail?type=pluie&${qs}`)} />
-                <BigTile icon={Wind} label="Vent" risk={ventTile} value={`${today?.windKmh} km/h`} sub={`rafales ${today?.gustKmh} km/h`} onClick={() => navigate(`/meteo/detail?type=vent&${qs}`)} />
+                <BigTile icon={Zap} label="Orage" risk={orageTile} value={orageText(orageTile)} sub={`${Math.round(todayCape)} J/kg CAPE`} />
+                <BigTile icon={CloudRain} label="Pluie" risk={pluieTile} value={`${(today?.precipMm ?? 0).toFixed(1)} mm`} sub={`${today?.precipProb ?? 0}% de probabilité`} />
+                <BigTile icon={Wind} label="Vent" risk={ventTile} value={`${today?.windKmh} km/h`} sub={`rafales ${today?.gustKmh} km/h`} />
               </div>
             </motion.div>
 
-            {/* 14-day forecast — 2 columns on desktop to use the width */}
-            <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5 mt-7">PRÉVISIONS 14 JOURS</p>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-              {days.map((day, i) => <DayCard key={day.date} day={day} isToday={i === 0} index={i} />)}
+            {/* Forecast (left) + live city maps (right, sticky) */}
+            <div className="mt-7 lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:items-start">
+              {/* Left — 14-day forecast */}
+              <div>
+                <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">PRÉVISIONS 14 JOURS</p>
+                <div className="space-y-3">
+                  {days.map((day, i) => <DayCard key={day.date} day={day} isToday={i === 0} index={i} />)}
+                </div>
+              </div>
+
+              {/* Right — live maps centred on the city */}
+              <div className="mt-8 lg:mt-0">
+                <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">EN DIRECT · {name.toUpperCase()}</p>
+                <div className="lg:sticky lg:top-4 space-y-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5 px-1 text-sky-300"><CloudRain className="w-3.5 h-3.5" /><span className="text-[11px] font-heading font-bold uppercase tracking-wider">Radar pluie</span></div>
+                    <MapEmbed src={windyUrl(lat, lon, 'rain', 8)} height={240} note="Windy · live" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5 px-1 text-emerald-300"><Wind className="w-3.5 h-3.5" /><span className="text-[11px] font-heading font-bold uppercase tracking-wider">Vent</span></div>
+                    <MapEmbed src={windyUrl(lat, lon, 'wind', 8)} height={240} note="Windy · live" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5 px-1 text-amber-300"><Zap className="w-3.5 h-3.5" /><span className="text-[11px] font-heading font-bold uppercase tracking-wider">Impacts foudre</span></div>
+                    <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={240} note="Blitzortung · live" />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <p className="text-center text-[11px] mt-6 text-white/30">
