@@ -231,53 +231,40 @@ function HourlyDay({ hourly, dateStr }) {
   const r0 = Math.round;
 
   return (
-    <div className="bg-dark-900/40 px-2 py-1 overflow-x-auto">
-      <table className="w-full text-xs min-w-[620px]">
-        <thead>
-          <tr className="text-white/30 font-heading">
-            <th className="text-left py-1.5 px-2 font-semibold">H</th>
-            <th className="text-left py-1.5 px-2 font-semibold">Ciel</th>
-            <th className="text-right py-1.5 px-2 font-semibold">Temp</th>
-            <th className="text-right py-1.5 px-2 font-semibold">Pluie</th>
-            <th className="text-right py-1.5 px-2 font-semibold">Vent</th>
-            <th className="text-center py-1.5 px-2 font-semibold">UV</th>
-            <th className="text-center py-1.5 px-2 font-semibold">Orage</th>
-            <th className="text-center py-1.5 px-2 font-semibold">Violent</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => {
-            const w = wmo(r.code);
-            const orage = capeRisk(r.cape);
-            const violent = severeStormRisk(r.cape ?? 0, r.code);
-            return (
-              <tr key={r.h} className="border-t border-white/[0.03]">
-                <td className="py-1.5 px-2 text-white/55 font-mono whitespace-nowrap">{String(r.h).padStart(2, '0')}h</td>
-                <td className="py-1.5 px-2">
-                  <span className="flex items-center gap-1.5">
-                    <span>{w.emoji}</span>
-                    <span className="text-white/70 whitespace-nowrap">{w.label}</span>
-                  </span>
-                </td>
-                <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">
-                  <span className="text-white/85">{r0(r.temp)}°</span>
-                  {r.feels != null && <span className="text-white/35 ml-1">({r0(r.feels)}°)</span>}
-                </td>
-                <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">
-                  <span className="text-sky-400">{r.prob ?? 0}%</span>
-                  <span className="text-white/40 ml-1">{(r.mm ?? 0).toFixed(1)}mm</span>
-                </td>
-                <td className="py-1.5 px-2 text-right text-white/55 font-mono whitespace-nowrap">
-                  {r0(r.wind)} <span className="text-white/30">({r0(r.gust)})</span>
-                </td>
-                <td className="py-1.5 px-2 text-center text-white/55 font-mono">{r0(r.uv ?? 0)}</td>
-                <td className="py-1.5 px-2 text-center"><span className={`font-heading font-semibold ${orage.text}`}>{orage.label}</span></td>
-                <td className="py-1.5 px-2 text-center"><span className={`font-heading font-semibold ${violent.text}`}>{violent.label}</span></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="bg-dark-900/40 px-2 py-2 space-y-1.5">
+      {/* Legend — clarify what % and mm mean */}
+      <p className="text-[10px] text-white/30 font-heading px-1">
+        🌧️ <span className="text-sky-400/80">%</span> = probabilité · <span className="text-white/45">mm</span> = quantité · 💨 vent (rafales) · ⛈️ orage / ⚡ violent
+      </p>
+      {rows.map((r) => {
+        const w = wmo(r.code);
+        const orage = capeRisk(r.cape);
+        const violent = severeStormRisk(r.cape ?? 0, r.code);
+        return (
+          <div key={r.h} className="rounded-lg bg-white/[0.02] px-3 py-2">
+            {/* Line 1: hour · sky · temp (feels) */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-mono text-white/55 text-xs w-9 flex-shrink-0">{String(r.h).padStart(2, '0')}h</span>
+                <span className="flex-shrink-0">{w.emoji}</span>
+                <span className="text-white/70 text-xs truncate">{w.label}</span>
+              </div>
+              <div className="font-mono text-sm flex-shrink-0">
+                <span className="text-white/90">{r0(r.temp)}°</span>
+                {r.feels != null && <span className="text-white/35 ml-1 text-xs">({r0(r.feels)}°)</span>}
+              </div>
+            </div>
+            {/* Line 2: rain · wind · UV · storm */}
+            <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] font-mono flex-wrap">
+              <span className="text-sky-400">🌧️ {r.prob ?? 0}% · {(r.mm ?? 0).toFixed(1)}mm</span>
+              <span className="text-white/50">💨 {r0(r.wind)} ({r0(r.gust)})</span>
+              <span className="text-white/50">UV {r0(r.uv ?? 0)}</span>
+              <span className={orage.text}>⛈️ {orage.label}</span>
+              {violent.label !== 'Faible' && <span className={`${violent.text} font-bold`}>⚡ {violent.label}</span>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
