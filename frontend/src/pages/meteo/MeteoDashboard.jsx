@@ -271,8 +271,10 @@ export default function MeteoDashboard() {
   const [error, setError] = useState(null);
   const [tempUnit, setTempUnit] = useState(() => localStorage.getItem('meteo_tempUnit') || 'C');
   const [windUnit, setWindUnit] = useState(() => localStorage.getItem('meteo_windUnit') || 'kmh');
+  const [mapSize, setMapSize] = useState(() => Number(localStorage.getItem('meteo_mapSize')) || 250);
   useEffect(() => { localStorage.setItem('meteo_tempUnit', tempUnit); }, [tempUnit]);
   useEffect(() => { localStorage.setItem('meteo_windUnit', windUnit); }, [windUnit]);
+  useEffect(() => { localStorage.setItem('meteo_mapSize', String(mapSize)); }, [mapSize]);
 
   const load = () => {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) { setError('Coordonnées invalides'); setLoading(false); return; }
@@ -358,27 +360,36 @@ export default function MeteoDashboard() {
 
               {/* Right — big live maps centred on the city */}
               <div className="mt-8 lg:mt-0">
-                <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">EN DIRECT · {name.toUpperCase()}</p>
+                <div className="flex items-center justify-between gap-3 mb-2.5">
+                  <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45">EN DIRECT · {name.toUpperCase()}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Taille cartes</span>
+                    <input type="range" min={150} max={650} step={10} value={mapSize}
+                      onChange={(e) => setMapSize(Number(e.target.value))}
+                      className="w-32 accent-sky-400 cursor-pointer" />
+                    <span className="text-[10px] font-mono text-white/40 w-9 text-right">{mapSize}</span>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-sky-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Radar pluie</span></div>
-                    <MapEmbed src={windyUrl(lat, lon, 'rain', 8)} height={185} note="Windy · live" />
+                    <MapEmbed src={windyUrl(lat, lon, 'rain', 8)} height={mapSize} note="Windy · live" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-emerald-300"><Wind className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Vent</span></div>
-                    <MapEmbed src={windyUrl(lat, lon, 'wind', 8)} height={185} note="Windy · live" />
+                    <MapEmbed src={windyUrl(lat, lon, 'wind', 8)} height={mapSize} note="Windy · live" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-blue-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Pluie HD</span></div>
-                    <MapEmbed src={METEOCIEL_RAIN_HD} height={185} scale={0.55} note="Meteociel · live" />
+                    <MapEmbed src={METEOCIEL_RAIN_HD} height={mapSize} scale={0.55} note="Meteociel · live" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige</span></div>
-                    <MapEmbed src={METEOCIEL_SNOW} height={185} scale={0.5} panY={-110} note="Meteociel · live" />
+                    <MapEmbed src={METEOCIEL_SNOW} height={mapSize} scale={0.5} panY={-110} note="Meteociel · live" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Impacts foudre</span></div>
-                    <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={185} note="Blitzortung · live" />
+                    <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={mapSize} note="Blitzortung · live" />
                   </div>
                 </div>
               </div>
