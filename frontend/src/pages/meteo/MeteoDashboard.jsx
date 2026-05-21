@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap, Snowflake } from 'lucide-react';
 import {
   getForecast, wmo, windRisk, rainRisk, uvRisk, stormRisk, severeStormRisk, maxRisk,
   dirToCompass, RISK, windyUrl, blitzortungUrl, tempColor,
@@ -228,7 +228,7 @@ export default function MeteoDashboard() {
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full blur-3xl" style={{ background: sky.glow }} />
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
+      <div className="relative max-w-7xl mx-auto px-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
         {/* Top bar */}
         <div className="flex items-center justify-between">
           <Link to="/meteo" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
@@ -273,8 +273,8 @@ export default function MeteoDashboard() {
               </div>
             </motion.div>
 
-            {/* Forecast (left) + live city maps (right, sticky) */}
-            <div className="mt-7 lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:items-start">
+            {/* Forecast (narrow, left) + big live city maps (right) */}
+            <div className="mt-7 lg:grid lg:grid-cols-[400px_minmax(0,1fr)] lg:gap-6 lg:items-start">
               {/* Left — 14-day forecast */}
               <div>
                 <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">PRÉVISIONS 14 JOURS</p>
@@ -283,21 +283,25 @@ export default function MeteoDashboard() {
                 </div>
               </div>
 
-              {/* Right — live maps centred on the city */}
+              {/* Right — big live maps centred on the city */}
               <div className="mt-8 lg:mt-0">
                 <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">EN DIRECT · {name.toUpperCase()}</p>
-                <div className="lg:sticky lg:top-4 space-y-3">
+                <div className="space-y-5">
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1.5 px-1 text-sky-300"><CloudRain className="w-3.5 h-3.5" /><span className="text-[11px] font-heading font-bold uppercase tracking-wider">Radar pluie</span></div>
-                    <MapEmbed src={windyUrl(lat, lon, 'rain', 8)} height={240} note="Windy · live" />
+                    <div className="flex items-center gap-1.5 mb-2 px-1 text-sky-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Radar pluie</span></div>
+                    <MapEmbed src={windyUrl(lat, lon, 'rain', 8)} height={460} note="Windy · live" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1.5 px-1 text-emerald-300"><Wind className="w-3.5 h-3.5" /><span className="text-[11px] font-heading font-bold uppercase tracking-wider">Vent</span></div>
-                    <MapEmbed src={windyUrl(lat, lon, 'wind', 8)} height={240} note="Windy · live" />
+                    <div className="flex items-center gap-1.5 mb-2 px-1 text-emerald-300"><Wind className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Vent</span></div>
+                    <MapEmbed src={windyUrl(lat, lon, 'wind', 8)} height={460} note="Windy · live" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1.5 px-1 text-amber-300"><Zap className="w-3.5 h-3.5" /><span className="text-[11px] font-heading font-bold uppercase tracking-wider">Impacts foudre</span></div>
-                    <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={240} note="Blitzortung · live" />
+                    <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige</span></div>
+                    <MapEmbed src={windyUrl(lat, lon, 'snow', 8)} height={460} note="Windy · live" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Impacts foudre</span></div>
+                    <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={460} note="Blitzortung · live" />
                   </div>
                 </div>
               </div>
