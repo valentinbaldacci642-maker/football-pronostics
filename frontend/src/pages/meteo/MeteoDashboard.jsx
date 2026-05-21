@@ -160,31 +160,34 @@ function ForecastRow({ day, isToday, tempUnit, windUnit }) {
   return (
     <>
       <tr onClick={() => setExpanded((e) => !e)} className="cursor-pointer border-t border-white/[0.06] hover:bg-white/[0.04] transition-colors align-middle">
-        <td className="pl-3 pr-2 py-2.5 relative whitespace-nowrap">
+        <td className="pl-2 pr-1 sm:pl-3 sm:pr-2 py-2.5 relative whitespace-nowrap">
           <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full" style={{ background: top.color, opacity: 0.85 }} />
-          <span className="font-heading font-bold capitalize text-sm" style={{ color: isToday ? '#7dd3fc' : '#e2e8f0' }}>
-            {isToday ? "Aujourd'hui" : fmtDate(day.date)}
+          <span className="font-heading font-bold capitalize text-[13px] sm:text-sm" style={{ color: isToday ? '#7dd3fc' : '#e2e8f0' }}>
+            {isToday ? (<><span className="sm:hidden">Auj.</span><span className="hidden sm:inline">Aujourd'hui</span></>) : fmtDate(day.date)}
           </span>
         </td>
-        <td className="px-2 text-center text-lg" title={day.desc}>{day.emoji}</td>
-        <td className="px-2 text-right whitespace-nowrap">
-          <span className="font-display text-base" style={{ color: tempColor(day.tempMax) }}>{fmtTemp(day.tempMax, tempUnit)}</span>
-          <span className="text-xs ml-1" style={{ color: tempColor(day.tempMin), opacity: 0.85 }}>{fmtTemp(day.tempMin, tempUnit)}</span>
+        <td className="px-1 sm:px-2 text-center text-base sm:text-lg" title={day.desc}>{day.emoji}</td>
+        <td className="px-1 sm:px-2 text-right whitespace-nowrap">
+          <span className="font-display text-sm sm:text-base" style={{ color: tempColor(day.tempMax) }}>{fmtTemp(day.tempMax, tempUnit)}</span>
+          <span className="text-[11px] sm:text-xs ml-0.5 sm:ml-1" style={{ color: tempColor(day.tempMin), opacity: 0.85 }}>{fmtTemp(day.tempMin, tempUnit)}</span>
         </td>
-        <td className="px-2 text-right whitespace-nowrap">
-          <span className="font-semibold text-sm" style={{ color: windR.color }}>{fmtWind(day.windKmh, windUnit)}</span>
-          <span className="text-white/40 text-xs"> ↑{fmtWind(day.gustKmh, windUnit)}</span>
-          <span className="text-white/35 text-[11px] ml-1">{windUnitLabel(windUnit)} {dirToCompass(day.windDir)}</span>
+        <td className="px-1 sm:px-2 text-right whitespace-nowrap">
+          <span className="font-semibold text-[13px] sm:text-sm" style={{ color: windR.color }}>{fmtWind(day.windKmh, windUnit)}</span>
+          <span className="text-white/40 text-[11px] sm:text-xs"> ↑{fmtWind(day.gustKmh, windUnit)}</span>
+          <span className="hidden sm:inline text-white/35 text-[11px] ml-1">{windUnitLabel(windUnit)} {dirToCompass(day.windDir)}</span>
         </td>
-        <td className="px-2 text-right whitespace-nowrap">
-          <span className="font-semibold text-sm" style={{ color: precipR.color }}>{day.precipProb}%</span>
-          <span className="text-white/45 text-xs ml-1">{day.precipMm.toFixed(1)}mm</span>
+        <td className="px-1 sm:px-2 text-right whitespace-nowrap">
+          <span className="font-semibold text-[13px] sm:text-sm" style={{ color: precipR.color }}>{day.precipProb}%</span>
+          <span className="hidden sm:inline text-white/45 text-xs ml-1">{day.precipMm.toFixed(1)}mm</span>
         </td>
-        <td className="px-2 text-center">
-          <span className="font-semibold text-sm" style={{ color: uvRisk(day.uvMax).color }}>{day.uvMax}</span>
+        <td className="px-1 sm:px-2 text-center">
+          <span className="font-semibold text-[13px] sm:text-sm" style={{ color: uvRisk(day.uvMax).color }}>{day.uvMax}</span>
         </td>
-        <td className="pr-3 pl-2 py-2.5 text-right">
-          <Pill risk={orageR}>{showViolent ? `⚡ ${violentR.label}` : orageText(orageR)}</Pill>
+        <td className="pr-2 pl-1 sm:pr-3 sm:pl-2 py-2.5 text-right">
+          <Pill risk={orageR}>
+            <span className="sm:hidden">{showViolent ? `⚡${violentR.label}` : (orageR.key === 'FAIBLE' ? '✓' : orageR.label)}</span>
+            <span className="hidden sm:inline">{showViolent ? `⚡ ${violentR.label}` : orageText(orageR)}</span>
+          </Pill>
         </td>
       </tr>
       {expanded && day.hours.length > 0 && (
@@ -205,22 +208,24 @@ function ForecastTable({ days, tempUnit, windUnit }) {
       className="rounded-2xl overflow-hidden backdrop-blur-md"
       style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 30px rgba(0,0,0,0.25)' }}
     >
-      <table className="w-full border-collapse">
+      <div className="overflow-x-auto no-scrollbar">
+      <table className="w-full min-w-[330px] border-collapse">
         <thead>
-          <tr className="text-[10px] uppercase tracking-wider text-white/40 font-heading">
-            <th className="text-left pl-3 pr-2 py-2.5 font-bold">Jour</th>
-            <th className="px-2 py-2.5 font-bold">Ciel</th>
-            <th className="px-2 py-2.5 text-right font-bold">Temp.</th>
-            <th className="px-2 py-2.5 text-right font-bold">Vent {windUnitLabel(windUnit)}</th>
-            <th className="px-2 py-2.5 text-right font-bold">Pluie</th>
-            <th className="px-2 py-2.5 text-center font-bold">UV</th>
-            <th className="pr-3 pl-2 py-2.5 text-right font-bold">Orage</th>
+          <tr className="text-[9px] sm:text-[10px] uppercase tracking-wider text-white/40 font-heading">
+            <th className="text-left pl-2 pr-1 sm:pl-3 sm:pr-2 py-2.5 font-bold">Jour</th>
+            <th className="px-1 sm:px-2 py-2.5 font-bold">Ciel</th>
+            <th className="px-1 sm:px-2 py-2.5 text-right font-bold">Temp.</th>
+            <th className="px-1 sm:px-2 py-2.5 text-right font-bold">Vent {windUnitLabel(windUnit)}</th>
+            <th className="px-1 sm:px-2 py-2.5 text-right font-bold">Pluie</th>
+            <th className="px-1 sm:px-2 py-2.5 text-center font-bold">UV</th>
+            <th className="pr-2 pl-1 sm:pr-3 sm:pl-2 py-2.5 text-right font-bold">Orage</th>
           </tr>
         </thead>
         <tbody>
           {days.map((day, i) => <ForecastRow key={day.date} day={day} isToday={i === 0} tempUnit={tempUnit} windUnit={windUnit} />)}
         </tbody>
       </table>
+      </div>
     </motion.div>
   );
 }
