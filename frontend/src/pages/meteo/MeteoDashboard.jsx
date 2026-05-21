@@ -12,9 +12,41 @@ import MapEmbed from '../../components/meteo/MapEmbed';
 const DAYS_FR = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
+// Meteociel HD radars (fixed France-wide views — no per-city centring available).
+const METEOCIEL_RAIN_HD = 'https://www.meteociel.fr/observations-meteo/radarzoom.php?x=8229.39&y=8647.89&ech=11&zoom=3';
+const METEOCIEL_SNOW = 'https://www.meteociel.fr/observations-meteo/radarzoom.php?&x=7709.94&y=7625.72&zoom=2.1&ech=0&snow=1';
+
 function fmtDate(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
   return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]}`;
+}
+
+// Unit helpers — display only; colour/risk logic keeps using the raw °C / km/h values.
+const MPH_PER_KMH = 0.621371;
+function fmtTemp(c, unit) {
+  if (c == null || Number.isNaN(c)) return '–';
+  return unit === 'K' ? `${Math.round(c + 273.15)} K` : `${Math.round(c)}°`;
+}
+function fmtWind(kmh, unit) {
+  return Math.round((unit === 'mph' ? (kmh || 0) * MPH_PER_KMH : (kmh || 0)));
+}
+function windUnitLabel(unit) { return unit === 'mph' ? 'mph' : 'km/h'; }
+
+function UnitToggle({ options, value, onChange }) {
+  return (
+    <div className="inline-flex rounded-lg overflow-hidden backdrop-blur-md" style={{ border: '1px solid rgba(255,255,255,0.14)' }}>
+      {options.map((o) => {
+        const active = value === o.v;
+        return (
+          <button key={o.v} onClick={() => onChange(o.v)}
+            className="px-2.5 py-1 text-xs font-heading font-bold transition-colors"
+            style={active ? { background: 'rgba(56,189,248,0.25)', color: '#7dd3fc' } : { color: 'rgba(255,255,255,0.5)' }}>
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 // Atmosphere that reacts to the current sky — committing to a premium,
@@ -73,7 +105,7 @@ function buildDays(data) {
   }));
 }
 
-function HourRow({ h }) {
+function HourRow({ h, tempUnit, windUnit }) {
   const gust = windRisk(h.gustKmh);
   const precip = rainRisk(h.precipMm);
   const orage = stormRisk(h.wmoCode, h.cape);
@@ -82,12 +114,12 @@ function HourRow({ h }) {
     <div className="flex items-center gap-2 min-h-[46px] py-1.5 border-t border-white/[0.06]">
       <span className="text-xs font-mono w-8 flex-shrink-0 text-white/40">{String(h.hour).padStart(2, '0')}h</span>
       <span className="text-base w-6 flex-shrink-0 text-center">{wmo(h.wmoCode).emoji}</span>
-      <div className="w-11 flex-shrink-0 leading-tight">
-        <span className="text-[13px] font-bold" style={{ color: tempColor(h.tempC) }}>{h.tempC}°</span>
-        {h.feelsLikeC !== h.tempC && <span className="block text-[10px] text-white/35">{h.feelsLikeC}°</span>}
+      <div className="w-14 flex-shrink-0 leading-tight">
+        <span className="text-[13px] font-bold" style={{ color: tempColor(h.tempC) }}>{fmtTemp(h.tempC, tempUnit)}</span>
+        {h.feelsLikeC !== h.tempC && <span className="block text-[10px] text-white/35">{fmtTemp(h.feelsLikeC, tempUnit)}</span>}
       </div>
       <div className="flex-1 flex flex-wrap gap-1">
-        <InfoBadge icon="💨" risk={gust} text={`${h.windKmh} (↑${h.gustKmh}) ${dirToCompass(h.windDir)}`} />
+        <InfoBadge icon="💨" risk={gust} text={`${fmtWind(h.windKmh, windUnit)} (↑${fmtWind(h.gustKmh, windUnit)}) ${windUnitLabel(windUnit)} ${dirToCompass(h.windDir)}`} />
         <InfoBadge icon="🌧️" risk={precip} text={`${h.precipMm.toFixed(1)}mm · ${h.precipProb}%`} />
         {h.uvIndex >= 3 && <InfoBadge icon="☀️" risk={uvRisk(h.uvIndex)} text={`UV ${h.uvIndex}`} />}
         <InfoBadge icon="⛈️" risk={orage} text={orageText(orage)} />
@@ -120,7 +152,7 @@ function Pill({ risk, children }) {
   );
 }
 
-function ForecastRow({ day, isToday }) {
+function ForecastRow({ day, isToday, tempUnit, windUnit }) {
   const [expanded, setExpanded] = useState(false);
   const { windR, precipR, orageR, violentR, top } = dayRisks(day);
   const showViolent = violentR.key !== 'FAIBLE';
@@ -135,13 +167,13 @@ function ForecastRow({ day, isToday }) {
         </td>
         <td className="px-2 text-center text-lg" title={day.desc}>{day.emoji}</td>
         <td className="px-2 text-right whitespace-nowrap">
-          <span className="font-display text-base" style={{ color: tempColor(day.tempMax) }}>{day.tempMax}°</span>
-          <span className="text-xs ml-1" style={{ color: tempColor(day.tempMin), opacity: 0.85 }}>{day.tempMin}°</span>
+          <span className="font-display text-base" style={{ color: tempColor(day.tempMax) }}>{fmtTemp(day.tempMax, tempUnit)}</span>
+          <span className="text-xs ml-1" style={{ color: tempColor(day.tempMin), opacity: 0.85 }}>{fmtTemp(day.tempMin, tempUnit)}</span>
         </td>
         <td className="px-2 text-right whitespace-nowrap">
-          <span className="font-semibold text-sm" style={{ color: windR.color }}>{day.windKmh}</span>
-          <span className="text-white/40 text-xs"> ↑{day.gustKmh}</span>
-          <span className="text-white/35 text-[11px] ml-1">km/h {dirToCompass(day.windDir)}</span>
+          <span className="font-semibold text-sm" style={{ color: windR.color }}>{fmtWind(day.windKmh, windUnit)}</span>
+          <span className="text-white/40 text-xs"> ↑{fmtWind(day.gustKmh, windUnit)}</span>
+          <span className="text-white/35 text-[11px] ml-1">{windUnitLabel(windUnit)} {dirToCompass(day.windDir)}</span>
         </td>
         <td className="px-2 text-right whitespace-nowrap">
           <span className="font-semibold text-sm" style={{ color: precipR.color }}>{day.precipProb}%</span>
@@ -157,7 +189,7 @@ function ForecastRow({ day, isToday }) {
       {expanded && day.hours.length > 0 && (
         <tr>
           <td colSpan={7} className="px-3 pb-3 pt-1" style={{ background: 'rgba(0,0,0,0.18)' }}>
-            {day.hours.map((h) => <HourRow key={h.hour} h={h} />)}
+            {day.hours.map((h) => <HourRow key={h.hour} h={h} tempUnit={tempUnit} windUnit={windUnit} />)}
           </td>
         </tr>
       )}
@@ -165,7 +197,7 @@ function ForecastRow({ day, isToday }) {
   );
 }
 
-function ForecastTable({ days }) {
+function ForecastTable({ days, tempUnit, windUnit }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -178,14 +210,14 @@ function ForecastTable({ days }) {
             <th className="text-left pl-3 pr-2 py-2.5 font-bold">Jour</th>
             <th className="px-2 py-2.5 font-bold">Ciel</th>
             <th className="px-2 py-2.5 text-right font-bold">Temp.</th>
-            <th className="px-2 py-2.5 text-right font-bold">Vent km/h</th>
+            <th className="px-2 py-2.5 text-right font-bold">Vent {windUnitLabel(windUnit)}</th>
             <th className="px-2 py-2.5 text-right font-bold">Pluie</th>
             <th className="px-2 py-2.5 text-center font-bold">UV</th>
             <th className="pr-3 pl-2 py-2.5 text-right font-bold">Orage</th>
           </tr>
         </thead>
         <tbody>
-          {days.map((day, i) => <ForecastRow key={day.date} day={day} isToday={i === 0} />)}
+          {days.map((day, i) => <ForecastRow key={day.date} day={day} isToday={i === 0} tempUnit={tempUnit} windUnit={windUnit} />)}
         </tbody>
       </table>
     </motion.div>
@@ -237,6 +269,10 @@ export default function MeteoDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [tempUnit, setTempUnit] = useState(() => localStorage.getItem('meteo_tempUnit') || 'C');
+  const [windUnit, setWindUnit] = useState(() => localStorage.getItem('meteo_windUnit') || 'kmh');
+  useEffect(() => { localStorage.setItem('meteo_tempUnit', tempUnit); }, [tempUnit]);
+  useEffect(() => { localStorage.setItem('meteo_windUnit', windUnit); }, [windUnit]);
 
   const load = () => {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) { setError('Coordonnées invalides'); setLoading(false); return; }
@@ -265,11 +301,15 @@ export default function MeteoDashboard() {
 
       <div className="relative w-full px-4 sm:px-5" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
         {/* Top bar */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <Link to="/meteo" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" /> Recherche
           </Link>
-          <button onClick={load} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+          <div className="flex items-center gap-2">
+            <UnitToggle value={tempUnit} onChange={setTempUnit} options={[{ v: 'C', label: '°C' }, { v: 'K', label: 'K' }]} />
+            <UnitToggle value={windUnit} onChange={setWindUnit} options={[{ v: 'kmh', label: 'km/h' }, { v: 'mph', label: 'mph' }]} />
+            <button onClick={load} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+          </div>
         </div>
 
         {/* Hero */}
@@ -282,7 +322,7 @@ export default function MeteoDashboard() {
             <>
               <p className="text-xs uppercase tracking-[3px] text-white/50 font-heading mb-1">{name}{admin ? ` · ${admin}` : ''}</p>
               <div className="text-7xl sm:text-8xl leading-none mb-2" style={{ filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.4))' }}>{emoji}</div>
-              <p className="font-display leading-none" style={{ fontSize: 'clamp(64px, 14vw, 104px)', fontWeight: 200, letterSpacing: '-3px', color: tempColor(Math.round(cur.temperature_2m)) }}>{Math.round(cur.temperature_2m)}°</p>
+              <p className="font-display leading-none" style={{ fontSize: 'clamp(64px, 14vw, 104px)', fontWeight: 200, letterSpacing: '-3px', color: tempColor(Math.round(cur.temperature_2m)) }}>{fmtTemp(cur.temperature_2m, tempUnit)}</p>
               <p className="text-lg text-white/75 font-heading mt-1">{label}</p>
             </>
           )}
@@ -292,8 +332,8 @@ export default function MeteoDashboard() {
           <>
             {/* Quick stats */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-7">
-              <QuickStat icon={Thermometer} label="Ressenti" value={`${Math.round(cur.apparent_temperature)}°`} />
-              <QuickStat icon={Wind} label="Vent" value={`${Math.round(cur.wind_speed_10m)} (${Math.round(cur.wind_gusts_10m)})`} />
+              <QuickStat icon={Thermometer} label="Ressenti" value={fmtTemp(cur.apparent_temperature, tempUnit)} />
+              <QuickStat icon={Wind} label={`Vent ${windUnitLabel(windUnit)}`} value={`${fmtWind(cur.wind_speed_10m, windUnit)} (${fmtWind(cur.wind_gusts_10m, windUnit)})`} />
               <QuickStat icon={Droplets} label="Humidité" value={`${cur.relative_humidity_2m}%`} />
               <QuickStat icon={Sun} label="UV" value={`${today?.uvMax ?? 0}`} />
             </motion.div>
@@ -304,7 +344,7 @@ export default function MeteoDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <BigTile icon={Zap} label="Orage" risk={orageTile} value={orageText(orageTile)} sub={`${Math.round(todayCape)} J/kg CAPE`} />
                 <BigTile icon={CloudRain} label="Pluie" risk={pluieTile} value={`${(today?.precipMm ?? 0).toFixed(1)} mm`} sub={`${today?.precipProb ?? 0}% de probabilité`} />
-                <BigTile icon={Wind} label="Vent" risk={ventTile} value={`${today?.windKmh} km/h`} sub={`rafales ${today?.gustKmh} km/h`} />
+                <BigTile icon={Wind} label="Vent" risk={ventTile} value={`${fmtWind(today?.windKmh, windUnit)} ${windUnitLabel(windUnit)}`} sub={`rafales ${fmtWind(today?.gustKmh, windUnit)} ${windUnitLabel(windUnit)}`} />
               </div>
             </motion.div>
 
@@ -313,7 +353,7 @@ export default function MeteoDashboard() {
               {/* Left — 14-day forecast table */}
               <div>
                 <p className="text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5">PRÉVISIONS 14 JOURS</p>
-                <ForecastTable days={days} />
+                <ForecastTable days={days} tempUnit={tempUnit} windUnit={windUnit} />
               </div>
 
               {/* Right — big live maps centred on the city */}
@@ -329,10 +369,14 @@ export default function MeteoDashboard() {
                     <MapEmbed src={windyUrl(lat, lon, 'wind', 8)} height={420} note="Windy · live" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige</span></div>
-                    <MapEmbed src={windyUrl(lat, lon, 'snowAccu', 8)} height={420} note="Windy · accumulation" />
+                    <div className="flex items-center gap-1.5 mb-2 px-1 text-blue-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Pluie HD</span></div>
+                    <MapEmbed src={METEOCIEL_RAIN_HD} height={420} note="Meteociel · live" />
                   </div>
                   <div>
+                    <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige</span></div>
+                    <MapEmbed src={METEOCIEL_SNOW} height={420} note="Meteociel · live" />
+                  </div>
+                  <div className="sm:col-span-2">
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Impacts foudre</span></div>
                     <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={420} note="Blitzortung · live" />
                   </div>
