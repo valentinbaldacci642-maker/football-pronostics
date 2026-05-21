@@ -28,30 +28,72 @@ export async function searchCity(name) {
   }));
 }
 
+const MF_URL = 'https://api.open-meteo.com/v1/meteofrance';
+
+// Overlay non-null values from `src` arrays onto `dst` arrays by index, for
+// the given keys. Used to splice accurate Météo-France data over best_match.
+function overlayArrays(dst, src, keys) {
+  if (!dst || !src) return;
+  for (const k of keys) {
+    const s = src[k];
+    const d = dst[k];
+    if (!Array.isArray(s) || !Array.isArray(d)) continue;
+    for (let i = 0; i < d.length && i < s.length; i++) {
+      if (s[i] != null) d[i] = s[i];
+    }
+  }
+}
+
 // ─── Forecast ─────────────────────────────────────────────────────────────────
+// best_match gives a full 14-day range of every field (UV, precip prob, CAPE…)
+// but its near-term temperatures can diverge ~2-3°C from Météo-France. So we
+// also pull the Météo-France model (accurate but only ~4 days, no UV/prob) and
+// overlay its temperature/sky/wind/precip over the best_match data where
+// available — best of both: accurate short term + full 14-day coverage.
 export async function getForecast(lat, lon) {
-  const { data } = await axios.get(FORECAST_URL, {
-    params: {
-      latitude: lat,
-      longitude: lon,
-      timezone: 'auto',
-      forecast_days: 14,
-      current: [
-        'temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'is_day',
-        'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m',
-      ].join(','),
-      hourly: [
-        'temperature_2m', 'apparent_temperature', 'precipitation_probability', 'precipitation',
-        'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'uv_index', 'cape',
-      ].join(','),
-      daily: [
-        'weather_code', 'temperature_2m_max', 'temperature_2m_min',
-        'precipitation_sum', 'precipitation_probability_max',
-        'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'uv_index_max',
-        'sunrise', 'sunset',
-      ].join(','),
-    },
-  });
+  const common = { latitude: lat, longitude: lon, timezone: 'auto', forecast_days: 14 };
+  const [bmRes, mfRes] = await Promise.all([
+    axios.get(FORECAST_URL, {
+      params: {
+        ...common,
+        current: [
+          'temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'is_day',
+          'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m',
+        ].join(','),
+        hourly: [
+          'temperature_2m', 'apparent_temperature', 'precipitation_probability', 'precipitation',
+          'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'uv_index', 'cape',
+        ].join(','),
+        daily: [
+          'weather_code', 'temperature_2m_max', 'temperature_2m_min',
+          'precipitation_sum', 'precipitation_probability_max',
+          'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'uv_index_max',
+          'sunrise', 'sunset',
+        ].join(','),
+      },
+    }),
+    axios.get(MF_URL, {
+      params: {
+        ...common,
+        current: ['temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m'].join(','),
+        hourly: ['temperature_2m', 'apparent_temperature', 'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m'].join(','),
+        daily: ['temperature_2m_max', 'temperature_2m_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant'].join(','),
+      },
+    }).catch(() => null),
+  ]);
+
+  const data = bmRes.data;
+  const mf = mfRes?.data;
+  if (mf) {
+    // Current: Météo-France is the trusted source for "right now".
+    if (mf.current?.temperature_2m != null) {
+      for (const k of ['temperature_2m', 'apparent_temperature', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'relative_humidity_2m', 'precipitation']) {
+        if (mf.current[k] != null) data.current[k] = mf.current[k];
+      }
+    }
+    overlayArrays(data.hourly, mf.hourly, ['temperature_2m', 'apparent_temperature', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'precipitation']);
+    overlayArrays(data.daily, mf.daily, ['temperature_2m_max', 'temperature_2m_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant']);
+  }
   return data;
 }
 
