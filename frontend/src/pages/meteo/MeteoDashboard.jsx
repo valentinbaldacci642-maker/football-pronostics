@@ -362,23 +362,23 @@ export default function MeteoDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-sky-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Radar pluie</span></div>
-                    <MapEmbed src={windyUrl(lat, lon, 'rain', 8)} height={420} note="Windy · live" />
+                    <MapEmbed src={windyUrl(lat, lon, 'rain', 8)} height={185} note="Windy · live" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-emerald-300"><Wind className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Vent</span></div>
-                    <MapEmbed src={windyUrl(lat, lon, 'wind', 8)} height={420} note="Windy · live" />
+                    <MapEmbed src={windyUrl(lat, lon, 'wind', 8)} height={185} note="Windy · live" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-blue-300"><CloudRain className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Pluie HD</span></div>
-                    <MapEmbed src={METEOCIEL_RAIN_HD} height={420} note="Meteociel · live" />
+                    <MapEmbed src={METEOCIEL_RAIN_HD} height={185} scale={0.55} note="Meteociel · live" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200"><Snowflake className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Neige</span></div>
-                    <MapEmbed src={METEOCIEL_SNOW} height={420} note="Meteociel · live" />
+                    <MapEmbed src={METEOCIEL_SNOW} height={185} scale={0.5} panY={-110} note="Meteociel · live" />
                   </div>
-                  <div className="sm:col-span-2">
+                  <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Impacts foudre</span></div>
-                    <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={420} note="Blitzortung · live" />
+                    <MapEmbed src={blitzortungUrl(lat, lon, 9)} height={185} note="Blitzortung · live" />
                   </div>
                 </div>
               </div>

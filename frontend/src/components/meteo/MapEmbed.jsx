@@ -1,6 +1,9 @@
 // Generic iframe wrapper for the weather live maps (RainViewer, Blitzortung,
-// Windy). Rounded card with a title bar.
-export default function MapEmbed({ title, src, height = 320, note }) {
+// Windy, Meteociel). Rounded card with a title bar.
+// `scale` < 1 zooms the embedded page out so a large page fits inside a short
+// card; `panY` (negative px) shifts the content up to skip a page header.
+export default function MapEmbed({ title, src, height = 320, note, scale = 1, panY = 0 }) {
+  const scaled = scale !== 1 || panY !== 0;
   return (
     <div className="glass-card overflow-hidden">
       {title && (
@@ -9,14 +12,32 @@ export default function MapEmbed({ title, src, height = 320, note }) {
           {note && <span className="text-[11px] text-white/30">{note}</span>}
         </div>
       )}
-      <iframe
-        src={src}
-        title={title || 'carte'}
-        loading="lazy"
-        className="w-full block border-0"
-        style={{ height }}
-        referrerPolicy="no-referrer-when-downgrade"
-      />
+      {scaled ? (
+        <div style={{ height, overflow: 'hidden', position: 'relative' }}>
+          <iframe
+            src={src}
+            title={title || 'carte'}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            style={{
+              position: 'absolute', top: panY, left: 0, border: 0,
+              width: `${100 / scale}%`,
+              height: `${(height - panY) / scale}px`,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+            }}
+          />
+        </div>
+      ) : (
+        <iframe
+          src={src}
+          title={title || 'carte'}
+          loading="lazy"
+          className="w-full block border-0"
+          style={{ height }}
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+      )}
     </div>
   );
 }
