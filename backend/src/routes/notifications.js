@@ -9,11 +9,11 @@ const adminAuth = require('../middleware/adminAuth');
 const authScan = adminAuth({ allowQueryKey: true });
 
 router.post('/register', (req, res) => {
-  const { token, platform, favoriteTeams, favoriteMatches, notifPrefs } = req.body || {};
+  const { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities } = req.body || {};
   if (!token || typeof token !== 'string') {
     return res.status(400).json({ error: 'token is required' });
   }
-  const ok = notifications.registerToken(token, platform, favoriteTeams, favoriteMatches, notifPrefs);
+  const ok = notifications.registerToken(token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities);
   res.json({ ok, status: notifications.getStatus() });
 });
 
@@ -57,8 +57,14 @@ router.get('/scan-new-vbs', authScan, async (req, res) => {
     } catch (liveErr) {
       logger.warn('live-favorites scan failed: ' + (liveErr?.message || liveErr));
     }
+    let weather = null;
+    try {
+      weather = await notifications.scanWeatherAndNotify({ dryRun });
+    } catch (wErr) {
+      logger.warn('weather scan failed: ' + (wErr?.message || wErr));
+    }
 
-    res.json({ ...result, favorites, live });
+    res.json({ ...result, favorites, live, weather });
   } catch (e) {
     logger.error('scan-new-vbs failed: ' + (e?.stack || e?.message || e));
     res.status(500).json({ error: 'Scan failed', message: e?.message });
@@ -74,6 +80,18 @@ router.get('/scan-favorite-teams', authScan, async (req, res) => {
     res.json(result);
   } catch (e) {
     logger.error('scan-favorite-teams failed: ' + (e?.stack || e?.message || e));
+    res.status(500).json({ error: 'Scan failed', message: e?.message });
+  }
+});
+
+// Standalone weather-alert scan — rain/storm coming for favorite cities.
+router.get('/scan-weather-alerts', authScan, async (req, res) => {
+  try {
+    const dryRun = req.query.dry === '1';
+    const result = await notifications.scanWeatherAndNotify({ dryRun });
+    res.json(result);
+  } catch (e) {
+    logger.error('scan-weather-alerts failed: ' + (e?.stack || e?.message || e));
     res.status(500).json({ error: 'Scan failed', message: e?.message });
   }
 });

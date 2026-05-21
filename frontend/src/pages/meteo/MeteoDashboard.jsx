@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap, Snowflake, Gauge, Leaf, Waves } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap, Snowflake, Gauge, Leaf, Waves, Bell, BellRing } from 'lucide-react';
 import { ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
   getForecast, getAirQuality, getMarine, wmo, windRisk, rainRisk, uvRisk, stormRisk, severeStormRisk, maxRisk,
   dirToCompass, RISK, windyUrl, blitzortungUrl, tempColor, aqiLevel, pollenLevel, POLLENS,
+  isAlertCity, toggleAlertCity,
 } from '../../services/meteo';
+import { syncWeatherCitiesToBackend } from '../../services/pushNotifications';
 import { InfoBadge, orageText, violentText } from '../../components/meteo/RiskUI';
 import MapEmbed from '../../components/meteo/MapEmbed';
 
@@ -407,6 +409,13 @@ export default function MeteoDashboard() {
   const [windUnit, setWindUnit] = useState(() => localStorage.getItem('meteo_windUnit') || 'kmh');
   const [mapSize, setMapSize] = useState(() => Number(localStorage.getItem('meteo_mapSize')) || 250);
   const [mapWidth, setMapWidth] = useState(() => Number(localStorage.getItem('meteo_mapWidth')) || 520);
+  const [alertOn, setAlertOn] = useState(false);
+  useEffect(() => { setAlertOn(isAlertCity(lat, lon)); }, [lat, lon]);
+  const toggleAlert = () => {
+    toggleAlertCity({ name: admin ? `${name} (${admin})` : name, lat, lon });
+    setAlertOn((v) => !v);
+    syncWeatherCitiesToBackend();
+  };
   useEffect(() => { localStorage.setItem('meteo_tempUnit', tempUnit); }, [tempUnit]);
   useEffect(() => { localStorage.setItem('meteo_windUnit', windUnit); }, [windUnit]);
   useEffect(() => { localStorage.setItem('meteo_mapSize', String(mapSize)); }, [mapSize]);
@@ -448,6 +457,11 @@ export default function MeteoDashboard() {
           <div className="flex items-center gap-2">
             <UnitToggle value={tempUnit} onChange={setTempUnit} options={[{ v: 'C', label: '°C' }, { v: 'K', label: 'K' }]} />
             <UnitToggle value={windUnit} onChange={setWindUnit} options={[{ v: 'kmh', label: 'km/h' }, { v: 'mph', label: 'mph' }]} />
+            <button onClick={toggleAlert} title={alertOn ? 'Alertes météo activées' : 'Activer les alertes pluie/orage'}
+              className="p-2 rounded-full transition-colors"
+              style={alertOn ? { color: '#7dd3fc', background: 'rgba(56,189,248,0.15)' } : { color: 'rgba(255,255,255,0.5)' }}>
+              {alertOn ? <BellRing className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+            </button>
             <button onClick={load} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
           </div>
         </div>

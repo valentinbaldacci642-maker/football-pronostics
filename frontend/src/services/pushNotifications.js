@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { notificationsApi } from './api';
 import { useFavoriteTeamsStore, useFavoritesStore } from '../store';
+import { getAlertCities } from './meteo';
 
 // Static import so Capacitor can wire the plugin bridge at JS init time.
 // On web the plugin's stub no-ops, so we gate the *runtime* behavior on
@@ -21,6 +22,7 @@ export const NOTIF_TYPES = [
   { key: 'kickoff',   label: 'Coup d’envoi',         desc: 'Au coup d’envoi d’un match suivi' },
   { key: 'goal',      label: 'But en direct',        desc: 'À chaque but d’un match suivi' },
   { key: 'final',     label: 'Résultat final',       desc: 'Score final d’un match suivi' },
+  { key: 'weather',   label: 'Alertes météo',        desc: 'Pluie ou orage à venir sur une ville suivie (MimiMétéo)' },
 ];
 
 export function getNotifPrefs() {
@@ -58,6 +60,11 @@ function currentFavoriteMatchIds() {
   } catch (_) {
     return [];
   }
+}
+
+// Read MimiMétéo weather-alert cities from localStorage.
+function currentFavoriteCities() {
+  try { return getAlertCities(); } catch (_) { return []; }
 }
 
 export function isNotificationsEnabled() {
@@ -103,6 +110,10 @@ export async function initPushNotifications() {
         id: 'favorite_teams', name: 'Équipes favorites',
         description: 'Quand une équipe favorite joue aujourd’hui', importance: 4, visibility: 1,
       });
+      await Push.createChannel({
+        id: 'weather_alerts', name: 'Alertes météo',
+        description: 'Pluie ou orage à venir sur une ville suivie', importance: 4, visibility: 1,
+      });
     } catch (_) { /* channels API unavailable on some devices — ignore */ }
 
     // The 'registration' listener fires with the FCM device token.
@@ -129,7 +140,7 @@ export async function initPushNotifications() {
 
     try {
       await notificationsApi.register(
-        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs()
+        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities()
       );
     } catch (e) {
       // Backend down → don't block the app, retry next launch
@@ -183,9 +194,15 @@ export async function syncFavoriteTeamsToBackend() {
   if (!token) return;
   try {
     await notificationsApi.register(
-      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs()
+      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities()
     );
   } catch (e) {
     console.warn('[push] favorite sync failed:', e?.message);
   }
+}
+
+// Re-send the current weather-alert cities to the backend. Called when the
+// user toggles a city's weather alerts on the MimiMétéo dashboard.
+export async function syncWeatherCitiesToBackend() {
+  return syncFavoriteTeamsToBackend();
 }

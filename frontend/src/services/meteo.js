@@ -421,3 +421,29 @@ export function addRecentCity(city) {
     localStorage.setItem(LS_RECENT, JSON.stringify(list.slice(0, 6)));
   } catch (_) { /* ignore */ }
 }
+
+// ─── Weather-alert cities (push notifs for rain/storm) ───────────────────────
+const LS_ALERT_CITIES = 'mimimeteo.alertCities';
+
+export function getAlertCities() {
+  try { return JSON.parse(localStorage.getItem(LS_ALERT_CITIES) || '[]'); } catch (_) { return []; }
+}
+
+function sameCity(a, b) {
+  return Math.abs(a.lat - b.lat) < 0.01 && Math.abs(a.lon - b.lon) < 0.01;
+}
+
+export function isAlertCity(lat, lon) {
+  return getAlertCities().some((c) => sameCity(c, { lat, lon }));
+}
+
+// Toggle a city's weather-alert subscription. Returns the new list (max 20).
+export function toggleAlertCity(city) {
+  const list = getAlertCities();
+  const exists = list.some((c) => sameCity(c, city));
+  const next = exists
+    ? list.filter((c) => !sameCity(c, city))
+    : [{ name: city.name, lat: city.lat, lon: city.lon }, ...list].slice(0, 20);
+  try { localStorage.setItem(LS_ALERT_CITIES, JSON.stringify(next)); } catch (_) { /* ignore */ }
+  return next;
+}

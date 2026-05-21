@@ -1,6 +1,7 @@
 const { getMessaging } = require('./firebaseAdmin');
 const pronosticsService = require('./pronosticsService');
 const apiFootball = require('./apiFootball');
+const weatherService = require('./weatherService');
 const logger = require('../utils/logger');
 
 // In-memory state. Render free tier stays warm via UptimeRobot ping so
@@ -14,6 +15,10 @@ const notifiedVbKeys = new Set();  // "fixtureId::market::selection"
 // keys naturally reset each day. Cleared wholesale when the date rolls over.
 const notifiedFavKeys = new Set();
 let lastFavScanDate = null;
+// Weather alert dedup — one rain/storm alert per favorite city per type per
+// Paris day. Reset when the date rolls over.
+const notifiedWeatherKeys = new Set();
+let lastWeatherScanDate = null;
 // Live match state for kickoff / goal / final notifs, only for fixtures a
 // token cares about. fixtureId → { status, gh, ga }. Wiped on restart →
 // at worst one live event is missed right after a deploy.
@@ -30,7 +35,7 @@ const ALLOWED_PLATFORMS = new Set(['android', 'ios', 'web', 'unknown']);
 
 // Per-token notification preferences. Any key absent → treated as enabled,
 // so a stale client that doesn't send prefs keeps getting everything.
-const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'goal', 'final', 'kickoff', 'favTeamVb'];
+const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'goal', 'final', 'kickoff', 'favTeamVb', 'weather'];
 
 function sanitizeNotifPrefs(input) {
   const out = {};
@@ -61,7 +66,28 @@ function sanitizeFavoriteTeams(input) {
   return ids;
 }
 
-function registerToken(token, platform = 'unknown', favoriteTeams = [], favoriteMatches = [], notifPrefs = null) {
+// Favorite weather cities: [{ name, lat, lon }], capped, coords validated.
+function sanitizeFavoriteCities(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const c of input) {
+    if (!c || typeof c !== 'object') continue;
+    const lat = Number(c.lat);
+    const lon = Number(c.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
+    const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const name = typeof c.name === 'string' ? c.name.slice(0, 80) : '';
+    out.push({ name, lat, lon });
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
+function registerToken(token, platform = 'unknown', favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null) {
   if (!token || typeof token !== 'string') return false;
   // FCM registration tokens are ~140-260 chars. Reject anything outside
   // a sane range so an attacker can't fill memory with megabyte tokens.
@@ -71,15 +97,17 @@ function registerToken(token, platform = 'unknown', favoriteTeams = [], favorite
     const oldest = tokens.keys().next().value;
     if (oldest) tokens.delete(oldest);
   }
-  // Preserve existing prefs if the client didn't send any this call.
+  // Preserve existing prefs/cities if the client didn't send any this call.
   const prev = tokens.get(token);
   const prefs = notifPrefs != null ? sanitizeNotifPrefs(notifPrefs) : (prev?.notifPrefs || {});
+  const cities = favoriteCities != null ? sanitizeFavoriteCities(favoriteCities) : (prev?.favoriteCities || []);
   tokens.set(token, {
     platform: safePlatform,
     registeredAt: Date.now(),
     favoriteTeams: sanitizeFavoriteTeams(favoriteTeams),
     favoriteMatches: sanitizeFavoriteTeams(favoriteMatches), // same shape: positive int IDs
     notifPrefs: prefs,
+    favoriteCities: cities,
   });
   return true;
 }
@@ -547,7 +575,7 @@ async function scanFavoriteTeamsToday({ dryRun = false } = {}) {
 // ─── Live notifications: kickoff / goal / final result ──────────────────────
 
 // Send a single push to a set of tokens. Prunes dead tokens. Returns count.
-async function notifyTokens(recipients, { title, body, type, fixtureId, tag }) {
+async function notifyTokens(recipients, { title, body, type, fixtureId, tag, channelId = 'favorite_teams' }) {
   const messaging = getMessaging();
   if (!messaging) return 0;
   const iconUrl = process.env.NOTIFICATION_ICON_URL
@@ -558,10 +586,10 @@ async function notifyTokens(recipients, { title, body, type, fixtureId, tag }) {
       await messaging.send({
         token,
         notification: { title, body },
-        data: { type, fixtureId: String(fixtureId) },
+        data: { type, fixtureId: String(fixtureId ?? '') },
         android: {
           priority: 'high',
-          notification: { channelId: 'favorite_teams', sound: 'default', imageUrl: iconUrl, tag },
+          notification: { channelId, sound: 'default', imageUrl: iconUrl, tag },
         },
       });
       sent++;
@@ -683,6 +711,90 @@ async function scanLiveFavorites({ dryRun = false } = {}) {
   return { events, sent, dryRun };
 }
 
+// ─── Weather alerts: rain / storm coming for a favorite city ────────────────
+
+const WEATHER_LOOKAHEAD_MS = 3 * 60 * 60 * 1000; // alert if rain/storm within 3h
+const WEATHER_RAIN_MM = 0.5;                      // min mm/h to count as rain
+const WEATHER_RAIN_PROB = 50;                     // min % probability
+
+/**
+ * For each favorite city across all tokens (that enabled weather notifs),
+ * check the next ~3h of Open-Meteo precipitation. Fire a single rain or
+ * storm alert per city per type per Paris day. Cities are deduped across
+ * tokens so each location is fetched once.
+ */
+async function scanWeatherAndNotify({ dryRun = false } = {}) {
+  const today = dateInParis(0);
+  if (lastWeatherScanDate !== today) {
+    notifiedWeatherKeys.clear();
+    lastWeatherScanDate = today;
+  }
+
+  // cityKey → { name, lat, lon, recipients: Set<token> }
+  const cities = new Map();
+  for (const [token, meta] of tokens) {
+    if (!prefOn(token, 'weather')) continue;
+    for (const c of (meta.favoriteCities || [])) {
+      const key = `${c.lat.toFixed(2)},${c.lon.toFixed(2)}`;
+      if (!cities.has(key)) cities.set(key, { name: c.name, lat: c.lat, lon: c.lon, recipients: new Set() });
+      cities.get(key).recipients.add(token);
+    }
+  }
+  if (cities.size === 0) return { cities: 0, alerts: 0, sent: 0 };
+
+  const now = Date.now();
+  let alerts = 0;
+  let sent = 0;
+
+  for (const [key, city] of cities) {
+    let outlook;
+    try {
+      outlook = await weatherService.getOutlook(city.lat, city.lon);
+    } catch (e) {
+      logger.warn(`weather outlook failed for ${city.name}: ${e.message}`);
+      continue;
+    }
+    const h = outlook?.hourly;
+    if (!h?.time) continue;
+
+    let maxPrecip = 0;
+    let maxProb = 0;
+    let storm = false;
+    for (let i = 0; i < h.time.length; i++) {
+      const ts = new Date(h.time[i]).getTime();
+      if (ts < now || ts > now + WEATHER_LOOKAHEAD_MS) continue;
+      maxPrecip = Math.max(maxPrecip, h.precipitation?.[i] ?? 0);
+      maxProb = Math.max(maxProb, h.precipitation_probability?.[i] ?? 0);
+      if ((h.weather_code?.[i] ?? 0) >= 95) storm = true;
+    }
+
+    const rain = maxPrecip >= WEATHER_RAIN_MM && maxProb >= WEATHER_RAIN_PROB;
+    if (!storm && !rain) continue;
+
+    const type = storm ? 'storm' : 'rain';
+    const dkey = `${key}::${type}::${today}`;
+    if (notifiedWeatherKeys.has(dkey)) continue;
+    alerts++;
+    if (dryRun) continue;
+
+    const title = storm ? `⛈️ Orage à ${city.name}` : `🌧️ Pluie à ${city.name}`;
+    const body = storm
+      ? 'Orage prévu dans les 3 prochaines heures — sois prudent.'
+      : `Pluie prévue dans les 3 prochaines heures · ${maxProb}% · jusqu'à ${maxPrecip.toFixed(1)} mm/h.`;
+    const n = await notifyTokens(city.recipients, {
+      title,
+      body,
+      type: `weather_${type}`,
+      tag: `weather_${type}_${key}`.replace(/[^a-zA-Z0-9_]/g, '_'),
+      channelId: 'weather_alerts',
+    });
+    if (n > 0) notifiedWeatherKeys.add(dkey);
+    sent += n;
+  }
+
+  return { cities: cities.size, alerts, sent, dryRun };
+}
+
 function getStatus() {
   return {
     tokenCount: tokens.size,
@@ -697,8 +809,10 @@ function getStatus() {
 function resetNotifiedKeys() {
   notifiedVbKeys.clear();
   notifiedFavKeys.clear();
+  notifiedWeatherKeys.clear();
   liveState.clear();
   lastFavScanDate = null;
+  lastWeatherScanDate = null;
 }
 
 module.exports = {
@@ -707,6 +821,7 @@ module.exports = {
   scanAndNotify,
   scanFavoriteTeamsToday,
   scanLiveFavorites,
+  scanWeatherAndNotify,
   getStatus,
   resetNotifiedKeys,
 };
