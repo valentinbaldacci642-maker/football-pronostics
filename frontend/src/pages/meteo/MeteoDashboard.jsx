@@ -194,11 +194,11 @@ function ForecastTable({ days }) {
 
 function QuickStat({ icon: Icon, label, value }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl px-3 py-2 backdrop-blur-md" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-      <Icon className="w-4 h-4 text-white/55 flex-shrink-0" />
+    <div className="flex items-center gap-3 rounded-xl px-4 py-3 backdrop-blur-md" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <Icon className="w-6 h-6 text-white/55 flex-shrink-0" />
       <div className="leading-none">
-        <p className="text-[10px] uppercase tracking-wider text-white/40 font-heading">{label}</p>
-        <p className="text-sm font-heading font-bold text-white/90 mt-0.5">{value}</p>
+        <p className="text-xs uppercase tracking-wider text-white/45 font-heading">{label}</p>
+        <p className="text-2xl font-heading font-bold text-white/90 mt-1">{value}</p>
       </div>
     </div>
   );
@@ -218,11 +218,11 @@ function BigTile({ icon: Icon, label, risk, value, sub }) {
         <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl" style={{ background: 'rgba(0,0,0,0.25)' }}>
           <Icon className="w-5 h-5" style={{ color: risk.color }} />
         </div>
-        <span className="text-xs font-bold px-2.5 py-1 rounded-full text-white" style={{ background: risk.color }}>{risk.label}</span>
+        <span className="text-sm font-bold px-3 py-1 rounded-full text-white" style={{ background: risk.color }}>{risk.label}</span>
       </div>
-      <p className="text-sm font-heading font-semibold text-white/80">{label}</p>
-      <p className="font-display text-xl text-white mt-0.5">{value}</p>
-      {sub && <p className="text-[11px] mt-0.5" style={{ color: risk.color }}>{sub}</p>}
+      <p className="text-base font-heading font-semibold text-white/80">{label}</p>
+      <p className="font-display text-2xl text-white mt-0.5">{value}</p>
+      {sub && <p className="text-xs mt-1" style={{ color: risk.color }}>{sub}</p>}
     </div>
   );
 }
