@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap, Snowflake } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap, Snowflake, Gauge, Leaf, Waves } from 'lucide-react';
+import { ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
-  getForecast, wmo, windRisk, rainRisk, uvRisk, stormRisk, severeStormRisk, maxRisk,
-  dirToCompass, RISK, windyUrl, blitzortungUrl, tempColor,
+  getForecast, getAirQuality, getMarine, wmo, windRisk, rainRisk, uvRisk, stormRisk, severeStormRisk, maxRisk,
+  dirToCompass, RISK, windyUrl, blitzortungUrl, tempColor, aqiLevel, pollenLevel, POLLENS,
 } from '../../services/meteo';
 import { InfoBadge, orageText, violentText } from '../../components/meteo/RiskUI';
 import MapEmbed from '../../components/meteo/MapEmbed';
@@ -265,6 +266,131 @@ function BigTile({ icon: Icon, label, risk, value, sub }) {
   );
 }
 
+const sectionLabel = 'text-[11px] font-heading font-bold tracking-[2px] text-white/45 mb-2.5';
+const glassCard = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' };
+
+// 48h meteogram: temperature line + precipitation bars.
+function Meteogram({ data, tempUnit }) {
+  const h = data?.hourly || {};
+  const times = h.time || [];
+  if (!times.length) return null;
+  const now = Date.now();
+  let start = times.findIndex((t) => new Date(t).getTime() >= now);
+  if (start < 0) start = 0;
+  start = Math.max(0, start - 1);
+  const rows = [];
+  for (let i = start; i < Math.min(start + 48, times.length); i++) {
+    const d = new Date(times[i]);
+    rows.push({
+      label: d.getHours() === 0 ? `${d.getDate()}/${d.getMonth() + 1}` : `${d.getHours()}h`,
+      temp: tempUnit === 'K' ? Math.round(h.temperature_2m[i] + 273.15) : Math.round(h.temperature_2m[i]),
+      precip: +(h.precipitation?.[i] ?? 0).toFixed(1),
+      prob: h.precipitation_probability?.[i] ?? 0,
+    });
+  }
+  const unit = tempUnit === 'K' ? ' K' : '°';
+  return (
+    <div className="rounded-2xl p-3 sm:p-4 backdrop-blur-md" style={glassCard}>
+      <ResponsiveContainer width="100%" height={220}>
+        <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+          <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+          <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} interval={3} axisLine={false} tickLine={false} />
+          <YAxis yAxisId="t" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} axisLine={false} tickLine={false} width={34} />
+          <YAxis yAxisId="p" orientation="right" tick={{ fill: 'rgba(56,189,248,0.6)', fontSize: 10 }} axisLine={false} tickLine={false} width={28} />
+          <Tooltip
+            contentStyle={{ background: '#0b1220', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, fontSize: 12 }}
+            labelStyle={{ color: '#94a3b8' }}
+            formatter={(v, n) => (n === 'temp' ? [`${v}${unit}`, 'Temp.'] : n === 'precip' ? [`${v} mm`, 'Pluie'] : [v, n])}
+          />
+          <Bar yAxisId="p" dataKey="precip" fill="#38bdf8" opacity={0.55} radius={[3, 3, 0, 0]} maxBarSize={14} />
+          <Line yAxisId="t" type="monotone" dataKey="temp" stroke="#f59e0b" strokeWidth={2.5} dot={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function AirPollen({ aq }) {
+  const c = aq?.current;
+  if (!c) return null;
+  const lvl = aqiLevel(c.european_aqi);
+  const pollens = POLLENS.map((p) => ({ ...p, v: c[p.key] })).filter((p) => p.v != null && p.v >= 1);
+  return (
+    <div>
+      <p className={sectionLabel}>AIR & POLLEN</p>
+      <div className="rounded-2xl p-4 backdrop-blur-md space-y-3" style={glassCard}>
+        {lvl && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.25)' }}>
+                <Gauge className="w-5 h-5" style={{ color: lvl.color }} />
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-heading font-semibold text-white/80">Qualité de l'air</p>
+                <p className="font-display text-xl text-white">{Math.round(c.european_aqi)}<span className="text-xs text-white/40 ml-1">indice EU</span></p>
+              </div>
+            </div>
+            <span className="text-sm font-bold px-3 py-1 rounded-full text-white" style={{ background: lvl.color }}>{lvl.label}</span>
+          </div>
+        )}
+        <div className="grid grid-cols-4 gap-2 pt-1">
+          {[['PM2.5', c.pm2_5], ['PM10', c.pm10], ['O₃', c.ozone], ['NO₂', c.nitrogen_dioxide]].map(([k, v]) => (
+            <div key={k} className="text-center rounded-lg py-1.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              <p className="text-[10px] uppercase tracking-wider text-white/40 font-heading">{k}</p>
+              <p className="text-sm font-mono text-white/85 mt-0.5">{v != null ? Math.round(v) : '–'}</p>
+            </div>
+          ))}
+        </div>
+        {pollens.length > 0 && (
+          <div className="pt-1 border-t border-white/[0.06]">
+            <p className="text-[10px] uppercase tracking-wider text-white/40 font-heading mb-1.5 flex items-center gap-1"><Leaf className="w-3 h-3" /> Pollens</p>
+            <div className="flex flex-wrap gap-1.5">
+              {pollens.map((p) => {
+                const r = pollenLevel(p.v);
+                return (
+                  <span key={p.key} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold"
+                    style={{ backgroundColor: r.bgHex, color: r.color, border: `1px solid ${r.color}55` }}>
+                    <span>{p.icon}</span>{p.label} · {r.label}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MarineCard({ marine, tempUnit }) {
+  const c = marine?.current;
+  if (!c || (c.wave_height == null && c.sea_surface_temperature == null)) return null;
+  const seaT = c.sea_surface_temperature;
+  const seaTxt = seaT == null ? '–' : (tempUnit === 'K' ? `${Math.round(seaT + 273.15)} K` : `${Math.round(seaT)}°`);
+  return (
+    <div>
+      <p className={sectionLabel}>MER</p>
+      <div className="rounded-2xl p-4 backdrop-blur-md grid grid-cols-3 gap-2" style={glassCard}>
+        <div className="flex flex-col items-center gap-1">
+          <Thermometer className="w-4 h-4 text-cyan-300" />
+          <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Eau</span>
+          <span className="font-display text-lg" style={{ color: tempColor(seaT) }}>{seaTxt}</span>
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <Waves className="w-4 h-4 text-sky-300" />
+          <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Vagues</span>
+          <span className="font-display text-lg text-white/90">{c.wave_height != null ? `${c.wave_height.toFixed(1)} m` : '–'}</span>
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <RefreshCw className="w-4 h-4 text-sky-300" />
+          <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Période</span>
+          <span className="font-display text-lg text-white/90">{c.wave_period != null ? `${Math.round(c.wave_period)} s` : '–'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MeteoDashboard() {
   const [params] = useSearchParams();
   const lat = parseFloat(params.get('lat'));
@@ -273,6 +399,8 @@ export default function MeteoDashboard() {
   const admin = params.get('admin') || '';
 
   const [data, setData] = useState(null);
+  const [aq, setAq] = useState(null);
+  const [marine, setMarine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tempUnit, setTempUnit] = useState(() => localStorage.getItem('meteo_tempUnit') || 'C');
@@ -288,6 +416,8 @@ export default function MeteoDashboard() {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) { setError('Coordonnées invalides'); setLoading(false); return; }
     setLoading(true); setError(null);
     getForecast(lat, lon).then(setData).catch((e) => setError(e?.message || 'Erreur')).finally(() => setLoading(false));
+    getAirQuality(lat, lon).then(setAq).catch(() => setAq(null));
+    getMarine(lat, lon).then(setMarine).catch(() => setMarine(null));
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [lat, lon]);
 
@@ -357,6 +487,20 @@ export default function MeteoDashboard() {
                 <BigTile icon={Wind} label="Vent" risk={ventTile} value={`${fmtWind(today?.windKmh, windUnit)} ${windUnitLabel(windUnit)}`} sub={`rafales ${fmtWind(today?.gustKmh, windUnit)} ${windUnitLabel(windUnit)}`} />
               </div>
             </motion.div>
+
+            {/* Meteogram 48h */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.13 }} className="mt-7">
+              <p className={sectionLabel}>TENDANCE 48H · TEMPÉRATURE & PLUIE</p>
+              <Meteogram data={data} tempUnit={tempUnit} />
+            </motion.div>
+
+            {/* Air quality + pollen, and marine (coastal only) */}
+            {(aq?.current || marine?.current) && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }} className="mt-7 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <AirPollen aq={aq} />
+                <MarineCard marine={marine} tempUnit={tempUnit} />
+              </motion.div>
+            )}
 
             {/* Forecast table (compact, left) + big live city maps 2x2 (right) */}
             <div className="mt-7 lg:grid lg:grid-cols-[1fr_2fr] lg:gap-6 lg:items-start">

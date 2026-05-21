@@ -158,6 +158,99 @@ async function fetchForecast(lat, lon) {
   return data;
 }
 
+// ─── Air quality + pollen ────────────────────────────────────────────────────
+const AQ_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+const MARINE_URL = 'https://marine-api.open-meteo.com/v1/marine';
+
+// Generic cached + retried GET (same rationale as getForecast: Open-Meteo 429s).
+async function cachedFetch(key, ttl, fetcher) {
+  const k = `meteo_${key}`;
+  const read = () => { try { const raw = localStorage.getItem(k); return raw ? JSON.parse(raw) : null; } catch { return null; } };
+  const cached = read();
+  if (cached && Date.now() - cached.t < ttl) return cached.data;
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const data = await fetcher();
+      try { localStorage.setItem(k, JSON.stringify({ t: Date.now(), data })); } catch { /* full */ }
+      return data;
+    } catch (e) {
+      lastErr = e;
+      const s = e?.response?.status;
+      if (!(s === 429 || s === 503 || s >= 500 || s === undefined)) throw e;
+      const stale = read();
+      if (stale) return stale.data;
+      await sleep(700 * (attempt + 1));
+    }
+  }
+  const stale = read();
+  if (stale) return stale.data;
+  throw lastErr;
+}
+
+export function getAirQuality(lat, lon) {
+  return cachedFetch(`aq_${lat.toFixed(3)}_${lon.toFixed(3)}`, FORECAST_TTL, async () => {
+    const { data } = await axios.get(AQ_URL, {
+      params: {
+        latitude: lat, longitude: lon, timezone: 'auto',
+        current: [
+          'european_aqi', 'pm2_5', 'pm10', 'ozone', 'nitrogen_dioxide',
+          'alder_pollen', 'birch_pollen', 'grass_pollen', 'mugwort_pollen', 'olive_pollen', 'ragweed_pollen',
+        ].join(','),
+      },
+    });
+    return data;
+  });
+}
+
+// Marine forecast — only meaningful for coastal/sea points. Returns null when
+// the location has no marine data (inland) instead of throwing.
+export async function getMarine(lat, lon) {
+  try {
+    const data = await cachedFetch(`marine_${lat.toFixed(3)}_${lon.toFixed(3)}`, FORECAST_TTL, async () => {
+      const res = await axios.get(MARINE_URL, {
+        params: {
+          latitude: lat, longitude: lon, timezone: 'auto',
+          current: ['wave_height', 'wave_direction', 'wave_period', 'sea_surface_temperature'].join(','),
+          daily: ['wave_height_max'].join(','),
+        },
+      });
+      return res.data;
+    });
+    if (data?.current?.wave_height == null && data?.current?.sea_surface_temperature == null) return null;
+    return data;
+  } catch { return null; }
+}
+
+// European AQI → level (official CAQI bands).
+export function aqiLevel(aqi) {
+  if (aqi == null || Number.isNaN(aqi)) return null;
+  if (aqi <= 20) return { label: 'Bon', color: '#22c55e', bgHex: '#14532d' };
+  if (aqi <= 40) return { label: 'Moyen', color: '#84cc16', bgHex: '#1a2e05' };
+  if (aqi <= 60) return { label: 'Dégradé', color: '#f59e0b', bgHex: '#431407' };
+  if (aqi <= 80) return { label: 'Mauvais', color: '#ef4444', bgHex: '#450a0a' };
+  if (aqi <= 100) return { label: 'Très mauvais', color: '#a855f7', bgHex: '#2e1065' };
+  return { label: 'Extrême', color: '#9f1239', bgHex: '#4c0519' };
+}
+
+// Pollen concentration (grains/m³) → risk level (generic CAMS bands).
+export function pollenLevel(v) {
+  if (v == null) return RISK.FAIBLE;
+  if (v >= 80) return RISK.EXTREME;
+  if (v >= 30) return RISK.ELEVE;
+  if (v >= 10) return RISK.MODERE;
+  return RISK.FAIBLE;
+}
+
+export const POLLENS = [
+  { key: 'grass_pollen', label: 'Graminées', icon: '🌾' },
+  { key: 'birch_pollen', label: 'Bouleau', icon: '🌳' },
+  { key: 'alder_pollen', label: 'Aulne', icon: '🌲' },
+  { key: 'ragweed_pollen', label: 'Ambroisie', icon: '🌿' },
+  { key: 'olive_pollen', label: 'Olivier', icon: '🫒' },
+  { key: 'mugwort_pollen', label: 'Armoise', icon: '🌱' },
+];
+
 // ─── WMO weather codes → French label + emoji ────────────────────────────────
 const WMO = {
   0:  ['Ciel clair', '☀️'],
