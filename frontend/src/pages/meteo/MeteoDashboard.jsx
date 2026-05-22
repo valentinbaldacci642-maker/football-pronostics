@@ -291,26 +291,44 @@ function Meteogram({ data, tempUnit }) {
     });
   }
   const unit = tempUnit === 'K' ? ' K' : '°';
+  const renderTip = ({ active, payload, label }) => {
+    if (!active || !payload || !payload.length) return null;
+    const r = payload[0].payload;
+    return (
+      <div style={{ background: '#0b1220', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '8px 10px', fontSize: 12 }}>
+        <p style={{ color: '#94a3b8', marginBottom: 4 }}>{label}</p>
+        <p style={{ color: '#f59e0b' }}>Température : <b>{r.temp}{unit}</b></p>
+        <p style={{ color: '#38bdf8' }}>Pluie : <b>{r.prob}%</b> · {r.precip.toFixed(1)} mm</p>
+      </div>
+    );
+  };
   return (
     <div className="rounded-2xl p-3 sm:p-4 backdrop-blur-md" style={glassCard}>
+      <div className="flex items-center gap-4 mb-2 px-1 text-[11px] font-heading">
+        <span className="flex items-center gap-1.5 text-amber-400"><span className="inline-block w-4 h-0.5 rounded-full" style={{ background: '#f59e0b' }} /> Température</span>
+        <span className="flex items-center gap-1.5 text-sky-300"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: '#38bdf8' }} /> Probabilité de pluie (%)</span>
+      </div>
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
           <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
           <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} interval={3} axisLine={false} tickLine={false} />
-          <YAxis yAxisId="t" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} axisLine={false} tickLine={false} width={34} />
-          <YAxis yAxisId="p" orientation="right" tick={{ fill: 'rgba(56,189,248,0.6)', fontSize: 10 }} axisLine={false} tickLine={false} width={28} />
-          <Tooltip
-            contentStyle={{ background: '#0b1220', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, fontSize: 12 }}
-            labelStyle={{ color: '#94a3b8' }}
-            formatter={(v, n) => (n === 'temp' ? [`${v}${unit}`, 'Temp.'] : n === 'precip' ? [`${v} mm`, 'Pluie'] : [v, n])}
-          />
-          <Bar yAxisId="p" dataKey="precip" fill="#38bdf8" opacity={0.55} radius={[3, 3, 0, 0]} maxBarSize={14} />
+          <YAxis yAxisId="t" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} axisLine={false} tickLine={false} width={34} unit={unit} />
+          <YAxis yAxisId="p" orientation="right" domain={[0, 100]} tick={{ fill: 'rgba(56,189,248,0.6)', fontSize: 10 }} axisLine={false} tickLine={false} width={30} unit="%" />
+          <Tooltip content={renderTip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+          <Bar yAxisId="p" dataKey="prob" fill="#38bdf8" opacity={0.5} radius={[3, 3, 0, 0]} maxBarSize={16} />
           <Line yAxisId="t" type="monotone" dataKey="temp" stroke="#f59e0b" strokeWidth={2.5} dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
 }
+
+const POLLUTANTS = [
+  { k: 'PM2.5', key: 'pm2_5', desc: 'Particules fines' },
+  { k: 'PM10', key: 'pm10', desc: 'Particules' },
+  { k: 'O₃', key: 'ozone', desc: 'Ozone' },
+  { k: 'NO₂', key: 'nitrogen_dioxide', desc: 'Dioxyde d’azote' },
+];
 
 function AirPollen({ aq }) {
   const c = aq?.current;
@@ -320,37 +338,47 @@ function AirPollen({ aq }) {
   return (
     <div>
       <p className={sectionLabel}>AIR & POLLEN</p>
-      <div className="rounded-2xl p-4 backdrop-blur-md space-y-3" style={glassCard}>
+      <div className="rounded-2xl p-4 backdrop-blur-md space-y-3.5" style={glassCard}>
         {lvl && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.25)' }}>
-                <Gauge className="w-5 h-5" style={{ color: lvl.color }} />
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(0,0,0,0.25)' }}>
+                  <Gauge className="w-6 h-6" style={{ color: lvl.color }} />
+                </div>
+                <div className="leading-tight">
+                  <p className="text-base font-heading font-semibold text-white/85">Qualité de l'air</p>
+                  <p className="font-display text-3xl text-white">{Math.round(c.european_aqi)}<span className="text-sm text-white/45 ml-1.5">/ 100 · indice EU</span></p>
+                </div>
               </div>
-              <div className="leading-tight">
-                <p className="text-sm font-heading font-semibold text-white/80">Qualité de l'air</p>
-                <p className="font-display text-xl text-white">{Math.round(c.european_aqi)}<span className="text-xs text-white/40 ml-1">indice EU</span></p>
-              </div>
+              <span className="text-base font-bold px-4 py-1.5 rounded-full text-white flex-shrink-0" style={{ background: lvl.color }}>{lvl.label}</span>
             </div>
-            <span className="text-sm font-bold px-3 py-1 rounded-full text-white" style={{ background: lvl.color }}>{lvl.label}</span>
-          </div>
+            <p className="text-xs text-white/45 leading-relaxed">
+              Indice européen de qualité de l'air : <span className="text-emerald-400">0–20 bon</span> · <span className="text-lime-400">20–40 moyen</span> · <span className="text-amber-400">40–60 dégradé</span> · <span className="text-red-400">60–80 mauvais</span> · <span className="text-purple-400">80+ très mauvais</span>.
+            </p>
+          </>
         )}
-        <div className="grid grid-cols-4 gap-2 pt-1">
-          {[['PM2.5', c.pm2_5], ['PM10', c.pm10], ['O₃', c.ozone], ['NO₂', c.nitrogen_dioxide]].map(([k, v]) => (
-            <div key={k} className="text-center rounded-lg py-1.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
-              <p className="text-[10px] uppercase tracking-wider text-white/40 font-heading">{k}</p>
-              <p className="text-sm font-mono text-white/85 mt-0.5">{v != null ? Math.round(v) : '–'}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+          {POLLUTANTS.map(({ k, key, desc }) => (
+            <div key={k} className="text-center rounded-xl py-2.5 px-1" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              <p className="text-xs uppercase tracking-wider text-white/55 font-heading font-bold">{k}</p>
+              <p className="text-xl font-mono text-white/90 mt-1">{c[key] != null ? Math.round(c[key]) : '–'}</p>
+              <p className="text-[10px] text-white/35 mt-0.5">µg/m³</p>
+              <p className="text-[10px] text-white/40 mt-1 leading-tight">{desc}</p>
             </div>
           ))}
         </div>
+        <p className="text-[11px] text-white/40 leading-relaxed">
+          Concentrations en microgrammes par m³ d'air. <strong className="text-white/55">PM2.5/PM10</strong> = particules fines (plus c'est bas, mieux c'est) · <strong className="text-white/55">O₃</strong> ozone · <strong className="text-white/55">NO₂</strong> pollution auto.
+        </p>
         {pollens.length > 0 && (
-          <div className="pt-1 border-t border-white/[0.06]">
-            <p className="text-[10px] uppercase tracking-wider text-white/40 font-heading mb-1.5 flex items-center gap-1"><Leaf className="w-3 h-3" /> Pollens</p>
+          <div className="pt-2 border-t border-white/[0.06]">
+            <p className="text-xs uppercase tracking-wider text-white/50 font-heading font-bold mb-2 flex items-center gap-1.5"><Leaf className="w-3.5 h-3.5" /> Pollens · risque allergique</p>
             <div className="flex flex-wrap gap-1.5">
               {pollens.map((p) => {
                 const r = pollenLevel(p.v);
                 return (
-                  <span key={p.key} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold"
+                  <span key={p.key} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold"
                     style={{ backgroundColor: r.bgHex, color: r.color, border: `1px solid ${r.color}55` }}>
                     <span>{p.icon}</span>{p.label} · {r.label}
                   </span>
