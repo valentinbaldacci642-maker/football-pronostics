@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { notificationsApi } from './api';
-import { useFavoriteTeamsStore, useFavoritesStore } from '../store';
+import { useFavoriteTeamsStore, useFavoritesStore, useHistoryStore } from '../store';
 import { getAlertCities } from './meteo';
 
 // Static import so Capacitor can wire the plugin bridge at JS init time.
@@ -23,6 +23,7 @@ export const NOTIF_TYPES = [
   { key: 'goal',      label: 'But en direct',        desc: 'À chaque but d’un match suivi' },
   { key: 'final',     label: 'Résultat final',       desc: 'Score final d’un match suivi' },
   { key: 'weather',   label: 'Alertes météo',        desc: 'Pluie ou orage à venir sur une ville suivie (MimiMétéo)' },
+  { key: 'betResult', label: 'Résultat de mes paris', desc: 'Quand un de tes paris en cours est gagné ou perdu' },
 ];
 
 export function getNotifPrefs() {
@@ -65,6 +66,28 @@ function currentFavoriteMatchIds() {
 // Read MimiMétéo weather-alert cities from localStorage.
 function currentFavoriteCities() {
   try { return getAlertCities(); } catch (_) { return []; }
+}
+
+// Staked, unresolved bets from the history store → backend notifies when each
+// settles (win/loss). Shape: { fixtureId, market, selection, home, away }.
+function currentPendingBets() {
+  try {
+    const entries = useHistoryStore.getState().entries || [];
+    const out = [];
+    for (const e of entries) {
+      if (!e.fixtureId || e.fixtureId <= 0) continue;
+      for (const [betKey, b] of Object.entries(e.bets || {})) {
+        if (Number.isFinite(b.mise) && b.mise > 0 && !b.result) {
+          const [market, selection] = betKey.split('::');
+          out.push({ fixtureId: e.fixtureId, market: b.market || market || '', selection: b.selection || selection || '', home: e.homeTeam || '', away: e.awayTeam || '' });
+        }
+      }
+      if (Number.isFinite(e.mise) && e.mise > 0 && !e.result && e.pick) {
+        out.push({ fixtureId: e.fixtureId, market: '', selection: e.pick, home: e.homeTeam || '', away: e.awayTeam || '' });
+      }
+    }
+    return out;
+  } catch (_) { return []; }
 }
 
 export function isNotificationsEnabled() {
@@ -140,7 +163,7 @@ export async function initPushNotifications() {
 
     try {
       await notificationsApi.register(
-        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities()
+        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets()
       );
     } catch (e) {
       // Backend down → don't block the app, retry next launch
@@ -194,7 +217,7 @@ export async function syncFavoriteTeamsToBackend() {
   if (!token) return;
   try {
     await notificationsApi.register(
-      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities()
+      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets()
     );
   } catch (e) {
     console.warn('[push] favorite sync failed:', e?.message);

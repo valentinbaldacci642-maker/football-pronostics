@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceL
 import { useHistoryStore, useBankrollStore, EDGE_MODE_THRESHOLD, gradeBet } from '../store';
 import { resolveFinishedMatches } from '../utils/resolveResults';
 import { fixturesApi } from '../services/api';
+import { syncWeatherCitiesToBackend } from '../services/pushNotifications';
 import { exportBankrollCsv } from '../utils/exportCsv';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -241,6 +242,9 @@ export default function History() {
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('pending');
   const [search, setSearch] = useState('');
+  // Push the current staked bets to the backend so it can notify when each
+  // settles (win/loss). Runs when the history page opens.
+  useEffect(() => { syncWeatherCitiesToBackend(); }, []);
   // Live scores for pending bets — fetched from /fixtures/live while the
   // "Paris en cours" tab is open, refreshed every 60s. Map fixtureId → live.
   const [liveMap, setLiveMap] = useState(() => new Map());

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap, Snowflake, Gauge, Leaf, Waves, Bell, BellRing } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap, Snowflake, Gauge, Leaf, Waves, Bell, BellRing, ShieldAlert } from 'lucide-react';
 import { ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
   getForecast, getAirQuality, getMarine, wmo, windRisk, rainRisk, uvRisk, stormRisk, severeStormRisk, maxRisk,
   dirToCompass, RISK, windyUrl, blitzortungUrl, tempColor, aqiLevel, pollenLevel, POLLENS,
   isAlertCity, toggleAlertCity,
 } from '../../services/meteo';
+import { weatherApi } from '../../services/api';
 import { syncWeatherCitiesToBackend } from '../../services/pushNotifications';
 import { InfoBadge, orageText, violentText } from '../../components/meteo/RiskUI';
 import MapEmbed from '../../components/meteo/MapEmbed';
@@ -483,6 +484,7 @@ export default function MeteoDashboard() {
   const [data, setData] = useState(null);
   const [aq, setAq] = useState(null);
   const [marine, setMarine] = useState(null);
+  const [vigilance, setVigilance] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tempUnit, setTempUnit] = useState(() => localStorage.getItem('meteo_tempUnit') || 'C');
@@ -507,6 +509,7 @@ export default function MeteoDashboard() {
     getForecast(lat, lon).then(setData).catch((e) => setError(e?.message || 'Erreur')).finally(() => setLoading(false));
     getAirQuality(lat, lon).then(setAq).catch(() => setAq(null));
     getMarine(lat, lon).then(setMarine).catch(() => setMarine(null));
+    weatherApi.getVigilance(lat, lon).then((r) => setVigilance(r?.warnings || [])).catch(() => setVigilance([]));
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [lat, lon]);
 
@@ -561,6 +564,28 @@ export default function MeteoDashboard() {
             </>
           )}
         </motion.div>
+
+        {/* Vigilance Météo-France (department-level, via MeteoAlarm) */}
+        {vigilance.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-5 rounded-2xl p-3.5 backdrop-blur-md"
+            style={{ background: `${vigilance[0].color}1f`, border: `1px solid ${vigilance[0].color}` }}>
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldAlert className="w-5 h-5" style={{ color: vigilance[0].color }} />
+              <span className="font-heading font-bold text-sm" style={{ color: vigilance[0].color }}>
+                Vigilance {vigilance[0].levelLabel} · Météo-France
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {vigilance.map((v, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold"
+                  style={{ backgroundColor: `${v.color}26`, color: v.color, border: `1px solid ${v.color}66` }}>
+                  <span>{v.icon}</span>{v.type} · {v.levelLabel}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
         {!loading && !error && data && (
           <>

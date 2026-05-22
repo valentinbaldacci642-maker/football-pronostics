@@ -217,12 +217,17 @@ export const newsApi = {
   getLatest: () => api.get('/news'),
 };
 
+export const weatherApi = {
+  // Météo-France vigilance for a point (proxied MeteoAlarm).
+  getVigilance: (lat, lon) => api.get('/weather/vigilance', { params: { lat, lon } }),
+};
+
 export const notificationsApi = {
   // favoriteTeams: API-Football team IDs → 'team plays today' notif (2h before).
   // favoriteMatches: fixture IDs → 'your match starts in 15 min' notif.
   // Both optional — omitted/empty means VB notifs only.
-  register: (token, platform, favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null) =>
-    api.post('/notifications/register', { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities }),
+  register: (token, platform, favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null, pendingBets = null) =>
+    api.post('/notifications/register', { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets }),
   unregister: (token) => api.post('/notifications/unregister', { token }),
   status: () => api.get('/notifications/status'),
 };

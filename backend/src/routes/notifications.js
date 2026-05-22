@@ -9,11 +9,11 @@ const adminAuth = require('../middleware/adminAuth');
 const authScan = adminAuth({ allowQueryKey: true });
 
 router.post('/register', (req, res) => {
-  const { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities } = req.body || {};
+  const { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets } = req.body || {};
   if (!token || typeof token !== 'string') {
     return res.status(400).json({ error: 'token is required' });
   }
-  const ok = notifications.registerToken(token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities);
+  const ok = notifications.registerToken(token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets);
   res.json({ ok, status: notifications.getStatus() });
 });
 
@@ -63,8 +63,14 @@ router.get('/scan-new-vbs', authScan, async (req, res) => {
     } catch (wErr) {
       logger.warn('weather scan failed: ' + (wErr?.message || wErr));
     }
+    let betResults = null;
+    try {
+      betResults = await notifications.scanBetResults({ dryRun });
+    } catch (bErr) {
+      logger.warn('bet-results scan failed: ' + (bErr?.message || bErr));
+    }
 
-    res.json({ ...result, favorites, live, weather });
+    res.json({ ...result, favorites, live, weather, betResults });
   } catch (e) {
     logger.error('scan-new-vbs failed: ' + (e?.stack || e?.message || e));
     res.status(500).json({ error: 'Scan failed', message: e?.message });
@@ -92,6 +98,18 @@ router.get('/scan-weather-alerts', authScan, async (req, res) => {
     res.json(result);
   } catch (e) {
     logger.error('scan-weather-alerts failed: ' + (e?.stack || e?.message || e));
+    res.status(500).json({ error: 'Scan failed', message: e?.message });
+  }
+});
+
+// Standalone bet-result scan — notify when a user's staked bet settles.
+router.get('/scan-bet-results', authScan, async (req, res) => {
+  try {
+    const dryRun = req.query.dry === '1';
+    const result = await notifications.scanBetResults({ dryRun });
+    res.json(result);
+  } catch (e) {
+    logger.error('scan-bet-results failed: ' + (e?.stack || e?.message || e));
     res.status(500).json({ error: 'Scan failed', message: e?.message });
   }
 });

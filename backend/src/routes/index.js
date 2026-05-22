@@ -13,5 +13,6 @@ router.use('/pronostics', require('./pronostics'));
 router.use('/cache', require('./cacheAdmin'));
 router.use('/news', require('./news'));
 router.use('/notifications', require('./notifications'));
+router.use('/weather', require('./weather'));
 
 module.exports = router;

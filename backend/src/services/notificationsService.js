@@ -19,6 +19,9 @@ let lastFavScanDate = null;
 // Paris day. Reset when the date rolls over.
 const notifiedWeatherKeys = new Set();
 let lastWeatherScanDate = null;
+// Bet-result dedup — one settled notif per (token, fixture, betKey). Reset daily.
+const notifiedBetResultKeys = new Set();
+let lastBetResultDate = null;
 // Live match state for kickoff / goal / final notifs, only for fixtures a
 // token cares about. fixtureId → { status, gh, ga }. Wiped on restart →
 // at worst one live event is missed right after a deploy.
@@ -35,7 +38,52 @@ const ALLOWED_PLATFORMS = new Set(['android', 'ios', 'web', 'unknown']);
 
 // Per-token notification preferences. Any key absent → treated as enabled,
 // so a stale client that doesn't send prefs keeps getting everything.
-const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'goal', 'final', 'kickoff', 'favTeamVb', 'weather'];
+const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'goal', 'final', 'kickoff', 'favTeamVb', 'weather', 'betResult'];
+
+// Grade a bet pick against a final score → 'win' | 'loss' | 'push' | null.
+// Mirror of the frontend gradeBet so settled-bet notifs match the app's verdict.
+function gradeBet(market, selection, hg, ag) {
+  const sel = (selection || '').trim().toLowerCase();
+  if (!sel) return null;
+  const total = hg + ag;
+  if (sel === '1' || sel === 'home') return hg > ag ? 'win' : 'loss';
+  if (sel === 'x' || sel === 'draw') return hg === ag ? 'win' : 'loss';
+  if (sel === '2' || sel === 'away') return ag > hg ? 'win' : 'loss';
+  if (sel.startsWith('over')) {
+    const line = parseFloat(sel.replace(/[^0-9.]/g, ''));
+    if (Number.isFinite(line)) return total > line ? 'win' : (total === line ? 'push' : 'loss');
+  }
+  if (sel.startsWith('under')) {
+    const line = parseFloat(sel.replace(/[^0-9.]/g, ''));
+    if (Number.isFinite(line)) return total < line ? 'win' : (total === line ? 'push' : 'loss');
+  }
+  if (sel === 'oui' || sel === 'yes') return (hg > 0 && ag > 0) ? 'win' : 'loss';
+  if (sel === 'non' || sel === 'no') return (hg === 0 || ag === 0) ? 'win' : 'loss';
+  return null;
+}
+
+// Sanitize the client's staked pending bets: [{ fixtureId, market, selection,
+// home, away }], capped. Used to notify when each bet settles.
+function sanitizePendingBets(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const b of input) {
+    if (!b || typeof b !== 'object') continue;
+    const fixtureId = typeof b.fixtureId === 'number' ? b.fixtureId : parseInt(b.fixtureId, 10);
+    if (!Number.isInteger(fixtureId) || fixtureId <= 0) continue;
+    const selection = typeof b.selection === 'string' ? b.selection.slice(0, 40) : '';
+    if (!selection) continue;
+    out.push({
+      fixtureId,
+      market: typeof b.market === 'string' ? b.market.slice(0, 40) : '',
+      selection,
+      home: typeof b.home === 'string' ? b.home.slice(0, 60) : '',
+      away: typeof b.away === 'string' ? b.away.slice(0, 60) : '',
+    });
+    if (out.length >= 100) break;
+  }
+  return out;
+}
 
 function sanitizeNotifPrefs(input) {
   const out = {};
@@ -87,7 +135,7 @@ function sanitizeFavoriteCities(input) {
   return out;
 }
 
-function registerToken(token, platform = 'unknown', favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null) {
+function registerToken(token, platform = 'unknown', favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null, pendingBets = null) {
   if (!token || typeof token !== 'string') return false;
   // FCM registration tokens are ~140-260 chars. Reject anything outside
   // a sane range so an attacker can't fill memory with megabyte tokens.
@@ -97,10 +145,11 @@ function registerToken(token, platform = 'unknown', favoriteTeams = [], favorite
     const oldest = tokens.keys().next().value;
     if (oldest) tokens.delete(oldest);
   }
-  // Preserve existing prefs/cities if the client didn't send any this call.
+  // Preserve existing prefs/cities/bets if the client didn't send any this call.
   const prev = tokens.get(token);
   const prefs = notifPrefs != null ? sanitizeNotifPrefs(notifPrefs) : (prev?.notifPrefs || {});
   const cities = favoriteCities != null ? sanitizeFavoriteCities(favoriteCities) : (prev?.favoriteCities || []);
+  const bets = pendingBets != null ? sanitizePendingBets(pendingBets) : (prev?.pendingBets || []);
   tokens.set(token, {
     platform: safePlatform,
     registeredAt: Date.now(),
@@ -108,6 +157,7 @@ function registerToken(token, platform = 'unknown', favoriteTeams = [], favorite
     favoriteMatches: sanitizeFavoriteTeams(favoriteMatches), // same shape: positive int IDs
     notifPrefs: prefs,
     favoriteCities: cities,
+    pendingBets: bets,
   });
   return true;
 }
@@ -795,6 +845,75 @@ async function scanWeatherAndNotify({ dryRun = false } = {}) {
   return { cities: cities.size, alerts, sent, dryRun };
 }
 
+// ─── Bet-result notifications: notify when a user's staked bet settles ──────
+
+/**
+ * For each token's staked pending bets, check the fixture's final result and
+ * notify "Pari gagné/perdu" once it's over. One notif per (token, fixture,
+ * bet); dedup resets daily. Fetches today + yesterday fixtures (cached).
+ */
+async function scanBetResults({ dryRun = false } = {}) {
+  const today = dateInParis(0);
+  if (lastBetResultDate !== today) {
+    notifiedBetResultKeys.clear();
+    lastBetResultDate = today;
+  }
+
+  const anyBets = Array.from(tokens.values()).some((m) => (m.pendingBets || []).length > 0);
+  if (!anyBets) return { tokensWithBets: 0, settled: 0, sent: 0 };
+
+  const [d0, d1] = await Promise.all([
+    apiFootball.getFixturesByDate(dateInParis(0)),
+    apiFootball.getFixturesByDate(dateInParis(-1)),
+  ]);
+  const byId = new Map();
+  for (const f of [...(d1?.response || []), ...(d0?.response || [])]) {
+    if (f.fixture?.id) byId.set(f.fixture.id, f);
+  }
+
+  let sent = 0;
+  let settled = 0;
+  let tokensWithBets = 0;
+
+  for (const [token, meta] of tokens) {
+    const bets = meta.pendingBets || [];
+    if (bets.length === 0) continue;
+    tokensWithBets++;
+    if (!prefOn(token, 'betResult')) continue;
+
+    for (const bet of bets) {
+      const f = byId.get(bet.fixtureId);
+      if (!f) continue;
+      const status = f.fixture?.status?.short;
+      if (!FINAL_STATUSES.has(status)) continue;
+      const hg = f.goals?.home;
+      const ag = f.goals?.away;
+      if (!Number.isFinite(hg) || !Number.isFinite(ag)) continue;
+      const verdict = gradeBet(bet.market, bet.selection, hg, ag);
+      if (!verdict) continue;
+      settled++;
+      const key = `${token}::${bet.fixtureId}::${bet.market}::${bet.selection}`;
+      if (notifiedBetResultKeys.has(key)) continue;
+      if (dryRun) continue;
+      const home = bet.home || f.teams?.home?.name || '';
+      const away = bet.away || f.teams?.away?.name || '';
+      const emoji = verdict === 'win' ? '✅' : verdict === 'push' ? '↩️' : '❌';
+      const verdictTxt = verdict === 'win' ? 'Pari gagné' : verdict === 'push' ? 'Pari remboursé' : 'Pari perdu';
+      const n = await notifyTokens([token], {
+        title: `${emoji} ${verdictTxt}`,
+        body: `${home} ${hg}-${ag} ${away} · ${bet.selection}`,
+        type: `bet_${verdict}`,
+        fixtureId: bet.fixtureId,
+        tag: `betres_${bet.fixtureId}_${bet.market}_${bet.selection}`.replace(/[^a-zA-Z0-9_]/g, '_'),
+      });
+      if (n > 0) notifiedBetResultKeys.add(key);
+      sent += n;
+    }
+  }
+
+  return { tokensWithBets, settled, sent, dryRun };
+}
+
 function getStatus() {
   return {
     tokenCount: tokens.size,
@@ -810,9 +929,11 @@ function resetNotifiedKeys() {
   notifiedVbKeys.clear();
   notifiedFavKeys.clear();
   notifiedWeatherKeys.clear();
+  notifiedBetResultKeys.clear();
   liveState.clear();
   lastFavScanDate = null;
   lastWeatherScanDate = null;
+  lastBetResultDate = null;
 }
 
 module.exports = {
@@ -822,6 +943,7 @@ module.exports = {
   scanFavoriteTeamsToday,
   scanLiveFavorites,
   scanWeatherAndNotify,
+  scanBetResults,
   getStatus,
   resetNotifiedKeys,
 };
