@@ -50,7 +50,11 @@ export const getMatchStatus = (fixture) => {
   const status = fixture?.fixture?.status;
   if (!status) return { label: '—', type: 'unknown' };
 
-  const { short, elapsed } = status;
+  const { short, elapsed, extra } = status;
+  // Injury / stoppage time (API-Football `extra`) → "90+3'".
+  const elapsedLabel = elapsed
+    ? (Number.isFinite(extra) && extra > 0 ? `${elapsed}+${extra}'` : `${elapsed}'`)
+    : 'LIVE';
   // HT and INT/SUSP are still 'live' for display purposes — the match is
   // ongoing, the score is current, and we want the red indicator + score
   // to stay visible. Without HT here, halftime would render as "unknown"
@@ -62,7 +66,10 @@ export const getMatchStatus = (fixture) => {
   const postponedStatuses = ['PST', 'SUSP', 'INT'];
 
   if (short === 'HT') return { label: 'Mi-temps', type: 'live' };
-  if (liveStatuses.includes(short)) return { label: elapsed ? `${elapsed}'` : 'LIVE', type: 'live' };
+  if (short === 'BT') return { label: 'Pause prolong.', type: 'live' };
+  if (short === 'P') return { label: 'Tirs au but', type: 'live' };
+  if (short === 'ET') return { label: `Prolong. ${elapsedLabel}`, type: 'live' };
+  if (liveStatuses.includes(short)) return { label: elapsedLabel, type: 'live' };
   if (finishedStatuses.includes(short)) return { label: 'Terminé', type: 'finished' };
   if (scheduledStatuses.includes(short)) return { label: 'Programmé', type: 'scheduled' };
   if (cancelledStatuses.includes(short)) return { label: 'Annulé', type: 'cancelled' };

@@ -9,7 +9,7 @@ import { syncWeatherCitiesToBackend } from '../services/pushNotifications';
 import { exportBankrollCsv } from '../utils/exportCsv';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { formatMatchDate } from '../utils/format';
+import { formatMatchDate, getMatchStatus } from '../utils/format';
 import clsx from 'clsx';
 import ValueBetSources from '../components/match/ValueBetSources';
 
@@ -940,8 +940,7 @@ function BetCard({ bet, live }) {
       {!bet.result && live && LIVE_SHORT.has(live.fixture?.status?.short) && (() => {
         const gh = live.goals?.home ?? 0;
         const ga = live.goals?.away ?? 0;
-        const st = live.fixture?.status?.short;
-        const elapsed = live.fixture?.status?.elapsed;
+        const liveLabel = getMatchStatus(live).label;
         const prov = gradeBet(bet.market, bet.selection, gh, ga);
         const cfg = prov === 'win' ? { t: 'En passe de gagner', c: 'text-brand-400 bg-brand-500/15 border-brand-500/30' }
           : prov === 'loss' ? { t: 'Perdant', c: 'text-danger bg-danger/15 border-danger/30' }
@@ -951,7 +950,7 @@ function BetCard({ bet, live }) {
           <div className="flex items-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1.5 text-danger font-heading font-bold">
               <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
-              {st === 'HT' ? 'Mi-temps' : `${elapsed ?? 0}'`}
+              {liveLabel}
             </span>
             <span className="font-mono font-bold text-white/90">{gh} - {ga}</span>
             {cfg && <span className={clsx('px-2 py-0.5 rounded border font-heading font-semibold', cfg.c)}>{cfg.t}</span>}
