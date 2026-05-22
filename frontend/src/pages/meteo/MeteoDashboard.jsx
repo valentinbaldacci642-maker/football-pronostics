@@ -105,6 +105,7 @@ function buildDays(data) {
     gustKmh: Math.round(daily.wind_gusts_10m_max?.[i] ?? 0),
     windDir: daily.wind_direction_10m_dominant?.[i],
     uvMax: Math.round(daily.uv_index_max?.[i] ?? 0),
+    snowfallCm: daily.snowfall_sum?.[i] ?? 0,
     hours: hoursByDate[date] || [],
   }));
 }
@@ -421,6 +422,57 @@ function MarineCard({ marine, tempUnit }) {
   );
 }
 
+// Snow / ski — current snow depth on the ground + 14-day snowfall forecast.
+// Only shown when there's snow on the ground or snowfall expected (mountains).
+function SnowSki({ data, days, tempUnit }) {
+  const h = data?.hourly || {};
+  const times = h.time || [];
+  const now = Date.now();
+  let idx = times.findIndex((t) => new Date(t).getTime() >= now);
+  if (idx < 0) idx = 0;
+  const depthCm = Math.round((h.snow_depth?.[idx] ?? 0) * 100);
+  const snowDays = (days || []).filter((d) => (d.snowfallCm ?? 0) >= 0.1);
+  const total14 = snowDays.reduce((s, d) => s + d.snowfallCm, 0);
+  if (depthCm <= 0 && total14 < 0.1) return null;
+  const maxCm = Math.max(0.1, ...snowDays.map((d) => d.snowfallCm));
+  return (
+    <div>
+      <p className={sectionLabel}>NEIGE & SKI</p>
+      <div className="rounded-2xl p-4 backdrop-blur-md space-y-3" style={glassCard}>
+        <div className="flex items-center justify-around text-center">
+          <div className="flex flex-col items-center gap-1">
+            <Snowflake className="w-5 h-5 text-cyan-200" />
+            <span className="text-[10px] uppercase tracking-wider text-white/45 font-heading">Au sol</span>
+            <span className="font-display text-2xl text-white">{depthCm}<span className="text-sm text-white/45 ml-1">cm</span></span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <CloudRain className="w-5 h-5 text-sky-300" />
+            <span className="text-[10px] uppercase tracking-wider text-white/45 font-heading">Cumul 14 j</span>
+            <span className="font-display text-2xl text-white">{total14.toFixed(0)}<span className="text-sm text-white/45 ml-1">cm</span></span>
+          </div>
+        </div>
+        {snowDays.length > 0 && (
+          <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
+            <p className="text-[10px] uppercase tracking-wider text-white/45 font-heading">Chutes de neige prévues</p>
+            {snowDays.map((d) => {
+              const dd = new Date(d.date + 'T12:00:00');
+              return (
+                <div key={d.date} className="flex items-center gap-2 text-xs">
+                  <span className="w-14 text-white/55 font-heading capitalize">{DAYS_FR[dd.getDay()]} {dd.getDate()}</span>
+                  <div className="flex-1 h-2.5 bg-white/[0.06] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-cyan-300/70" style={{ width: `${Math.min(100, (d.snowfallCm / maxCm) * 100)}%` }} />
+                  </div>
+                  <span className="w-12 text-right text-cyan-200 font-mono">{d.snowfallCm.toFixed(1)} cm</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function MeteoDashboard() {
   const [params] = useSearchParams();
   const lat = parseFloat(params.get('lat'));
@@ -536,11 +588,12 @@ export default function MeteoDashboard() {
               <Meteogram data={data} tempUnit={tempUnit} />
             </motion.div>
 
-            {/* Air quality + pollen, and marine (coastal only) */}
-            {(aq?.current || marine?.current) && (
+            {/* Air quality + pollen, marine (coastal), snow/ski (mountains) */}
+            {(aq?.current || marine?.current || data) && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }} className="mt-7 grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <AirPollen aq={aq} />
                 <MarineCard marine={marine} tempUnit={tempUnit} />
+                <SnowSki data={data} days={days} tempUnit={tempUnit} />
               </motion.div>
             )}
 

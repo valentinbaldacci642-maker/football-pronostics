@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, Clock, Target, TrendingUp, BarChart3, BookOpen, Search, Wallet, Euro, History as HistoryIcon, ListChecks, RotateCcw, RefreshCw, Save, Download, MessageSquare, Trash2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { useHistoryStore, useBankrollStore, EDGE_MODE_THRESHOLD } from '../store';
+import { useHistoryStore, useBankrollStore, EDGE_MODE_THRESHOLD, gradeBet } from '../store';
 import { resolveFinishedMatches } from '../utils/resolveResults';
+import { fixturesApi } from '../services/api';
 import { exportBankrollCsv } from '../utils/exportCsv';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -240,6 +241,26 @@ export default function History() {
   const [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('pending');
   const [search, setSearch] = useState('');
+  // Live scores for pending bets — fetched from /fixtures/live while the
+  // "Paris en cours" tab is open, refreshed every 60s. Map fixtureId → live.
+  const [liveMap, setLiveMap] = useState(() => new Map());
+  useEffect(() => {
+    if (tab !== 'pending') return undefined;
+    let cancelled = false;
+    const fetchLive = async () => {
+      try {
+        const raw = await fixturesApi.getLive();
+        const list = raw?.response || raw?.data?.response || [];
+        if (cancelled) return;
+        const m = new Map();
+        for (const f of list) if (f.fixture?.id) m.set(f.fixture.id, f);
+        setLiveMap(m);
+      } catch { /* ignore — keep last known */ }
+    };
+    fetchLive();
+    const t = setInterval(fetchLive, 60_000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [tab]);
   // activeBookmaker peut être 'unibet', 'winamax', ou 'all' (cumul). En
   // mode 'all', on passe undefined aux selectors → stats agrégées sur les
   // deux books.
@@ -745,7 +766,7 @@ export default function History() {
               </div>
             ) : (
               <div className="space-y-2">
-                {pending.map((b) => <BetCard key={b.key} bet={b} />)}
+                {pending.map((b) => <BetCard key={b.key} bet={b} live={liveMap.get(b.fixtureId)} />)}
               </div>
             )}
           </>
@@ -826,7 +847,9 @@ export default function History() {
  * Compact card for a single bet (entry-level OR per-VB). Used by both the
  * 'Paris en cours' tab and the 'Historique pronos' (settled) tab.
  */
-function BetCard({ bet }) {
+const LIVE_SHORT = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'SUSP', 'INT']);
+
+function BetCard({ bet, live }) {
   const setBetCashout = useHistoryStore((s) => s.setBetCashout);
   const clearBetResult = useHistoryStore((s) => s.clearBetResult);
   const duplicateBet = useHistoryStore((s) => s.duplicateBet);
@@ -908,6 +931,29 @@ function BetCard({ bet }) {
         <span className="text-base font-heading font-bold text-white/90 truncate flex-1 min-w-0 text-right">{bet.awayTeam}</span>
         {bet.awayLogo && <img src={bet.awayLogo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
       </div>
+
+      {/* Live : score + statut provisoire du pari pendant le match */}
+      {!bet.result && live && LIVE_SHORT.has(live.fixture?.status?.short) && (() => {
+        const gh = live.goals?.home ?? 0;
+        const ga = live.goals?.away ?? 0;
+        const st = live.fixture?.status?.short;
+        const elapsed = live.fixture?.status?.elapsed;
+        const prov = gradeBet(bet.market, bet.selection, gh, ga);
+        const cfg = prov === 'win' ? { t: 'En passe de gagner', c: 'text-brand-400 bg-brand-500/15 border-brand-500/30' }
+          : prov === 'loss' ? { t: 'Perdant', c: 'text-danger bg-danger/15 border-danger/30' }
+          : prov === 'push' ? { t: 'Remboursé', c: 'text-white/60 bg-white/10 border-white/15' }
+          : null;
+        return (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 text-danger font-heading font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
+              {st === 'HT' ? 'Mi-temps' : `${elapsed ?? 0}'`}
+            </span>
+            <span className="font-mono font-bold text-white/90">{gh} - {ga}</span>
+            {cfg && <span className={clsx('px-2 py-0.5 rounded border font-heading font-semibold', cfg.c)}>{cfg.t}</span>}
+          </div>
+        );
+      })()}
 
       {/* Ligne 3 : market+selection / odd+mise+pnl */}
       <div className="flex items-center justify-between gap-2 flex-wrap text-sm">

@@ -11,7 +11,7 @@ import { persist } from 'zustand/middleware';
  *   O/U: 'Over 2.5', 'Under 1.5', etc.
  *   BTTS: 'Oui', 'Non', 'yes', 'no'
  */
-function gradeBet(market, selection, homeGoals, awayGoals) {
+export function gradeBet(market, selection, homeGoals, awayGoals) {
   const sel = (selection || '').trim().toLowerCase();
   if (!sel) return null;
   const total = homeGoals + awayGoals;

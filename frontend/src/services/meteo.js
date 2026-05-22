@@ -111,12 +111,13 @@ async function fetchForecast(lat, lon) {
         hourly: [
           'temperature_2m', 'apparent_temperature', 'precipitation_probability', 'precipitation',
           'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'cape',
+          'snowfall', 'snow_depth',
         ].join(','),
         daily: [
           'weather_code', 'temperature_2m_max', 'temperature_2m_min',
           'precipitation_sum', 'precipitation_probability_max',
           'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant',
-          'sunrise', 'sunset',
+          'snowfall_sum', 'sunrise', 'sunset',
         ].join(','),
       },
     }),
@@ -129,8 +130,8 @@ async function fetchForecast(lat, lon) {
       params: {
         ...common,
         current: ['temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m'].join(','),
-        hourly: ['temperature_2m', 'apparent_temperature', 'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m'].join(','),
-        daily: ['temperature_2m_max', 'temperature_2m_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant'].join(','),
+        hourly: ['temperature_2m', 'apparent_temperature', 'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'snowfall', 'snow_depth'].join(','),
+        daily: ['temperature_2m_max', 'temperature_2m_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'snowfall_sum'].join(','),
       },
     }).catch(() => null),
   ]);
@@ -152,8 +153,8 @@ async function fetchForecast(lat, lon) {
         if (mf.current[k] != null) data.current[k] = mf.current[k];
       }
     }
-    overlayArrays(data.hourly, mf.hourly, ['temperature_2m', 'apparent_temperature', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'precipitation']);
-    overlayArrays(data.daily, mf.daily, ['temperature_2m_max', 'temperature_2m_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant']);
+    overlayArrays(data.hourly, mf.hourly, ['temperature_2m', 'apparent_temperature', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'precipitation', 'snowfall', 'snow_depth']);
+    overlayArrays(data.daily, mf.daily, ['temperature_2m_max', 'temperature_2m_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'snowfall_sum']);
   }
   return data;
 }
