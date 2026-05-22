@@ -8,9 +8,6 @@ const BET_MATCH_WINNER = 1;
 const BET_OVER_UNDER = 5;
 const BET_BTTS = 8;
 
-// Only show the user's two bookmakers.
-const ALLOWED_BOOKMAKERS = new Set(['unibet', 'winamax']);
-
 // Markets the user can compare across bookmakers. Each column maps a label to
 // the API-Football `value` string for that selection.
 function buildMarkets(homeTeam, awayTeam) {
@@ -69,7 +66,6 @@ export default function BookmakersComparison({ fixtureId, homeTeam, awayTeam }) 
   // Parse the selected market across bookmakers, sorted by lowest margin.
   const rows = useMemo(() => {
     return raw
-      .filter((bk) => ALLOWED_BOOKMAKERS.has((bk.name || '').toLowerCase()))
       .map((bk) => {
         const bet = bk.bets?.find((b) => b.id === cfg.betId);
         if (!bet) return null;
