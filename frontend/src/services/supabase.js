@@ -3,8 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 // Optional cloud-sync layer. The app works fully offline / anonymous —
 // Supabase is only used when the user explicitly creates an account.
 // If env vars are missing, exports null and the auth flow stays hidden.
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// `import.meta.env` is replaced by Vite at build time. Guard against it being
+// undefined so the module is importable in plain Node (unit tests, scripts).
+const ENV = import.meta.env || {};
+const SUPABASE_URL = ENV.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = ENV.VITE_SUPABASE_ANON_KEY || '';
 
 export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 

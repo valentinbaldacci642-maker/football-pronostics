@@ -68,6 +68,15 @@ async function getVigilance(depName) {
     headers: { 'User-Agent': 'SiteDesFoufous/1.0' },
     timeout: 12000,
   });
+  // Le flux MeteoAlarm renvoie aussi des alertes passées (observé : alertes du
+  // 18/05 encore présentes le 23/05) → on ne garde que celles ACTIVES : non
+  // expirées et démarrées au plus tard en fin de journée courante. Sans ce
+  // filtre, une vieille « Vigilance jaune orages » s'affiche alors que la
+  // carte officielle Météo-France est verte.
+  const now = Date.now();
+  const eod = new Date(); eod.setHours(23, 59, 59, 999);
+  const endOfToday = eod.getTime();
+
   const out = [];
   for (const w of (data?.warnings || [])) {
     const infos = w.alert?.info || [];
@@ -75,6 +84,11 @@ async function getVigilance(depName) {
     if (!info) continue;
     const inDept = (info.area || []).some((a) => norm(a.areaDesc) === target);
     if (!inDept) continue;
+    // Time window: skip expired warnings and warnings that only start after today.
+    const exp = info.expires ? new Date(info.expires).getTime() : null;
+    const ons = (info.onset || info.effective) ? new Date(info.onset || info.effective).getTime() : null;
+    if (Number.isFinite(exp) && exp < now) continue;
+    if (Number.isFinite(ons) && ons > endOfToday) continue;
     const lvlNum = parseInt(parseParam(info.parameter, 'awareness_level'), 10) || 1;
     const typeNum = parseInt(parseParam(info.parameter, 'awareness_type'), 10) || 0;
     const lvl = LEVELS[lvlNum] || LEVELS[1];

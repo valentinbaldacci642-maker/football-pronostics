@@ -4,7 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useHistoryStore, useFavoriteTeamsStore, useFavoritesStore } from './store';
 import { resolveFinishedMatches } from './utils/resolveResults';
-import { initCloudSync } from './services/cloudSync';
+import { initCloudSync, resyncFromCloud } from './services/cloudSync';
 import { initPushNotifications, syncFavoriteTeamsToBackend } from './services/pushNotifications';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
@@ -59,6 +59,25 @@ export default function App() {
   // Initialize cloud sync (Supabase). No-op if env vars are missing —
   // app keeps working in localStorage-only mode.
   useEffect(() => { initCloudSync(); }, []);
+
+  // Re-pull cloud data whenever the app regains focus / resumes from background.
+  // initCloudSync only pulls once at cold boot; on Android the app is almost
+  // always *resumed* (not relaunched), so without this the device stays frozen
+  // on its last cold-boot snapshot — bankroll/favoris/paris never refresh.
+  // On phone: mirrors the cloud. On web: keeps/pushes local (never overwritten).
+  useEffect(() => {
+    const resync = () => { resyncFromCloud().catch(() => {}); };
+    const onVisible = () => { if (document.visibilityState === 'visible') resync(); };
+    document.addEventListener('visibilitychange', onVisible);
+    let removeAppListener = () => {};
+    CapacitorApp.addListener('appStateChange', ({ isActive }) => { if (isActive) resync(); })
+      .then((handle) => { removeAppListener = () => handle.remove(); })
+      .catch(() => { /* plugin unavailable (web/PWA) — visibilitychange covers it */ });
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      removeAppListener();
+    };
+  }, []);
 
   // Register FCM push notifications on native (Android). Idempotent —
   // re-sending the same token is a no-op server-side. Web → skipped.

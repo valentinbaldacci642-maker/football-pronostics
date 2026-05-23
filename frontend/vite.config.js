@@ -48,7 +48,13 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+        // NE PAS précacher le shell de l'app (HTML/JS/CSS). Dans la WebView
+        // Capacitor, le précache survivait à la réinstallation de l'APK et
+        // servait l'ANCIENNE version (« pas la bonne version sur le tel »).
+        // Les assets sont déjà embarqués dans l'APK (et servis par Vercel) :
+        // on les charge toujours frais. On garde uniquement le runtimeCaching
+        // ci-dessous (API Render, logos, polices).
+        globPatterns: [],
         runtimeCaching: [
           // API backend Render — NetworkFirst: données fraîches, fallback cache si hors ligne
           // IMPORTANT: ONLY cache the Render API, NOT vercel.app itself.
