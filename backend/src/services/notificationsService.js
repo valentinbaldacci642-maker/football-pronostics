@@ -176,8 +176,10 @@ function registerToken(token, platform = 'unknown', favoriteTeams = [], favorite
     if (oldest) tokens.delete(oldest);
   }
   // Preserve existing prefs/cities/bets if the client didn't send any this call.
+  // MERGE prefs (don't replace) so a partial update — e.g. the embedded
+  // SeismoTrack page setting only `seisme` — doesn't wipe football/weather prefs.
   const prev = tokens.get(token);
-  const prefs = notifPrefs != null ? sanitizeNotifPrefs(notifPrefs) : (prev?.notifPrefs || {});
+  const prefs = { ...(prev?.notifPrefs || {}), ...(notifPrefs != null ? sanitizeNotifPrefs(notifPrefs) : {}) };
   const cities = favoriteCities != null ? sanitizeFavoriteCities(favoriteCities) : (prev?.favoriteCities || []);
   const bets = pendingBets != null ? sanitizePendingBets(pendingBets) : (prev?.pendingBets || []);
   const seisme = seismeSettings != null ? sanitizeSeisme(seismeSettings) : (prev?.seisme || null);
@@ -189,6 +191,37 @@ function registerToken(token, platform = 'unknown', favoriteTeams = [], favorite
     notifPrefs: prefs,
     favoriteCities: cities,
     pendingBets: bets,
+    seisme,
+  });
+  return true;
+}
+
+// Lightweight registration used by the embedded SeismoTrack page. Accepts its
+// native format ({notifM4, notifMinMag, radius, cityLat, cityLon}) and MERGES
+// the seisme settings into the token without clobbering football/weather prefs.
+function registerSeisme(token, platform = 'android', opts = {}) {
+  if (!token || typeof token !== 'string' || token.length < 100 || token.length > 512) return false;
+  const safePlatform = ALLOWED_PLATFORMS.has(platform) ? platform : 'unknown';
+  const prev = tokens.get(token);
+  if (!prev && tokens.size >= MAX_TOKENS) {
+    const oldest = tokens.keys().next().value;
+    if (oldest) tokens.delete(oldest);
+  }
+  const seisme = sanitizeSeisme({
+    minMag: opts.notifMinMag,
+    zoneLat: opts.cityLat,
+    zoneLon: opts.cityLon,
+    zoneRadius: opts.radius,
+  });
+  const wantSeisme = !!opts.notifM4 || (seisme.zoneRadius > 0 && seisme.zoneLat != null);
+  tokens.set(token, {
+    platform: safePlatform,
+    registeredAt: Date.now(),
+    favoriteTeams: prev?.favoriteTeams || [],
+    favoriteMatches: prev?.favoriteMatches || [],
+    notifPrefs: { ...(prev?.notifPrefs || {}), seisme: wantSeisme },
+    favoriteCities: prev?.favoriteCities || [],
+    pendingBets: prev?.pendingBets || [],
     seisme,
   });
   return true;
@@ -1149,6 +1182,7 @@ module.exports = {
   scanWeatherAndNotify,
   scanVigilanceAndNotify,
   scanSeismeAndNotify,
+  registerSeisme,
   scanBetResults,
   getStatus,
   resetNotifiedKeys,

@@ -187,7 +187,7 @@ export default function HubSettings() {
               <>
                 <NotifGroup title="PRONOS FOOT" icon={Target} color="#34d399" accent="brand" types={footTypes} prefs={prefs} onToggle={toggleType} />
                 <NotifGroup title="MIMIMÉTÉO" icon={CloudSun} color="#38bdf8" accent="sky" types={meteoTypes} prefs={prefs} onToggle={toggleType} />
-                <NotifGroup title="MIMISÉISME" icon={Waves} color="#e879f9" accent="fuchsia" types={seismeTypes} prefs={prefs} onToggle={toggleType} />
+                <NotifGroup title="TREMBLEMENT2TEUH" icon={Waves} color="#e879f9" accent="fuchsia" types={seismeTypes} prefs={prefs} onToggle={toggleType} />
                 {prefs.seisme && <SeismeExtra />}
                 <p className="text-[11px] text-white/30 italic px-1">Les changements s'appliquent au prochain scan (≤ 5 min).</p>
               </>

@@ -17,6 +17,17 @@ router.post('/register', (req, res) => {
   res.json({ ok, status: notifications.getStatus() });
 });
 
+// Used by the embedded SeismoTrack page (Tremblement2Teuh) — its native payload
+// format. Merges seisme settings into the token without touching other prefs.
+router.post('/seisme-register', (req, res) => {
+  const { token, platform, notifM4, notifMinMag, radius, cityLat, cityLon } = req.body || {};
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ error: 'token is required' });
+  }
+  const ok = notifications.registerSeisme(token, platform, { notifM4, notifMinMag, radius, cityLat, cityLon });
+  res.json({ ok });
+});
+
 router.post('/unregister', (req, res) => {
   const { token } = req.body || {};
   if (!token) return res.status(400).json({ error: 'token is required' });

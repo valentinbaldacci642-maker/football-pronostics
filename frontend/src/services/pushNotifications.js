@@ -25,7 +25,6 @@ export const NOTIF_TYPES = [
   { key: 'final',     label: 'Résultat final',       desc: 'Score final d’un match suivi' },
   { key: 'weather',   label: 'Alertes pluie / orage', desc: 'Pluie ou orage à venir sur une ville suivie (MimiMétéo)' },
   { key: 'vigilance', label: 'Vigilance Météo-France', desc: 'Changement de niveau de vigilance sur une ville suivie' },
-  { key: 'seisme',    label: 'Alertes séisme',        desc: 'Séisme ≥ ton seuil de magnitude, ou proche de ta zone (MimiSéisme)' },
   { key: 'betResult', label: 'Résultat de mes paris', desc: 'Quand un de tes paris en cours est gagné ou perdu' },
 ];
 
@@ -186,7 +185,7 @@ export async function initPushNotifications() {
 
     try {
       await notificationsApi.register(
-        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets(), getSeismeSettings()
+        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets()
       );
     } catch (e) {
       // Backend down → don't block the app, retry next launch
@@ -240,7 +239,7 @@ export async function syncFavoriteTeamsToBackend() {
   if (!token) return;
   try {
     await notificationsApi.register(
-      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets(), getSeismeSettings()
+      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets()
     );
   } catch (e) {
     console.warn('[push] favorite sync failed:', e?.message);
