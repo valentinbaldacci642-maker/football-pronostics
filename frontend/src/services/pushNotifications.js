@@ -62,6 +62,32 @@ export async function testNotification() {
   }
 }
 
+// In-app banner for notifications received while the app is foregrounded
+// (Android delivers those to JS instead of the system tray).
+function showForegroundToast(title, body) {
+  try {
+    if (typeof document === 'undefined') return;
+    const el = document.createElement('div');
+    el.style.cssText = [
+      'position:fixed', 'left:50%', 'top:calc(12px + env(safe-area-inset-top,0px))',
+      'transform:translateX(-50%)', 'z-index:99999', 'width:min(380px,92vw)',
+      'background:#0f172a', 'border:1px solid rgba(56,189,248,.45)',
+      'box-shadow:0 10px 30px rgba(0,0,0,.55)', 'border-radius:14px', 'padding:12px 14px',
+      'color:#e8edf7', 'font-family:system-ui,-apple-system,sans-serif',
+    ].join(';');
+    const t = document.createElement('div');
+    t.style.cssText = 'font-weight:700;font-size:14px;margin-bottom:2px';
+    t.textContent = title || 'Notification';
+    const b = document.createElement('div');
+    b.style.cssText = 'font-size:13px;opacity:.82;line-height:1.3';
+    b.textContent = body || '';
+    el.appendChild(t); el.appendChild(b);
+    el.addEventListener('click', () => el.remove());
+    document.body.appendChild(el);
+    setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 5000);
+  } catch (_) { /* ignore */ }
+}
+
 export function getNotifPrefs() {
   let stored = {};
   try { stored = JSON.parse(localStorage.getItem(LS_PREFS_KEY) || '{}'); } catch (_) { stored = {}; }
@@ -206,11 +232,12 @@ export async function initPushNotifications() {
       console.warn('[push] register backend call failed:', e?.message);
     }
 
-    // Foreground notifs: when the app is open, Android delivers them via
-    // this event instead of the system tray. We could surface a toast here
-    // later — for v1, just log so debug is easy.
+    // Foreground notifs: when the app is open, Android delivers them via this
+    // event instead of the system tray → show an in-app banner so the user
+    // still sees them (e.g. when tapping "Tester une notification" in-app).
     Push.addListener('pushNotificationReceived', (notif) => {
       console.log('[push] received foreground:', notif);
+      showForegroundToast(notif?.title, notif?.body);
     });
 
     return { ok: true, token };

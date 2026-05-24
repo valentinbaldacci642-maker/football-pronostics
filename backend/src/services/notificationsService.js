@@ -1171,7 +1171,7 @@ async function scanBetResults({ dryRun = false } = {}) {
 
 // Send a one-off test push to a single token (used by the "Tester une
 // notification" button). Returns {ok} or {ok:false, error}.
-async function sendTestNotification(token) {
+async function sendTestNotification(token, title, body) {
   const messaging = getMessaging();
   if (!messaging) return { ok: false, reason: 'fcm-not-configured' };
   if (!token || typeof token !== 'string') return { ok: false, reason: 'no-token' };
@@ -1180,7 +1180,10 @@ async function sendTestNotification(token) {
   try {
     await messaging.send({
       token,
-      notification: { title: '🔔 Test SiteDesFoufous', body: 'Tes notifications fonctionnent ! 🎉' },
+      notification: {
+        title: (typeof title === 'string' && title.trim()) ? title.slice(0, 120) : '🔔 Test SiteDesFoufous',
+        body: (typeof body === 'string' && body.trim()) ? body.slice(0, 240) : 'Tes notifications fonctionnent ! 🎉',
+      },
       android: {
         priority: 'high',
         notification: { channelId: 'favorite_teams', sound: 'default', imageUrl: iconUrl },

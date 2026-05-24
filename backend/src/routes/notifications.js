@@ -29,10 +29,11 @@ router.post('/seisme-register', (req, res) => {
 });
 
 // Send a test push to the caller's own token ("Tester une notification").
+// Optional title/body for custom tests (e.g. a fake earthquake).
 router.post('/test', async (req, res) => {
-  const { token } = req.body || {};
+  const { token, title, body } = req.body || {};
   if (!token || typeof token !== 'string') return res.status(400).json({ error: 'token required' });
-  const r = await notifications.sendTestNotification(token);
+  const r = await notifications.sendTestNotification(token, title, body);
   res.json(r);
 });
 
