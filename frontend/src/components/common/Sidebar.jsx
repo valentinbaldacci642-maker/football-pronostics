@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Flame, Star, ChevronLeft, CloudSun,
+  Flame, Star, ChevronLeft, CloudSun, Waves,
   Calendar, Settings, Globe2, BookOpen, Newspaper, HelpCircle, Target,
 } from 'lucide-react';
 import { useUIStore } from '../../store';
@@ -86,6 +86,19 @@ function SidebarContent({ onClose }) {
           </div>
           <span className="tracking-wide flex-1">MimiMétéo</span>
         </NavLink>
+
+        {/* Tremblement2Teuh — séismes (page autonome), accent fuchsia */}
+        <a
+          href="/tremblement2teuh/index.html"
+          onClick={onClose}
+          className="flex items-center gap-3 px-3 py-2.5 mt-2 rounded-xl text-sm font-heading font-semibold transition-all duration-200 cursor-pointer border border-fuchsia-500/30 bg-gradient-to-r from-fuchsia-500/15 to-fuchsia-500/5 text-fuchsia-300 hover:from-fuchsia-500/25 hover:to-fuchsia-500/10 hover:text-fuchsia-200"
+          style={{ boxShadow: '0 0 16px rgba(232,121,249,0.15)' }}
+        >
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-fuchsia-500/20 text-fuchsia-300">
+            <Waves className="w-4 h-4" />
+          </div>
+          <span className="tracking-wide flex-1">Tremblement2Teuh</span>
+        </a>
       </nav>
 
       {/* Spacer pushes the settings cog to the bottom */}
