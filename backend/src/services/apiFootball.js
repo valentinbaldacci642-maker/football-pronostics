@@ -191,7 +191,7 @@ class ApiFootballService {
 
   // ─── Fixtures ─────────────────────────────────────────────────────────────
   async getFixtures(params) {
-    return this.request('/fixtures', params, config.cache.ttlFixtures);
+    return this.overlayLive(await this.request('/fixtures', params, config.cache.ttlFixtures));
   }
 
   async getLiveFixtures() {
@@ -199,7 +199,7 @@ class ApiFootballService {
   }
 
   async getFixtureById(id) {
-    return this.request('/fixtures', { id }, config.cache.ttlFixtures);
+    return this.overlayLive(await this.request('/fixtures', { id }, config.cache.ttlFixtures));
   }
 
   async getFixturesByDate(date, league, season, timezone) {
@@ -211,7 +211,42 @@ class ApiFootballService {
     // already 00:00 of D+1, so the user sees it under the wrong day in
     // their app. Passing timezone makes API-Football group correctly.
     if (timezone) params.timezone = timezone;
-    return this.request('/fixtures', params, config.cache.ttlFixtures);
+    return this.overlayLive(await this.request('/fixtures', params, config.cache.ttlFixtures));
+  }
+
+  // The fixtures cache (20 min) can hold a pre-kickoff "Not Started" status for
+  // a match that has since gone live → the match page / favorites show "pas
+  // commencé" for ~20 min after kickoff while the live tab is correct. Overlay
+  // the live feed (cached 60 s) onto any in-progress fixture so status / score
+  // are always current, everywhere. Cheap: one live call, deduped by cache.
+  async overlayLive(result) {
+    try {
+      const resp = result?.response;
+      if (!Array.isArray(resp) || resp.length === 0) return result;
+      const FINAL = new Set(['FT', 'AET', 'PEN', 'PST', 'CANC', 'ABD', 'AWD', 'WO']);
+      const now = Date.now();
+      const couldBeLive = resp.some((f) => {
+        const ts = new Date(f.fixture?.date).getTime();
+        return Number.isFinite(ts) && ts <= now && !FINAL.has(f.fixture?.status?.short);
+      });
+      if (!couldBeLive) return result;
+
+      const live = await this.getLiveFixtures();
+      const byId = new Map();
+      for (const lf of (live?.response || [])) if (lf.fixture?.id) byId.set(lf.fixture.id, lf);
+      if (byId.size === 0) return result;
+
+      for (const f of resp) {
+        const lf = byId.get(f.fixture?.id);
+        if (!lf) continue;
+        if (lf.fixture?.status) f.fixture.status = lf.fixture.status;
+        if (lf.goals) f.goals = lf.goals;
+        if (lf.score) f.score = lf.score;
+      }
+      return result;
+    } catch (_) {
+      return result; // overlay is best-effort; never break the base response
+    }
   }
 
   async getH2H(h2h, last = 10) {
