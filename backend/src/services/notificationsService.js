@@ -1177,6 +1177,7 @@ function getStatus() {
     lastScanAt,
     lastSentCount,
     fcmConfigured: getMessaging() != null,
+    tokenPersist: tokenStore.enabled, // true => SUPABASE_URL + key chargés sur le serveur
   };
 }
 
