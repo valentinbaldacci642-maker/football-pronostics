@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { motion } from 'framer-motion';
 import { Settings as SettingsIcon, SlidersHorizontal, User, Cloud, LogOut, Loader2, CheckCircle2, Bell, BellOff } from 'lucide-react';
@@ -9,14 +10,9 @@ import {
   NOTIF_TYPES, getNotifPrefs, setNotifPref, syncFavoriteTeamsToBackend,
 } from '../services/pushNotifications';
 
-const TABS = [
-  { id: 'general', label: 'Paramètres généraux', icon: SlidersHorizontal },
-  { id: 'account', label: 'Compte', icon: User },
-];
-
 export default function Settings() {
-  const [tab, setTab] = useState('general');
-
+  // Les réglages de notifications sont centralisés dans le Hub (/reglages),
+  // groupés par application. Ici on ne garde que le compte / la synchro.
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -26,30 +22,14 @@ export default function Settings() {
       <div>
         <h1 className="font-display text-4xl text-white tracking-wide leading-none mb-1 flex items-center gap-2">
           <SettingsIcon className="w-8 h-8 text-brand-400" />
-          Paramètres
+          Compte
         </h1>
+        <p className="text-sm text-white/40 font-heading mt-1">
+          Les notifications se règlent dans <Link to="/reglages" className="text-brand-400 hover:underline">Réglages · Notifications</Link> (accueil).
+        </p>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        {TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={clsx(
-              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-heading font-semibold border transition-all whitespace-nowrap',
-              tab === id
-                ? 'bg-brand-500/15 border-brand-500/35 text-brand-400'
-                : 'border-white/[0.08] text-white/35 hover:text-white/60'
-            )}
-          >
-            <Icon className="w-4 h-4" /> {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'general' && <GeneralTab />}
-
-      {tab === 'account' && <AccountTab />}
+      <AccountTab />
     </motion.div>
   );
 }
@@ -152,7 +132,9 @@ function NotifTypeToggles() {
       <p className="text-xs font-heading font-semibold text-white/40 uppercase tracking-wider mb-2">
         Types de notifications
       </p>
-      {NOTIF_TYPES.map(({ key, label, desc }) => (
+      {/* 'weather' est réglé dans les paramètres MimiMétéo (/meteo/reglages),
+          pas ici — ces réglages-ci concernent le foot. */}
+      {NOTIF_TYPES.filter(({ key }) => key !== 'weather').map(({ key, label, desc }) => (
         <div key={key} className="flex items-center justify-between gap-3 py-2">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-heading font-semibold text-white/80">{label}</p>

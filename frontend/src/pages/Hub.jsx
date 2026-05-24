@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Target, CloudSun, ChevronRight, Flame } from 'lucide-react';
+import { Target, CloudSun, ChevronRight, Flame, Settings } from 'lucide-react';
 import { getForecast, getAlertCities, getRecentCities, wmo, tempColor } from '../services/meteo';
 import { pronosticsApi } from '../services/api';
 import WeatherInsights from '../components/meteo/WeatherInsights';
@@ -109,13 +109,24 @@ function BetsWidget() {
 export default function Hub() {
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-5"
+      className="relative min-h-screen flex flex-col items-center justify-center px-5"
       style={{
         background: 'radial-gradient(1200px 600px at 50% -10%, #0a1628 0%, #050a12 60%)',
         paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
         paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
       }}
     >
+      {/* Settings (notifications) */}
+      <Link
+        to="/reglages"
+        aria-label="Réglages"
+        title="Réglages"
+        className="absolute top-4 right-4 w-10 h-10 rounded-xl border border-white/10 bg-white/[0.04] flex items-center justify-center text-white/45 hover:text-white hover:border-white/25 transition-all"
+        style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+      >
+        <Settings className="w-5 h-5" />
+      </Link>
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}

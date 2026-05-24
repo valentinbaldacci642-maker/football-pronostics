@@ -12,6 +12,7 @@ import BottomNav from './components/common/BottomNav';
 import PageTransition from './components/common/PageTransition';
 import RateLimitBanner from './components/common/RateLimitBanner';
 import Hub from './pages/Hub';
+import HubSettings from './pages/HubSettings';
 import Meteo from './pages/meteo/Meteo';
 import Home from './pages/Home';
 import Matchs from './pages/Matchs';
@@ -170,6 +171,7 @@ export default function App() {
     <Routes>
       {/* Umbrella hub + standalone weather section (no football chrome) */}
       <Route path="/" element={<Hub />} />
+      <Route path="/reglages" element={<HubSettings />} />
       <Route path="/meteo/*" element={<Meteo />} />
 
       {/* Football section — shares the sidebar/navbar layout */}

@@ -98,6 +98,8 @@ function buildDays(data) {
     date,
     tempMin: Math.round(daily.temperature_2m_min?.[i]),
     tempMax: Math.round(daily.temperature_2m_max?.[i]),
+    feelsMax: daily.apparent_temperature_max?.[i] != null ? Math.round(daily.apparent_temperature_max[i]) : null,
+    feelsMin: daily.apparent_temperature_min?.[i] != null ? Math.round(daily.apparent_temperature_min[i]) : null,
     desc: wmo(daily.weather_code?.[i]).label,
     emoji: wmo(daily.weather_code?.[i]).emoji,
     code: daily.weather_code?.[i],
@@ -173,9 +175,16 @@ function ForecastRow({ day, isToday, tempUnit, windUnit }) {
           </span>
         </td>
         <td className="px-1 sm:px-2 text-center text-base sm:text-lg" title={day.desc}>{day.emoji}</td>
-        <td className="px-1 sm:px-2 text-right whitespace-nowrap">
-          <span className="font-display text-sm sm:text-base" style={{ color: tempColor(day.tempMax) }}>{fmtTemp(day.tempMax, tempUnit)}</span>
-          <span className="text-[11px] sm:text-xs ml-0.5 sm:ml-1" style={{ color: tempColor(day.tempMin), opacity: 0.85 }}>{fmtTemp(day.tempMin, tempUnit)}</span>
+        <td className="px-1 sm:px-2 text-right whitespace-nowrap leading-tight">
+          <div>
+            <span className="font-display text-sm sm:text-base" style={{ color: tempColor(day.tempMax) }} title="Maxi">↑{fmtTemp(day.tempMax, tempUnit)}</span>
+            <span className="text-[11px] sm:text-xs ml-1" style={{ color: tempColor(day.tempMin), opacity: 0.85 }} title="Mini">↓{fmtTemp(day.tempMin, tempUnit)}</span>
+          </div>
+          {day.feelsMax != null && (
+            <div className="text-[10px] text-white/40" title="Température ressentie (max)">
+              ressenti {fmtTemp(day.feelsMax, tempUnit)}
+            </div>
+          )}
         </td>
         <td className="px-1 sm:px-2 text-right whitespace-nowrap">
           <span className="font-semibold text-[13px] sm:text-sm" style={{ color: windR.color }}>{fmtWind(day.windKmh, windUnit)}</span>

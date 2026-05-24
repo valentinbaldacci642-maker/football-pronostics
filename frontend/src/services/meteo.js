@@ -115,6 +115,7 @@ async function fetchForecast(lat, lon) {
         ].join(','),
         daily: [
           'weather_code', 'temperature_2m_max', 'temperature_2m_min',
+          'apparent_temperature_max', 'apparent_temperature_min',
           'precipitation_sum', 'precipitation_probability_max',
           'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant',
           'snowfall_sum', 'sunrise', 'sunset',
@@ -131,7 +132,7 @@ async function fetchForecast(lat, lon) {
         ...common,
         current: ['temperature_2m', 'relative_humidity_2m', 'apparent_temperature', 'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m'].join(','),
         hourly: ['temperature_2m', 'apparent_temperature', 'precipitation', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'snowfall', 'snow_depth'].join(','),
-        daily: ['temperature_2m_max', 'temperature_2m_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'snowfall_sum'].join(','),
+        daily: ['temperature_2m_max', 'temperature_2m_min', 'apparent_temperature_max', 'apparent_temperature_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'snowfall_sum'].join(','),
       },
     }).catch(() => null),
   ]);
@@ -154,7 +155,7 @@ async function fetchForecast(lat, lon) {
       }
     }
     overlayArrays(data.hourly, mf.hourly, ['temperature_2m', 'apparent_temperature', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'precipitation', 'snowfall', 'snow_depth']);
-    overlayArrays(data.daily, mf.daily, ['temperature_2m_max', 'temperature_2m_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'snowfall_sum']);
+    overlayArrays(data.daily, mf.daily, ['temperature_2m_max', 'temperature_2m_min', 'apparent_temperature_max', 'apparent_temperature_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'snowfall_sum']);
   }
   return data;
 }

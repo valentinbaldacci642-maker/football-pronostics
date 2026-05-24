@@ -38,7 +38,7 @@ const ALLOWED_PLATFORMS = new Set(['android', 'ios', 'web', 'unknown']);
 
 // Per-token notification preferences. Any key absent → treated as enabled,
 // so a stale client that doesn't send prefs keeps getting everything.
-const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'goal', 'final', 'kickoff', 'favTeamVb', 'weather', 'betResult'];
+const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'favMatchKickoff', 'goal', 'final', 'kickoff', 'favTeamVb', 'weather', 'betResult'];
 
 // Grade a bet pick against a final score → 'win' | 'loss' | 'push' | null.
 // Mirror of the frontend gradeBet so settled-bet notifs match the app's verdict.
@@ -697,8 +697,8 @@ async function scanLiveFavorites({ dryRun = false } = {}) {
     const h = f.teams?.home;
     const a = f.teams?.away;
     // Split team-followers vs match-followers: kickoff for a *favorited match*
-    // is gated by the same 'favMatch' pref as its 15-min reminder, so enabling
-    // "match favori" gives both the 15-min heads-up AND the kickoff ping.
+    // has its own 'favMatchKickoff' toggle (separate from the 15-min 'favMatch'
+    // reminder), while kickoff for a *favorited team* uses the 'kickoff' toggle.
     const teamRecipients = new Set([
       ...(teamToTokens.get(h?.id) || []),
       ...(teamToTokens.get(a?.id) || []),
@@ -717,12 +717,11 @@ async function scanLiveFavorites({ dryRun = false } = {}) {
     const forPref = (key) => [...recipients].filter((t) => prefOn(t, key));
 
     // Kickoff: was scheduled, now live. Recipients = team-followers with the
-    // 'kickoff' pref OR match-followers with the 'favMatch' pref (so a favorited
-    // match gets its kickoff ping from the same toggle as its 15-min reminder).
+    // 'kickoff' pref OR match-followers with the 'favMatchKickoff' pref.
     if (prev && (prev.status === 'NS' || prev.status === 'TBD') && LIVE_STATUSES.has(status)) {
       const ko = new Set();
       for (const t of teamRecipients) if (prefOn(t, 'kickoff')) ko.add(t);
-      for (const t of matchRecipients) if (prefOn(t, 'favMatch')) ko.add(t);
+      for (const t of matchRecipients) if (prefOn(t, 'favMatchKickoff')) ko.add(t);
       events++;
       if (!dryRun && ko.size) {
         sent += await notifyTokens([...ko], {
