@@ -67,7 +67,13 @@ export default function App() {
   // on its last cold-boot snapshot — bankroll/favoris/paris never refresh.
   // On phone: mirrors the cloud. On web: keeps/pushes local (never overwritten).
   useEffect(() => {
-    const resync = () => { resyncFromCloud().catch(() => {}); };
+    const resync = () => {
+      resyncFromCloud().catch(() => {});
+      // Re-register the FCM token on every resume: the backend keeps tokens in
+      // memory, so a Render restart/deploy wipes them — re-registering whenever
+      // the app is foregrounded keeps notifications alive without a cold relaunch.
+      syncFavoriteTeamsToBackend().catch(() => {});
+    };
     const onVisible = () => { if (document.visibilityState === 'visible') resync(); };
     document.addEventListener('visibilitychange', onVisible);
     let removeAppListener = () => {};
