@@ -63,6 +63,12 @@ router.get('/scan-new-vbs', authScan, async (req, res) => {
     } catch (wErr) {
       logger.warn('weather scan failed: ' + (wErr?.message || wErr));
     }
+    let vigilance = null;
+    try {
+      vigilance = await notifications.scanVigilanceAndNotify({ dryRun });
+    } catch (vErr) {
+      logger.warn('vigilance scan failed: ' + (vErr?.message || vErr));
+    }
     let betResults = null;
     try {
       betResults = await notifications.scanBetResults({ dryRun });
@@ -70,7 +76,7 @@ router.get('/scan-new-vbs', authScan, async (req, res) => {
       logger.warn('bet-results scan failed: ' + (bErr?.message || bErr));
     }
 
-    res.json({ ...result, favorites, live, weather, betResults });
+    res.json({ ...result, favorites, live, weather, vigilance, betResults });
   } catch (e) {
     logger.error('scan-new-vbs failed: ' + (e?.stack || e?.message || e));
     res.status(500).json({ error: 'Scan failed', message: e?.message });
@@ -98,6 +104,19 @@ router.get('/scan-weather-alerts', authScan, async (req, res) => {
     res.json(result);
   } catch (e) {
     logger.error('scan-weather-alerts failed: ' + (e?.stack || e?.message || e));
+    res.status(500).json({ error: 'Scan failed', message: e?.message });
+  }
+});
+
+// Standalone vigilance scan — Météo-France vigilance level change for a
+// favorite city's department.
+router.get('/scan-vigilance', authScan, async (req, res) => {
+  try {
+    const dryRun = req.query.dry === '1';
+    const result = await notifications.scanVigilanceAndNotify({ dryRun });
+    res.json(result);
+  } catch (e) {
+    logger.error('scan-vigilance failed: ' + (e?.stack || e?.message || e));
     res.status(500).json({ error: 'Scan failed', message: e?.message });
   }
 });

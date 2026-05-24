@@ -11,7 +11,7 @@ import {
 const PAGE_BG = 'radial-gradient(120% 80% at 50% 0%, #10213f 0%, #0a1326 45%, #060a14 100%)';
 const isNative = Capacitor.isNativePlatform();
 // Which notif types belong to MimiMétéo; everything else is Pronos Foot.
-const METEO_KEYS = new Set(['weather']);
+const METEO_KEYS = new Set(['weather', 'vigilance']);
 
 function Toggle({ on, onClick, accent = 'brand' }) {
   const bg = on ? (accent === 'sky' ? 'bg-sky-500/60' : 'bg-brand-500/60') : 'bg-white/10';

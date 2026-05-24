@@ -19,6 +19,11 @@ let lastFavScanDate = null;
 // Paris day. Reset when the date rolls over.
 const notifiedWeatherKeys = new Set();
 let lastWeatherScanDate = null;
+// Vigilance state: normDept → last seen level (1=vert..4=rouge). We notify on a
+// CHANGE of level. First observation of a dept is baseline-silent (so a restart
+// doesn't spam). reverseDept results are cached by rounded coords.
+const vigilanceState = new Map();
+const deptCache = new Map();
 // Bet-result dedup — one settled notif per (token, fixture, betKey). Reset daily.
 const notifiedBetResultKeys = new Set();
 let lastBetResultDate = null;
@@ -38,7 +43,7 @@ const ALLOWED_PLATFORMS = new Set(['android', 'ios', 'web', 'unknown']);
 
 // Per-token notification preferences. Any key absent → treated as enabled,
 // so a stale client that doesn't send prefs keeps getting everything.
-const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'favMatchKickoff', 'goal', 'final', 'kickoff', 'favTeamVb', 'weather', 'betResult'];
+const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'favMatchKickoff', 'goal', 'final', 'kickoff', 'favTeamVb', 'weather', 'vigilance', 'betResult'];
 
 // Grade a bet pick against a final score → 'win' | 'loss' | 'push' | null.
 // Mirror of the frontend gradeBet so settled-bet notifs match the app's verdict.
@@ -853,6 +858,79 @@ async function scanWeatherAndNotify({ dryRun = false } = {}) {
   return { cities: cities.size, alerts, sent, dryRun };
 }
 
+// ─── Vigilance Météo-France: notify on a level CHANGE for a favorite city ────
+
+/**
+ * For each favorite city (tokens with 'vigilance' pref), resolve its French
+ * department and compare the current Météo-France vigilance level to the last
+ * seen one. Notify only when it CHANGES (e.g. vert→jaune, jaune→orange, or back
+ * to vert). First observation of a dept is baseline-silent to avoid spamming on
+ * restart. One feed fetch covers all favorite cities.
+ */
+async function scanVigilanceAndNotify({ dryRun = false } = {}) {
+  // Gather favorite cities for tokens that enabled vigilance notifs.
+  const cityList = [];
+  for (const [token, meta] of tokens) {
+    if (!prefOn(token, 'vigilance')) continue;
+    for (const c of (meta.favoriteCities || [])) cityList.push({ ...c, token });
+  }
+  if (cityList.length === 0) return { depts: 0, changes: 0, sent: 0 };
+
+  let vigMap;
+  try {
+    vigMap = await weatherService.getActiveVigilanceMap();
+  } catch (e) {
+    logger.warn('vigilance map failed: ' + (e?.message || e));
+    return { depts: 0, changes: 0, sent: 0 };
+  }
+
+  // Group recipients by department (resolved from coords, cached).
+  const deptInfo = new Map(); // normDept → { label, name, recipients:Set }
+  for (const c of cityList) {
+    const ck = `${c.lat.toFixed(2)},${c.lon.toFixed(2)}`;
+    let dep = deptCache.get(ck);
+    if (dep === undefined) {
+      try { dep = await weatherService.reverseDept(c.lat, c.lon); } catch { dep = null; }
+      deptCache.set(ck, dep);
+    }
+    if (!dep) continue;
+    const nd = weatherService.normDept(dep);
+    if (!deptInfo.has(nd)) deptInfo.set(nd, { label: dep, name: c.name, recipients: new Set() });
+    deptInfo.get(nd).recipients.add(c.token);
+  }
+
+  let changes = 0;
+  let sent = 0;
+  for (const [nd, info] of deptInfo) {
+    const warnings = vigMap.get(nd) || [];
+    const level = warnings.length ? warnings[0].level : 1; // 1 = vert (aucune)
+    const prev = vigilanceState.get(nd);
+    vigilanceState.set(nd, level);
+    if (prev === undefined || prev === level) continue; // baseline or no change
+    changes++;
+    if (dryRun) continue;
+
+    let title; let body;
+    if (level >= 2) {
+      const top = warnings[0];
+      title = `${top.icon} Vigilance ${top.levelLabel} · ${info.label}`;
+      body = `${warnings.map((w) => `${w.icon} ${w.type}`).join(', ')} — ${info.name}`;
+    } else {
+      title = `✅ Vigilance levée · ${info.label}`;
+      body = `Retour au vert — ${info.name}`;
+    }
+    sent += await notifyTokens(info.recipients, {
+      title,
+      body,
+      type: 'weather_vigilance',
+      tag: `vigilance_${nd}`.replace(/[^a-zA-Z0-9_]/g, '_'),
+      channelId: 'weather_alerts',
+    });
+  }
+
+  return { depts: deptInfo.size, changes, sent, dryRun };
+}
+
 // ─── Bet-result notifications: notify when a user's staked bet settles ──────
 
 /**
@@ -951,6 +1029,7 @@ module.exports = {
   scanFavoriteTeamsToday,
   scanLiveFavorites,
   scanWeatherAndNotify,
+  scanVigilanceAndNotify,
   scanBetResults,
   getStatus,
   resetNotifiedKeys,

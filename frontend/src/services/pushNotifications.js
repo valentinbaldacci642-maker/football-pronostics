@@ -23,7 +23,8 @@ export const NOTIF_TYPES = [
   { key: 'kickoff',   label: 'Coup d’envoi (équipe favorite)', desc: 'Au coup d’envoi d’un match d’une équipe favorite' },
   { key: 'goal',      label: 'But en direct',        desc: 'À chaque but d’un match suivi' },
   { key: 'final',     label: 'Résultat final',       desc: 'Score final d’un match suivi' },
-  { key: 'weather',   label: 'Alertes météo',        desc: 'Pluie ou orage à venir sur une ville suivie (MimiMétéo)' },
+  { key: 'weather',   label: 'Alertes pluie / orage', desc: 'Pluie ou orage à venir sur une ville suivie (MimiMétéo)' },
+  { key: 'vigilance', label: 'Vigilance Météo-France', desc: 'Changement de niveau de vigilance sur une ville suivie' },
   { key: 'betResult', label: 'Résultat de mes paris', desc: 'Quand un de tes paris en cours est gagné ou perdu' },
 ];
 

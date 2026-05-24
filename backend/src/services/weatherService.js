@@ -115,4 +115,45 @@ async function getVigilance(depName) {
   return Array.from(byType.values()).sort((a, b) => b.level - a.level);
 }
 
-module.exports = { getOutlook, reverseDept, getVigilance };
+// Active vigilance for ALL departments in one feed fetch. Returns
+// Map(normDept → warnings[] sorted worst-first). Used by the vigilance push
+// scan so we hit the feed once for every favorite city instead of per-dept.
+async function getActiveVigilanceMap() {
+  const { data } = await axios.get(METEOALARM_FR, {
+    headers: { 'User-Agent': 'SiteDesFoufous/1.0' },
+    timeout: 12000,
+  });
+  const now = Date.now();
+  const eod = new Date(); eod.setHours(23, 59, 59, 999);
+  const endOfToday = eod.getTime();
+
+  const perDept = new Map(); // normDept → Map(type → warning)
+  for (const w of (data?.warnings || [])) {
+    const infos = w.alert?.info || [];
+    const info = infos.find((i) => (i.language || '').toLowerCase().startsWith('fr')) || infos[0];
+    if (!info) continue;
+    const exp = info.expires ? new Date(info.expires).getTime() : null;
+    const ons = (info.onset || info.effective) ? new Date(info.onset || info.effective).getTime() : null;
+    if (Number.isFinite(exp) && exp < now) continue;
+    if (Number.isFinite(ons) && ons > endOfToday) continue;
+    const lvlNum = parseInt(parseParam(info.parameter, 'awareness_level'), 10) || 1;
+    if (lvlNum < 2) continue; // only real vigilance (yellow+)
+    const typeNum = parseInt(parseParam(info.parameter, 'awareness_type'), 10) || 0;
+    const lvl = LEVELS[lvlNum] || LEVELS[1];
+    const type = AWARENESS_TYPES[typeNum] || { label: info.event || 'Phénomène', icon: '⚠️' };
+    const warning = { type: type.label, icon: type.icon, level: lvl.level, levelLabel: lvl.label, color: lvl.color };
+    for (const a of (info.area || [])) {
+      const dep = norm(a.areaDesc);
+      if (!dep) continue;
+      if (!perDept.has(dep)) perDept.set(dep, new Map());
+      const bt = perDept.get(dep);
+      const cur = bt.get(warning.type);
+      if (!cur || warning.level > cur.level) bt.set(warning.type, warning);
+    }
+  }
+  const out = new Map();
+  for (const [dep, bt] of perDept) out.set(dep, Array.from(bt.values()).sort((a, b) => b.level - a.level));
+  return out;
+}
+
+module.exports = { getOutlook, reverseDept, getVigilance, getActiveVigilanceMap, normDept: norm };
