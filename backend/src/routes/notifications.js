@@ -9,11 +9,11 @@ const adminAuth = require('../middleware/adminAuth');
 const authScan = adminAuth({ allowQueryKey: true });
 
 router.post('/register', (req, res) => {
-  const { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets } = req.body || {};
+  const { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets, seismeSettings } = req.body || {};
   if (!token || typeof token !== 'string') {
     return res.status(400).json({ error: 'token is required' });
   }
-  const ok = notifications.registerToken(token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets);
+  const ok = notifications.registerToken(token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets, seismeSettings);
   res.json({ ok, status: notifications.getStatus() });
 });
 
@@ -69,6 +69,12 @@ router.get('/scan-new-vbs', authScan, async (req, res) => {
     } catch (vErr) {
       logger.warn('vigilance scan failed: ' + (vErr?.message || vErr));
     }
+    let seisme = null;
+    try {
+      seisme = await notifications.scanSeismeAndNotify({ dryRun });
+    } catch (sErr) {
+      logger.warn('seisme scan failed: ' + (sErr?.message || sErr));
+    }
     let betResults = null;
     try {
       betResults = await notifications.scanBetResults({ dryRun });
@@ -76,7 +82,7 @@ router.get('/scan-new-vbs', authScan, async (req, res) => {
       logger.warn('bet-results scan failed: ' + (bErr?.message || bErr));
     }
 
-    res.json({ ...result, favorites, live, weather, vigilance, betResults });
+    res.json({ ...result, favorites, live, weather, vigilance, seisme, betResults });
   } catch (e) {
     logger.error('scan-new-vbs failed: ' + (e?.stack || e?.message || e));
     res.status(500).json({ error: 'Scan failed', message: e?.message });
@@ -117,6 +123,18 @@ router.get('/scan-vigilance', authScan, async (req, res) => {
     res.json(result);
   } catch (e) {
     logger.error('scan-vigilance failed: ' + (e?.stack || e?.message || e));
+    res.status(500).json({ error: 'Scan failed', message: e?.message });
+  }
+});
+
+// Standalone earthquake scan — USGS poll → push for magnitude/zone matches.
+router.get('/scan-seisme', authScan, async (req, res) => {
+  try {
+    const dryRun = req.query.dry === '1';
+    const result = await notifications.scanSeismeAndNotify({ dryRun });
+    res.json(result);
+  } catch (e) {
+    logger.error('scan-seisme failed: ' + (e?.stack || e?.message || e));
     res.status(500).json({ error: 'Scan failed', message: e?.message });
   }
 });

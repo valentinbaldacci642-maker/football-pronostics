@@ -226,8 +226,8 @@ export const notificationsApi = {
   // favoriteTeams: API-Football team IDs → 'team plays today' notif (2h before).
   // favoriteMatches: fixture IDs → 'your match starts in 15 min' notif.
   // Both optional — omitted/empty means VB notifs only.
-  register: (token, platform, favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null, pendingBets = null) =>
-    api.post('/notifications/register', { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets }),
+  register: (token, platform, favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null, pendingBets = null, seismeSettings = null) =>
+    api.post('/notifications/register', { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets, seismeSettings }),
   unregister: (token) => api.post('/notifications/unregister', { token }),
   status: () => api.get('/notifications/status'),
 };

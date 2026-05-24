@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Target, CloudSun, ChevronRight, Flame, Settings } from 'lucide-react';
+import { Target, CloudSun, ChevronRight, Flame, Settings, Waves } from 'lucide-react';
 import { getForecast, getAlertCities, getRecentCities, wmo, tempColor } from '../services/meteo';
 import { pronosticsApi } from '../services/api';
 import WeatherInsights from '../components/meteo/WeatherInsights';
@@ -24,6 +24,14 @@ const PROJECTS = [
     subtitle: 'Météo, orages, pluie & foudre en direct',
     accent: 'from-sky-500/20 to-sky-500/5 border-sky-500/30',
     iconColor: 'text-sky-400',
+  },
+  {
+    to: '/seismes',
+    icon: Waves,
+    title: 'MimiSéisme',
+    subtitle: 'Séismes en direct · USGS & EMSC · alertes',
+    accent: 'from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/30',
+    iconColor: 'text-fuchsia-400',
   },
 ];
 

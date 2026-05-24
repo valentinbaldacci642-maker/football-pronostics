@@ -1,3 +1,4 @@
+const axios = require('axios');
 const { getMessaging } = require('./firebaseAdmin');
 const pronosticsService = require('./pronosticsService');
 const apiFootball = require('./apiFootball');
@@ -24,6 +25,11 @@ let lastWeatherScanDate = null;
 // doesn't spam). reverseDept results are cached by rounded coords.
 const vigilanceState = new Map();
 const deptCache = new Map();
+// Earthquake scan: remember the last quake time we processed + already-notified
+// quake ids (bounded) so we never double-notify. Wiped on restart (at worst we
+// re-evaluate the last few minutes, dedup by id still holds within a run).
+let lastSeismeTime = 0;
+const notifiedQuakeKeys = new Set();
 // Bet-result dedup — one settled notif per (token, fixture, betKey). Reset daily.
 const notifiedBetResultKeys = new Set();
 let lastBetResultDate = null;
@@ -43,7 +49,7 @@ const ALLOWED_PLATFORMS = new Set(['android', 'ios', 'web', 'unknown']);
 
 // Per-token notification preferences. Any key absent → treated as enabled,
 // so a stale client that doesn't send prefs keeps getting everything.
-const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'favMatchKickoff', 'goal', 'final', 'kickoff', 'favTeamVb', 'weather', 'vigilance', 'betResult'];
+const NOTIF_PREF_KEYS = ['vb', 'favTeam', 'favMatch', 'favMatchKickoff', 'goal', 'final', 'kickoff', 'favTeamVb', 'weather', 'vigilance', 'seisme', 'betResult'];
 
 // Grade a bet pick against a final score → 'win' | 'loss' | 'push' | null.
 // Mirror of the frontend gradeBet so settled-bet notifs match the app's verdict.
@@ -140,7 +146,26 @@ function sanitizeFavoriteCities(input) {
   return out;
 }
 
-function registerToken(token, platform = 'unknown', favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null, pendingBets = null) {
+// Earthquake notif settings: { minMag, zoneLat, zoneLon, zoneRadius } — global
+// alerts above minMag + optional proximity alerts within zoneRadius km.
+function sanitizeSeisme(input) {
+  if (!input || typeof input !== 'object') return null;
+  const num = (v, def, min, max) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : def;
+  };
+  const lat = parseFloat(input.zoneLat);
+  const lon = parseFloat(input.zoneLon);
+  const hasZone = Number.isFinite(lat) && Number.isFinite(lon);
+  return {
+    minMag: num(input.minMag, 5, 1, 9),
+    zoneLat: hasZone ? lat : null,
+    zoneLon: hasZone ? lon : null,
+    zoneRadius: hasZone ? num(input.zoneRadius, 300, 10, 3000) : 0,
+  };
+}
+
+function registerToken(token, platform = 'unknown', favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null, pendingBets = null, seismeSettings = null) {
   if (!token || typeof token !== 'string') return false;
   // FCM registration tokens are ~140-260 chars. Reject anything outside
   // a sane range so an attacker can't fill memory with megabyte tokens.
@@ -155,6 +180,7 @@ function registerToken(token, platform = 'unknown', favoriteTeams = [], favorite
   const prefs = notifPrefs != null ? sanitizeNotifPrefs(notifPrefs) : (prev?.notifPrefs || {});
   const cities = favoriteCities != null ? sanitizeFavoriteCities(favoriteCities) : (prev?.favoriteCities || []);
   const bets = pendingBets != null ? sanitizePendingBets(pendingBets) : (prev?.pendingBets || []);
+  const seisme = seismeSettings != null ? sanitizeSeisme(seismeSettings) : (prev?.seisme || null);
   tokens.set(token, {
     platform: safePlatform,
     registeredAt: Date.now(),
@@ -163,6 +189,7 @@ function registerToken(token, platform = 'unknown', favoriteTeams = [], favorite
     notifPrefs: prefs,
     favoriteCities: cities,
     pendingBets: bets,
+    seisme,
   });
   return true;
 }
@@ -931,6 +958,97 @@ async function scanVigilanceAndNotify({ dryRun = false } = {}) {
   return { depts: deptInfo.size, changes, sent, dryRun };
 }
 
+// ─── Earthquake alerts (SeismoTrack) : USGS poll + FCM push ─────────────────
+
+const SEISME_ZONE_FLOOR = 2.5; // min magnitude for proximity (zone) alerts
+const USGS_QUERY = 'https://earthquake.usgs.gov/fdsnws/event/1/query';
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Poll USGS for new earthquakes and FCM-push to tokens with 'seisme' on:
+ *  - global: magnitude ≥ the token's minMag
+ *  - zone:   within zoneRadius km of the token's location (mag ≥ floor)
+ * Server-side FCM (like weather) — reliable, unlike the old background-runner.
+ * First run after restart is baseline-silent (records the time, no history spam).
+ */
+async function scanSeismeAndNotify({ dryRun = false } = {}) {
+  const recipients = [];
+  for (const [token, meta] of tokens) {
+    if (!prefOn(token, 'seisme')) continue;
+    recipients.push({ token, s: meta.seisme || { minMag: 5, zoneLat: null, zoneLon: null, zoneRadius: 0 } });
+  }
+  if (recipients.length === 0) return { quakes: 0, sent: 0 };
+
+  const now = Date.now();
+  if (lastSeismeTime === 0) { lastSeismeTime = now; return { quakes: 0, sent: 0, baseline: true }; }
+
+  const startTime = new Date(Math.max(lastSeismeTime, now - 30 * 60 * 1000)).toISOString();
+  let features = [];
+  try {
+    const { data } = await axios.get(USGS_QUERY, {
+      params: { format: 'geojson', starttime: startTime, minmagnitude: 1, orderby: 'time' },
+      timeout: 10000,
+    });
+    features = data?.features || [];
+  } catch (e) {
+    logger.warn('seisme fetch failed: ' + (e?.message || e));
+    return { quakes: 0, sent: 0 };
+  }
+
+  const fresh = features.filter((f) => (f.properties?.time || 0) > lastSeismeTime);
+  lastSeismeTime = now;
+  if (fresh.length === 0) return { quakes: 0, sent: 0 };
+
+  let sent = 0;
+  for (const f of fresh) {
+    const p = f.properties || {};
+    const c = f.geometry?.coordinates || [];
+    const mag = p.mag;
+    if (mag == null) continue;
+    const place = p.place || 'Lieu inconnu';
+    const depth = c[2];
+    const lat = c[1];
+    const lon = c[0];
+    const tsunami = p.tsunami === 1 ? ' ⚠️ TSUNAMI' : '';
+    const qid = f.id;
+
+    for (const { token, s } of recipients) {
+      let proximityKm = null;
+      let hit = false;
+      if (mag >= s.minMag) {
+        hit = true;
+      } else if (s.zoneRadius > 0 && s.zoneLat != null && mag >= SEISME_ZONE_FLOOR
+                 && Number.isFinite(lat) && Number.isFinite(lon)) {
+        const dist = haversineKm(s.zoneLat, s.zoneLon, lat, lon);
+        if (dist <= s.zoneRadius) { hit = true; proximityKm = Math.round(dist); }
+      }
+      if (!hit) continue;
+      const dkey = `${token}::${qid}`;
+      if (notifiedQuakeKeys.has(dkey)) continue;
+      if (dryRun) { notifiedQuakeKeys.add(dkey); sent++; continue; }
+
+      const title = proximityKm != null
+        ? `📍 Séisme à proximité · M${mag.toFixed(1)}${tsunami}`
+        : `🌍 Séisme · M${mag.toFixed(1)}${tsunami}`;
+      const body = `${proximityKm != null ? `À ${proximityKm} km · ` : ''}${place} — Prof. ${depth != null ? Math.round(depth) : '?'} km`;
+      const n = await notifyTokens([token], {
+        title, body, type: 'seisme', tag: `seisme_${qid}`, channelId: 'weather_alerts',
+      });
+      if (n > 0) { notifiedQuakeKeys.add(dkey); sent++; }
+    }
+  }
+  if (notifiedQuakeKeys.size > 5000) notifiedQuakeKeys.clear();
+  return { quakes: fresh.length, sent, dryRun };
+}
+
 // ─── Bet-result notifications: notify when a user's staked bet settles ──────
 
 /**
@@ -1030,6 +1148,7 @@ module.exports = {
   scanLiveFavorites,
   scanWeatherAndNotify,
   scanVigilanceAndNotify,
+  scanSeismeAndNotify,
   scanBetResults,
   getStatus,
   resetNotifiedKeys,
