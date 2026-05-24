@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Target, CloudSun, ChevronRight, Flame } from 'lucide-react';
 import { getForecast, getAlertCities, getRecentCities, wmo, tempColor } from '../services/meteo';
 import { pronosticsApi } from '../services/api';
+import WeatherInsights from '../components/meteo/WeatherInsights';
 
 // SiteDesFoufous landing — the umbrella that gathers the projects. Each card
 // links into a section. Standalone layout (no football sidebar/navbar).
@@ -39,20 +40,23 @@ function WeatherWidget() {
   const { emoji, label } = wmo(cur?.weather_code);
   const to = `/meteo/ville?lat=${city.lat}&lon=${city.lon}&name=${encodeURIComponent(city.name)}`;
   return (
-    <Link to={to} className="group flex items-center gap-3 rounded-2xl border border-sky-500/25 bg-gradient-to-b from-sky-500/10 to-transparent p-4 transition-all hover:border-sky-400/40">
-      <div className="text-3xl leading-none">{cur ? emoji : '⏳'}</div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] uppercase tracking-wider text-white/40 font-heading">Météo · {city.name}</p>
-        {cur ? (
-          <p className="font-heading">
-            <span className="font-display text-2xl" style={{ color: tempColor(Math.round(cur.temperature_2m)) }}>{Math.round(cur.temperature_2m)}°</span>
-            <span className="text-sm text-white/55 ml-2">{label}</span>
-          </p>
-        ) : (
-          <p className="text-sm text-white/40">Chargement…</p>
-        )}
+    <Link to={to} className="group block rounded-2xl border border-sky-500/25 bg-gradient-to-b from-sky-500/10 to-transparent p-4 transition-all hover:border-sky-400/40">
+      <div className="flex items-center gap-3">
+        <div className="text-3xl leading-none">{cur ? emoji : '⏳'}</div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] uppercase tracking-wider text-white/40 font-heading">Météo · {city.name}</p>
+          {cur ? (
+            <p className="font-heading">
+              <span className="font-display text-2xl" style={{ color: tempColor(Math.round(cur.temperature_2m)) }}>{Math.round(cur.temperature_2m)}°</span>
+              <span className="text-sm text-white/55 ml-2">{label}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-white/40">Chargement…</p>
+          )}
+        </div>
+        <ChevronRight className="w-4 h-4 text-white/25 group-hover:text-white/60 transition-colors" />
       </div>
-      <ChevronRight className="w-4 h-4 text-white/25 group-hover:text-white/60 transition-colors" />
+      {data && <WeatherInsights forecast={data} variant="compact" />}
     </Link>
   );
 }

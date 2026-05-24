@@ -12,6 +12,7 @@ import { weatherApi } from '../../services/api';
 import { syncWeatherCitiesToBackend } from '../../services/pushNotifications';
 import { InfoBadge, orageText, violentText } from '../../components/meteo/RiskUI';
 import MapEmbed from '../../components/meteo/MapEmbed';
+import WeatherInsights from '../../components/meteo/WeatherInsights';
 
 const DAYS_FR = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
@@ -589,6 +590,9 @@ export default function MeteoDashboard() {
 
         {!loading && !error && data && (
           <>
+            {/* Smart insights — résumé foufous + alertes malines */}
+            <WeatherInsights forecast={data} airQuality={aq} variant="full" />
+
             {/* Quick stats */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-7">
               <QuickStat icon={Thermometer} label="Ressenti" value={fmtTemp(cur.apparent_temperature, tempUnit)} />
@@ -674,7 +678,7 @@ export default function MeteoDashboard() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 px-1 text-yellow-300"><Zap className="w-4 h-4" /><span className="text-xs font-heading font-bold uppercase tracking-wider">Foudre en direct · Meteociel</span></div>
-                    <MapEmbed src={METEOCIEL_FOUDRE} height={mapSize} canvasCrop={{ x: 648, y: 322, w: 768, h: 768, frameW: 1900, fit: 'cover' }} note="Meteociel · plein écran" />
+                    <MapEmbed src={METEOCIEL_FOUDRE} height={mapSize} canvasCrop={{ x: 648, y: 322, w: 768, h: 808, frameW: 1900, fit: 'width' }} note="Meteociel · plein écran" />
                   </div>
                 </div>
               </div>

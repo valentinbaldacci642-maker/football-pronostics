@@ -696,10 +696,15 @@ async function scanLiveFavorites({ dryRun = false } = {}) {
   for (const [fid, f] of byId) {
     const h = f.teams?.home;
     const a = f.teams?.away;
-    const recipients = new Set();
-    for (const t of (teamToTokens.get(h?.id) || [])) recipients.add(t);
-    for (const t of (teamToTokens.get(a?.id) || [])) recipients.add(t);
-    for (const t of (matchToTokens.get(fid) || [])) recipients.add(t);
+    // Split team-followers vs match-followers: kickoff for a *favorited match*
+    // is gated by the same 'favMatch' pref as its 15-min reminder, so enabling
+    // "match favori" gives both the 15-min heads-up AND the kickoff ping.
+    const teamRecipients = new Set([
+      ...(teamToTokens.get(h?.id) || []),
+      ...(teamToTokens.get(a?.id) || []),
+    ]);
+    const matchRecipients = new Set(matchToTokens.get(fid) || []);
+    const recipients = new Set([...teamRecipients, ...matchRecipients]);
     if (recipients.size === 0) continue;
 
     const status = f.fixture?.status?.short;
@@ -711,12 +716,16 @@ async function scanLiveFavorites({ dryRun = false } = {}) {
     // Per-event recipient filtering by preference.
     const forPref = (key) => [...recipients].filter((t) => prefOn(t, key));
 
-    // Kickoff: was scheduled, now live.
+    // Kickoff: was scheduled, now live. Recipients = team-followers with the
+    // 'kickoff' pref OR match-followers with the 'favMatch' pref (so a favorited
+    // match gets its kickoff ping from the same toggle as its 15-min reminder).
     if (prev && (prev.status === 'NS' || prev.status === 'TBD') && LIVE_STATUSES.has(status)) {
-      const r = forPref('kickoff');
+      const ko = new Set();
+      for (const t of teamRecipients) if (prefOn(t, 'kickoff')) ko.add(t);
+      for (const t of matchRecipients) if (prefOn(t, 'favMatch')) ko.add(t);
       events++;
-      if (!dryRun && r.length) {
-        sent += await notifyTokens(r, {
+      if (!dryRun && ko.size) {
+        sent += await notifyTokens([...ko], {
           title: "C'est parti !",
           body: `${h?.name} vs ${a?.name}`,
           type: 'live_kickoff', fixtureId: fid, tag: `kickoff_${fid}`,
