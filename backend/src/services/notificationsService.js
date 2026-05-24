@@ -1169,6 +1169,35 @@ async function scanBetResults({ dryRun = false } = {}) {
   return { tokensWithBets, settled, sent, dryRun };
 }
 
+// Send a one-off test push to a single token (used by the "Tester une
+// notification" button). Returns {ok} or {ok:false, error}.
+async function sendTestNotification(token) {
+  const messaging = getMessaging();
+  if (!messaging) return { ok: false, reason: 'fcm-not-configured' };
+  if (!token || typeof token !== 'string') return { ok: false, reason: 'no-token' };
+  const iconUrl = process.env.NOTIFICATION_ICON_URL
+    || 'https://pronos-foufous-app.vercel.app/pwa-512x512.png';
+  try {
+    await messaging.send({
+      token,
+      notification: { title: '🔔 Test SiteDesFoufous', body: 'Tes notifications fonctionnent ! 🎉' },
+      android: {
+        priority: 'high',
+        notification: { channelId: 'favorite_teams', sound: 'default', imageUrl: iconUrl },
+      },
+    });
+    return { ok: true };
+  } catch (e) {
+    const code = e?.code || '';
+    if (code === 'messaging/registration-token-not-registered'
+        || code === 'messaging/invalid-registration-token') {
+      tokens.delete(token);
+      tokenStore.remove(token).catch(() => {});
+    }
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
 function getStatus() {
   return {
     tokenCount: tokens.size,
@@ -1202,6 +1231,7 @@ module.exports = {
   scanVigilanceAndNotify,
   scanSeismeAndNotify,
   registerSeisme,
+  sendTestNotification,
   scanBetResults,
   getStatus,
   resetNotifiedKeys,

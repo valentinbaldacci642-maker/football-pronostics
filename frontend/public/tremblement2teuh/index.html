@@ -363,7 +363,7 @@
     </div>
     <div class="hdr-right">
       <div class="live-badge"><div class="live-dot"></div>LIVE</div>
-      <button class="icon-btn" onclick="openSettings()" title="Paramètres">⚙</button>
+      <!-- Réglages séismes déplacés dans le Hub (Accueil → Réglages → Tremblement2Teuh) -->
       <button class="icon-btn" onclick="loadAll()" id="refresh-btn" title="Actualiser">↻</button>
     </div>
   </header>
@@ -1441,7 +1441,9 @@ async function checkNewEarthquakes(list) {
 window.addEventListener('load', () => {
   loadSettings();
   setTimeout(() => initMap(), 200);
-  initNotifications().then(() => initPushNotifications());
+  // Les notifications séisme sont gérées par l'app SiteDesFoufous (FCM serveur,
+  // réglées dans le Hub). L'app embarquée n'enregistre plus son propre token
+  // pour éviter tout conflit — elle ne sert qu'à visualiser les séismes.
 });
 
 loadAll();

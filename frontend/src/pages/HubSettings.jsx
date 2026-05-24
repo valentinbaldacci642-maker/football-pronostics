@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import {
   isNotificationsEnabled, enablePushNotifications, disablePushNotifications,
   NOTIF_TYPES, getNotifPrefs, setNotifPref, syncFavoriteTeamsToBackend,
-  getSeismeSettings, setSeismeSettings,
+  getSeismeSettings, setSeismeSettings, testNotification,
 } from '../services/pushNotifications';
 import { searchCity } from '../services/meteo';
 
@@ -137,6 +137,15 @@ export default function HubSettings() {
   const [enabled, setEnabled] = useState(() => isNotificationsEnabled());
   const [prefs, setPrefs] = useState(() => getNotifPrefs());
   const [busy, setBusy] = useState(false);
+  const [testMsg, setTestMsg] = useState(null);
+
+  const runTest = async () => {
+    setTestMsg('Envoi…');
+    const r = await testNotification();
+    setTestMsg(r?.ok
+      ? '✅ Envoyée ! Tu devrais la recevoir dans un instant.'
+      : `❌ Échec (${r?.reason || r?.error || 'inconnu'})`);
+  };
 
   const toggleMaster = async () => {
     setBusy(true);
@@ -185,6 +194,20 @@ export default function HubSettings() {
 
             {enabled && (
               <>
+                {/* Test push */}
+                <section className="rounded-2xl p-4 bg-white/[0.04] border border-white/10 backdrop-blur-md flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-heading font-semibold text-white/85">Tester une notification</p>
+                    {testMsg && <p className="text-xs text-white/55 leading-snug mt-0.5">{testMsg}</p>}
+                  </div>
+                  <button
+                    onClick={runTest}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-500/20 border border-brand-500/40 text-brand-300 text-sm font-heading font-semibold hover:bg-brand-500/30 transition-colors flex-shrink-0"
+                  >
+                    <Bell className="w-4 h-4" /> Tester
+                  </button>
+                </section>
+
                 <NotifGroup title="PRONOS FOOT" icon={Target} color="#34d399" accent="brand" types={footTypes} prefs={prefs} onToggle={toggleType} />
                 <NotifGroup title="MIMIMÉTÉO" icon={CloudSun} color="#38bdf8" accent="sky" types={meteoTypes} prefs={prefs} onToggle={toggleType} />
                 <NotifGroup title="TREMBLEMENT2TEUH" icon={Waves} color="#e879f9" accent="fuchsia" types={seismeTypes} prefs={prefs} onToggle={toggleType} />

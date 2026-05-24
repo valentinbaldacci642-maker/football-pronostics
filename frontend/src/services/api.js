@@ -229,6 +229,7 @@ export const notificationsApi = {
   register: (token, platform, favoriteTeams = [], favoriteMatches = [], notifPrefs = null, favoriteCities = null, pendingBets = null, seismeSettings = null) =>
     api.post('/notifications/register', { token, platform, favoriteTeams, favoriteMatches, notifPrefs, favoriteCities, pendingBets, seismeSettings }),
   unregister: (token) => api.post('/notifications/unregister', { token }),
+  test: (token) => api.post('/notifications/test', { token }),
   status: () => api.get('/notifications/status'),
 };
 

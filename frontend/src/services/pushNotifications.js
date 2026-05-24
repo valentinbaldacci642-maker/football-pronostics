@@ -25,6 +25,7 @@ export const NOTIF_TYPES = [
   { key: 'final',     label: 'Résultat final',       desc: 'Score final d’un match suivi' },
   { key: 'weather',   label: 'Alertes pluie / orage', desc: 'Pluie ou orage à venir sur une ville suivie (MimiMétéo)' },
   { key: 'vigilance', label: 'Vigilance Météo-France', desc: 'Changement de niveau de vigilance sur une ville suivie' },
+  { key: 'seisme',    label: 'Alertes séisme',        desc: 'Séisme ≥ ton seuil de magnitude, ou proche de ta zone (Tremblement2Teuh)' },
   { key: 'betResult', label: 'Résultat de mes paris', desc: 'Quand un de tes paris en cours est gagné ou perdu' },
 ];
 
@@ -46,6 +47,19 @@ export function setSeismeSettings(patch) {
   const next = { ...getSeismeSettings(), ...patch };
   try { localStorage.setItem(LS_SEISME_KEY, JSON.stringify(next)); } catch (_) { /* ignore */ }
   return next;
+}
+
+// Ask the backend to send a real FCM test push to this device's token.
+// Returns { ok } or { ok:false, reason/error }.
+export async function testNotification() {
+  const token = localStorage.getItem(LS_TOKEN_KEY);
+  if (!token) return { ok: false, reason: 'no-token' };
+  try {
+    const { data } = await notificationsApi.test(token);
+    return data || { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || 'network' };
+  }
 }
 
 export function getNotifPrefs() {
@@ -185,7 +199,7 @@ export async function initPushNotifications() {
 
     try {
       await notificationsApi.register(
-        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets()
+        token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets(), getSeismeSettings()
       );
     } catch (e) {
       // Backend down → don't block the app, retry next launch
@@ -239,7 +253,7 @@ export async function syncFavoriteTeamsToBackend() {
   if (!token) return;
   try {
     await notificationsApi.register(
-      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets()
+      token, Capacitor.getPlatform(), currentFavoriteTeamIds(), currentFavoriteMatchIds(), getNotifPrefs(), currentFavoriteCities(), currentPendingBets(), getSeismeSettings()
     );
   } catch (e) {
     console.warn('[push] favorite sync failed:', e?.message);

@@ -28,6 +28,14 @@ router.post('/seisme-register', (req, res) => {
   res.json({ ok });
 });
 
+// Send a test push to the caller's own token ("Tester une notification").
+router.post('/test', async (req, res) => {
+  const { token } = req.body || {};
+  if (!token || typeof token !== 'string') return res.status(400).json({ error: 'token required' });
+  const r = await notifications.sendTestNotification(token);
+  res.json(r);
+});
+
 router.post('/unregister', (req, res) => {
   const { token } = req.body || {};
   if (!token) return res.status(400).json({ error: 'token is required' });
