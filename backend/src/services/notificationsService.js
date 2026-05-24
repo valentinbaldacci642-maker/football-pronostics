@@ -3,6 +3,7 @@ const { getMessaging } = require('./firebaseAdmin');
 const pronosticsService = require('./pronosticsService');
 const apiFootball = require('./apiFootball');
 const weatherService = require('./weatherService');
+const tokenStore = require('./tokenStore');
 const logger = require('../utils/logger');
 
 // In-memory state. Render free tier stays warm via UptimeRobot ping so
@@ -11,6 +12,17 @@ const logger = require('../utils/logger');
 // Frontend re-registers its token on every app launch, so token loss
 // after a restart self-heals quickly.
 const tokens = new Map();          // token → { platform, registeredAt, favoriteTeams: number[] }
+
+// Rehydrate tokens from durable storage (Supabase) on boot so a Render
+// restart/deploy no longer wipes everyone's notifications.
+if (tokenStore.enabled) {
+  tokenStore.loadAll().then((rows) => {
+    let n = 0;
+    for (const r of rows) { if (r?.token && r?.data) { tokens.set(r.token, r.data); n += 1; } }
+    if (n) logger.info(`Rehydrated ${n} push token(s) from Supabase`);
+  }).catch(() => {});
+}
+
 const notifiedVbKeys = new Set();  // "fixtureId::market::selection"
 // "token::date::teamId" — favorite-team 'plays today' notifs, date-scoped so
 // keys naturally reset each day. Cleared wholesale when the date rolls over.
@@ -193,6 +205,7 @@ function registerToken(token, platform = 'unknown', favoriteTeams = [], favorite
     pendingBets: bets,
     seisme,
   });
+  tokenStore.save(token, tokens.get(token)).catch(() => {});
   return true;
 }
 
@@ -224,10 +237,12 @@ function registerSeisme(token, platform = 'android', opts = {}) {
     pendingBets: prev?.pendingBets || [],
     seisme,
   });
+  tokenStore.save(token, tokens.get(token)).catch(() => {});
   return true;
 }
 
 function unregisterToken(token) {
+  tokenStore.remove(token).catch(() => {});
   return tokens.delete(token);
 }
 
@@ -472,7 +487,7 @@ async function sendNewVbsNotification(newVbs) {
   }
 
   // Prune dead tokens so we don't keep retrying them
-  for (const t of invalidTokens) tokens.delete(t);
+  for (const t of invalidTokens) { tokens.delete(t); tokenStore.remove(t).catch(() => {}); }
   if (invalidTokens.length > 0) {
     logger.info(`Pruned ${invalidTokens.length} stale FCM tokens`);
   }
@@ -541,6 +556,7 @@ async function sendFavoriteTeamNotification(token, favTeam, fixture) {
     if (code === 'messaging/registration-token-not-registered'
         || code === 'messaging/invalid-registration-token') {
       tokens.delete(token);
+      tokenStore.remove(token).catch(() => {});
     }
     logger.warn(`favorite-team notif failed: ${e.message}`);
     return false;
@@ -581,6 +597,7 @@ async function sendFavoriteMatchNotification(token, fixture) {
     if (code === 'messaging/registration-token-not-registered'
         || code === 'messaging/invalid-registration-token') {
       tokens.delete(token);
+      tokenStore.remove(token).catch(() => {});
     }
     logger.warn(`favorite-match notif failed: ${e.message}`);
     return false;
@@ -713,6 +730,7 @@ async function notifyTokens(recipients, { title, body, type, fixtureId, tag, cha
       if (code === 'messaging/registration-token-not-registered'
           || code === 'messaging/invalid-registration-token') {
         tokens.delete(token);
+        tokenStore.remove(token).catch(() => {});
       }
     }
   }
