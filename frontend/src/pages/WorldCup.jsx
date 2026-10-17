@@ -20,6 +20,13 @@ const STATUS_LABELS = {
   PEN: { label: 'Tirs au but', color: 'text-white/30' },
 };
 
+// Un match de phase finale peut se terminer après prolongation (AET) ou aux
+// tirs au but (PEN) : ce sont des matchs joués, au même titre que FT. Ne
+// tester que 'FT' masquait le score des 9 matchs à élimination directe de la
+// CDM 2026 — dont la finale — et les excluait de l'onglet Résultats.
+// Même liste que dans Matchs.jsx.
+const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'AWD', 'WO'];
+
 export default function WorldCup() {
   const [tab, setTab] = useState('calendrier');
 
@@ -99,7 +106,7 @@ function CalendrierTab() {
   const now = new Date();
   const filtered = filter === 'all' ? fixtures
     : filter === 'upcoming' ? fixtures.filter(f => new Date(f.fixture.date) >= now)
-    : fixtures.filter(f => f.fixture.status.short === 'FT');
+    : fixtures.filter(f => FINISHED_STATUSES.includes(f.fixture.status.short));
 
   // Group by date
   const grouped = filtered.reduce((acc, f) => {
@@ -163,10 +170,10 @@ function CalendrierTab() {
 }
 
 function FixtureRow({ fixture }) {
-  const { fixture: fix, teams, goals, league } = fixture;
+  const { fixture: fix, teams, goals, league, score } = fixture;
   const status = STATUS_LABELS[fix.status.short] || { label: fix.status.short, color: 'text-white/40' };
   const isLive = ['1H', 'HT', '2H', 'ET', 'BT'].includes(fix.status.short);
-  const isFinished = fix.status.short === 'FT';
+  const isFinished = FINISHED_STATUSES.includes(fix.status.short);
   const navigate = useNavigate();
 
   const onCardClick = () => navigate(`/match/${fix.id}`);
@@ -207,11 +214,20 @@ function FixtureRow({ fixture }) {
           </Link>
 
           {/* Score */}
-          <div className="w-14 flex-shrink-0 flex items-center justify-center">
+          <div className="w-14 flex-shrink-0 flex flex-col items-center justify-center leading-none">
             {isFinished || isLive ? (
-              <span className="font-black text-white text-lg tabular-nums">
-                {goals.home ?? 0} - {goals.away ?? 0}
-              </span>
+              <>
+                <span className="font-black text-white text-lg tabular-nums">
+                  {goals.home ?? 0} - {goals.away ?? 0}
+                </span>
+                {/* Aux tirs au but, le score du temps réglementaire est un nul :
+                    sans ce détail on ne sait pas qui s'est qualifié. */}
+                {score?.penalty?.home != null && score?.penalty?.away != null && (
+                  <span className="text-[9px] text-white/40 font-mono mt-0.5 tabular-nums">
+                    {score.penalty.home}-{score.penalty.away} t.a.b.
+                  </span>
+                )}
+              </>
             ) : (
               <span className="text-white/30 text-sm font-mono">vs</span>
             )}
