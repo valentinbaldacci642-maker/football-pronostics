@@ -59,7 +59,7 @@ export default function Favorites() {
             <p className="text-white/20 text-xs font-heading">Ajoutez des équipes depuis la page d'une équipe</p>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {favoriteTeams.map((team) => (
               <motion.div
                 key={team.id}
@@ -117,7 +117,7 @@ export default function Favorites() {
             icon={<Star className="w-8 h-8 text-white/20" />}
           />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {fixtureData.map((fixture) => (
               <MatchCard key={fixture.fixture.id} fixture={fixture} />
             ))}

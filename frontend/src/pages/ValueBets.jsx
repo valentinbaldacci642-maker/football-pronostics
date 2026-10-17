@@ -597,7 +597,9 @@ export default function ValueBets() {
             </div>
           )}
 
-          <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+          {/* grid-cols-1 explicite — cf. Home.jsx : sans colonne mobile définie,
+              la piste `auto` s'étire au contenu et fait déborder la page. */}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
           {filteredMatches.map((m, mi) => (
             <Link
               key={m.fixtureId}

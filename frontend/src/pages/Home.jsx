@@ -668,7 +668,10 @@ export default function Home() {
             </h2>
             {/* Toutes les cartes en grille uniforme. Le #1 garde son badge
                 "TOP PRONO" mais à la même taille que les autres. */}
-            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+            {/* grid-cols-1 explicite : sans lui la colonne mobile est en `auto`,
+                donc elle s'élargit au min-content des cartes (417 px pour 328 px
+                dispo) et fait déborder toute la page horizontalement. */}
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
               {topPronostics.map((p, i) => (
                 <Link
                   key={p.fixture?.fixture?.id || i}

@@ -11,6 +11,7 @@ import StandingsView from '../components/leagues/StandingsView';
 import { EmptyState, ErrorState } from '../components/ui/Loading';
 import { fixturesApi } from '../services/api';
 import { useLivePolling, isLiveStatus } from '../hooks/useLivePolling';
+import { currentSeason } from '../utils/season';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -278,7 +279,7 @@ export default function Matchs() {
     if (leagueParam && !selectedLeague) {
       // Minimal stub so the filter applies; StandingsView will gracefully
       // show the picker if user switches to Classements without enough info.
-      setSelectedLeague({ id: parseInt(leagueParam), name: '', logo: null, season: new Date().getFullYear() - 1 });
+      setSelectedLeague({ id: parseInt(leagueParam), name: '', logo: null, season: currentSeason() });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueParam]);
@@ -335,7 +336,7 @@ export default function Matchs() {
         // Fetch the full season's fixtures so the round navigator can
         // page through every Journée, not just the last/next 50 matches.
         // We filter to upcoming vs past client-side below.
-        const season = selectedLeague?.season || (new Date().getFullYear() - 1);
+        const season = selectedLeague?.season || currentSeason();
         result = await fixturesApi.getByLeagueSeason(selectedLeagueId, season);
       } else if (mode === 'live') {
         result = await fixturesApi.getLive();
@@ -411,7 +412,7 @@ export default function Matchs() {
       name: league.name || found?.name || `Ligue ${league.id}`,
       logo: league.logo || found?.logo || null,
       flag: league.flag || null,
-      season: league.season || found?.season || (new Date().getFullYear() - 1),
+      season: league.season || found?.season || currentSeason(),
     });
     if (tabParam === 'matchs') setTab('calendrier');
     setSidebarOpenMobile(false);

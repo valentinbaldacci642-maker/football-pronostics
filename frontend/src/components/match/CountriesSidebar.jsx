@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronDown, ChevronRight, Pin, Globe2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { leaguesApi } from '../../services/api';
+import { currentSeason } from '../../utils/season';
 
 // The 10 pinned leagues that show up at the top of the sidebar — mirrors
 // the priority order used by groupByLeague in Matchs and the standings
@@ -122,7 +123,7 @@ export default function CountriesSidebar({
       name: l.name,
       logo: null, // pinned uses emoji flag — let StandingsView fall back to flag
       flag: l.flag,
-      season: new Date().getFullYear() - 1, // Aug-Dec → use current calendar yr -1 for European seasons
+      season: currentSeason(),
     });
   };
 
