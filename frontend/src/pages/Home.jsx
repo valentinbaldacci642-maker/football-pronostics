@@ -36,7 +36,7 @@ function getConfidenceConfig(score) {
   };
 }
 
-function PronosticCard({ pronostic, featured = false, index = 0 }) {
+function PronosticCard({ pronostic, topBadge = false, index = 0 }) {
   const { fixture: fix, analysis, confidence, pick } = pronostic;
   const home = fix.teams?.home;
   const away = fix.teams?.away;
@@ -118,18 +118,21 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.04, 0.2), duration: 0.28, ease: 'easeOut' }}
-      className={clsx(
-        'football-card card-accent flex flex-col gap-4 cursor-pointer',
-        featured ? 'p-5 border-brand-500/20' : 'p-4',
-      )}
+      className="football-card card-accent flex flex-col gap-4 cursor-pointer p-4 h-full"
     >
-      {/* Featured badge — its own line above league/time so it doesn't
+      {/* Top-prono badge — its own line above league/time so it doesn't
           collide with the kick-off time + favourite star on the right */}
-      {featured && (
-        <div className="flex justify-end -mt-1 -mr-1">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-display tracking-widest text-dark-900 rounded-lg"
-            style={{ background: 'linear-gradient(135deg, #22c55e, #15803d)' }}>
-            ★ TOP PRONO
+      {topBadge && (
+        <div className="flex justify-start -mt-2 -ml-2">
+          <div
+            className="inline-flex items-center gap-2 px-4 py-2 text-base font-display font-black tracking-[0.25em] text-dark-900 rounded-xl shadow-[0_0_24px_rgba(34,197,94,0.55)] ring-2 ring-emerald-300/60 animate-pulse"
+            style={{
+              background: 'linear-gradient(135deg, #fde047 0%, #22c55e 45%, #15803d 100%)',
+              animationDuration: '2.8s',
+            }}
+          >
+            <span className="text-lg leading-none">★</span>
+            <span>TOP PRONO</span>
           </div>
         </div>
       )}
@@ -157,11 +160,11 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
       {/* Teams matchup */}
       <div className="flex items-center gap-3 pl-3">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className={clsx('bg-dark-700/80 rounded-xl flex items-center justify-center p-1.5 flex-shrink-0', featured ? 'w-11 h-11' : 'w-9 h-9')}>
+          <div className="bg-dark-700/80 rounded-xl flex items-center justify-center p-1.5 flex-shrink-0 w-9 h-9">
             <img src={home?.logo} alt={home?.name} className="w-full h-full object-contain" onError={(e) => { e.target.style.opacity = '0'; }} />
           </div>
           <div className="min-w-0">
-            <span className={clsx('block font-heading font-bold text-white truncate', featured ? 'text-base' : 'text-sm')}>{home?.name}</span>
+            <span className="block font-heading font-bold text-white truncate text-sm">{home?.name}</span>
             {streaks.home && (
               <span className={clsx(
                 'block text-[10px] font-mono leading-none mt-0.5 truncate',
@@ -176,11 +179,11 @@ function PronosticCard({ pronostic, featured = false, index = 0 }) {
         <span className="matchup-vs flex-shrink-0 text-sm">VS</span>
 
         <div className="flex items-center gap-2 flex-1 min-w-0 flex-row-reverse">
-          <div className={clsx('bg-dark-700/80 rounded-xl flex items-center justify-center p-1.5 flex-shrink-0', featured ? 'w-11 h-11' : 'w-9 h-9')}>
+          <div className="bg-dark-700/80 rounded-xl flex items-center justify-center p-1.5 flex-shrink-0 w-9 h-9">
             <img src={away?.logo} alt={away?.name} className="w-full h-full object-contain" onError={(e) => { e.target.style.opacity = '0'; }} />
           </div>
           <div className="min-w-0 text-right">
-            <span className={clsx('block font-heading font-bold text-white truncate', featured ? 'text-base' : 'text-sm')}>{away?.name}</span>
+            <span className="block font-heading font-bold text-white truncate text-sm">{away?.name}</span>
             {streaks.away && (
               <span className={clsx(
                 'block text-[10px] font-mono leading-none mt-0.5 truncate',
@@ -528,7 +531,7 @@ export default function Home() {
   const liveBankroll = bankroll + (bkStats.pnl || 0) - (bkStats.pendingCommitted || 0);
 
   return (
-    <div className="space-y-6 max-w-4xl xl:max-w-6xl mx-auto">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -663,16 +666,19 @@ export default function Home() {
             <h2 className="text-sm font-heading font-bold text-white/60 tracking-wide">
               Top 10 pronos du jour ({topPronostics.length})
             </h2>
-            <PronosticCard pronostic={topPronostics[0]} featured index={0} />
-            {topPronostics.slice(1).map((p, i) => (
-              <Link
-                key={p.fixture?.fixture?.id || i}
-                to={`/match/${p.fixture?.fixture?.id}`}
-                className="block"
-              >
-                <PronosticCard pronostic={p} index={i + 1} />
-              </Link>
-            ))}
+            {/* Toutes les cartes en grille uniforme. Le #1 garde son badge
+                "TOP PRONO" mais à la même taille que les autres. */}
+            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+              {topPronostics.map((p, i) => (
+                <Link
+                  key={p.fixture?.fixture?.id || i}
+                  to={`/match/${p.fixture?.fixture?.id}`}
+                  className="block h-full"
+                >
+                  <PronosticCard pronostic={p} index={i} topBadge={i === 0} />
+                </Link>
+              ))}
+            </div>
           </div>
         </>
       )}

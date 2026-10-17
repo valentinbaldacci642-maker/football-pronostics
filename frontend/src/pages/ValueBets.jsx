@@ -70,8 +70,19 @@ function PerBetMiseInputs({ fixtureId, vb, leagueId, liveBankrollUnibet, liveBan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBookmaker]);
 
-  const miseDirty = miseInput !== savedMise;
-  const oddDirty = oddInput !== savedOdd;
+  // Compare numerically: the store parseFloats inputs before saving, so a
+  // user typing "5.00" gets stored as 5 then re-stringified to "5" — a raw
+  // string compare would keep the save button "dirty" forever after a valid
+  // save. Treat empty as null on both sides.
+  const sameNum = (a, b) => {
+    const na = a === '' || a == null ? null : parseFloat(a);
+    const nb = b === '' || b == null ? null : parseFloat(b);
+    if (na === null && nb === null) return true;
+    if (na === null || nb === null) return false;
+    return Number.isFinite(na) && Number.isFinite(nb) && na === nb;
+  };
+  const miseDirty = !sameNum(miseInput, savedMise);
+  const oddDirty = !sameNum(oddInput, savedOdd);
 
   // The "live bankroll" used for Kelly depends on which bookmaker the user
   // is about to play this bet at — the bet pulls from that book's capital.
@@ -419,8 +430,23 @@ export default function ValueBets() {
   const totalValueBetsCount = filteredMatches.reduce((s, m) => s + m.valueBets.length, 0);
   const totalSuggestedStake = filteredMatches.reduce((s, m) => s + m.totalStake, 0);
 
+  // Identify the match holding the highest-edge value bet of the day. That
+  // match gets a flashy "★ TOP VALUE BET" badge — same idea as TOP PRONO
+  // on the home page, but anchored on edge instead of confidence.
+  const topValueBetFixtureId = (() => {
+    let best = null;
+    for (const m of filteredMatches) {
+      for (const vb of m.valueBets || []) {
+        if (vb?.edge != null && (!best || vb.edge > best.edge)) {
+          best = { edge: vb.edge, fixtureId: m.fixtureId };
+        }
+      }
+    }
+    return best?.fixtureId ?? null;
+  })();
+
   return (
-    <div className="space-y-6 max-w-4xl xl:max-w-6xl mx-auto">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -555,7 +581,8 @@ export default function ValueBets() {
         </div>
       )}
 
-      {/* Match cards — one per match, with all its value bets stacked inside */}
+      {/* Match cards — one per match, with all its value bets stacked inside.
+          Grille 2-3 colonnes pour remplir la largeur de l'écran (style Unibet). */}
       {!loading && !error && filteredMatches.length > 0 && (
         <div className="space-y-3">
           {liveBankrollUnibet <= 0 && liveBankrollWinamax <= 0 && (
@@ -570,18 +597,33 @@ export default function ValueBets() {
             </div>
           )}
 
+          <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
           {filteredMatches.map((m, mi) => (
             <Link
               key={m.fixtureId}
               to={`/match/${m.fixtureId}`}
-              className="block"
+              className="block h-full"
             >
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(mi * 0.04, 0.3), duration: 0.28 }}
-                className="football-card p-4 border-l-4 border-gold-500 cursor-pointer hover:border-gold-400 transition-colors space-y-3"
+                className="football-card p-4 border-l-4 border-gold-500 cursor-pointer hover:border-gold-400 transition-colors space-y-3 h-full"
               >
+                {m.fixtureId === topValueBetFixtureId && (
+                  <div className="flex justify-start -mt-2 -ml-2">
+                    <div
+                      className="inline-flex items-center gap-2 px-4 py-2 text-base font-display font-black tracking-[0.25em] text-dark-900 rounded-xl shadow-[0_0_24px_rgba(234,179,8,0.55)] ring-2 ring-amber-300/60 animate-pulse"
+                      style={{
+                        background: 'linear-gradient(135deg, #fef3c7 0%, #facc15 45%, #b45309 100%)',
+                        animationDuration: '2.8s',
+                      }}
+                    >
+                      <span className="text-lg leading-none">★</span>
+                      <span>TOP VALUE BET</span>
+                    </div>
+                  </div>
+                )}
                 {/* League + bookmaker badge + time header */}
                 <div className="flex items-center gap-3">
                   {m.league?.logo && (
@@ -712,6 +754,7 @@ export default function ValueBets() {
               </motion.div>
             </Link>
           ))}
+          </div>
         </div>
       )}
     </div>

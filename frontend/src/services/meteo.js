@@ -99,7 +99,7 @@ export async function getForecast(lat, lon) {
 //     term for phone-accurate temps/sky/wind/precip.
 async function fetchForecast(lat, lon) {
   const common = { latitude: lat, longitude: lon, timezone: 'auto', forecast_days: 14 };
-  const [ecmwfRes, uvRes, mfRes] = await Promise.all([
+  const [ecmwfRes, uvRes, mfRes, convRes] = await Promise.all([
     axios.get(FORECAST_URL, {
       params: {
         ...common,
@@ -135,6 +135,27 @@ async function fetchForecast(lat, lon) {
         daily: ['temperature_2m_max', 'temperature_2m_min', 'apparent_temperature_max', 'apparent_temperature_min', 'weather_code', 'precipitation_sum', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant', 'snowfall_sum'].join(','),
       },
     }).catch(() => null),
+    // Keraunos-style convective ingredients (GFS): lifted index, CIN, and the
+    // multi-level winds we need for deep-layer shear (sfc→500hPa) AND for
+    // Storm-Relative Helicity 0-3km (needs wind on the low/mid troposphere
+    // profile to assess rotation = tornadic potential). ECMWF doesn't expose
+    // these via the open hourly endpoint, so we pull them from best_match.
+    // Failure here just degrades severe/tornadic risk back to CAPE-only.
+    axios.get(FORECAST_URL, {
+      params: {
+        ...common,
+        hourly: [
+          'lifted_index', 'convective_inhibition',
+          // 950 + 900 = couche 0-1 km, le vrai prédicteur tornadique
+          'wind_speed_950hPa', 'wind_direction_950hPa',
+          'wind_speed_900hPa', 'wind_direction_900hPa',
+          'wind_speed_925hPa', 'wind_direction_925hPa',
+          'wind_speed_850hPa', 'wind_direction_850hPa',
+          'wind_speed_700hPa', 'wind_direction_700hPa',
+          'wind_speed_500hPa', 'wind_direction_500hPa',
+        ].join(','),
+      },
+    }).catch(() => null),
   ]);
 
   const data = ecmwfRes.data;
@@ -144,6 +165,14 @@ async function fetchForecast(lat, lon) {
   if (uv) {
     if (data.hourly && uv.hourly) data.hourly.uv_index = uv.hourly.uv_index;
     if (data.daily && uv.daily) data.daily.uv_index_max = uv.daily.uv_index_max;
+  }
+
+  // Splice convective ingredients (lifted index, CIN, 500hPa wind) into ECMWF.
+  const conv = convRes?.data;
+  if (conv?.hourly && data.hourly) {
+    for (const k of ['lifted_index', 'convective_inhibition', 'wind_speed_500hPa', 'wind_direction_500hPa']) {
+      if (conv.hourly[k]) data.hourly[k] = conv.hourly[k];
+    }
   }
 
   // Overlay Météo-France for the trusted near term.
@@ -205,6 +234,103 @@ export function getAirQuality(lat, lon) {
   });
 }
 
+// Pleines/basses mers depuis la série horaire sea_level_height_msl.
+// Trouve les extrema locaux (pic = entouré de valeurs plus basses, creux =
+// entouré de valeurs plus hautes). La marée a un cycle d'environ 12h25, donc
+// on s'attend à ~2 hautes et ~2 basses par 24h. La précision est limitée à
+// l'heure (Open-Meteo ne sert pas en sous-horaire), suffisant pour un usage
+// récréatif "pleine mer vers 14h, 4.2 m".
+export function computeTides(times, heights) {
+  if (!Array.isArray(times) || !Array.isArray(heights) || times.length < 3) return [];
+  const out = [];
+  for (let i = 1; i < heights.length - 1; i++) {
+    const h = heights[i];
+    if (h == null) continue;
+    const prev = heights[i - 1];
+    const next = heights[i + 1];
+    if (prev == null || next == null) continue;
+    if (h > prev && h > next) {
+      out.push({ type: 'high', time: times[i], height: h });
+    } else if (h < prev && h < next) {
+      out.push({ type: 'low', time: times[i], height: h });
+    }
+  }
+  return out;
+}
+
+// Phase de lune simplifiée (algo Meeus tronqué). Retourne un objet :
+//   { age: jours depuis nouvelle lune (0-29.5),
+//     illum: fraction éclairée 0-1,
+//     name: 'Nouvelle' | 'Premier croissant' | 'Premier quartier' | ...,
+//     emoji: '🌑' à '🌘' }
+// Précision ~±0.5 jour, largement suffisant pour les conseils pêche.
+export function moonPhase(date = new Date()) {
+  // Synodic month length and known new moon reference (2000-01-06 18:14 UTC).
+  const SYNODIC = 29.530588853;
+  const REF = Date.UTC(2000, 0, 6, 18, 14) / 86400000;
+  const days = date.getTime() / 86400000 - REF;
+  const age = ((days % SYNODIC) + SYNODIC) % SYNODIC;
+  // Fraction illuminée approximée par 0.5 * (1 - cos(2π * age / synodic)).
+  const illum = 0.5 * (1 - Math.cos((2 * Math.PI * age) / SYNODIC));
+  const phases = [
+    { max: 1.5,  name: 'Nouvelle lune',     emoji: '🌑' },
+    { max: 7.4,  name: 'Premier croissant', emoji: '🌒' },
+    { max: 8.9,  name: 'Premier quartier',  emoji: '🌓' },
+    { max: 14.8, name: 'Gibbeuse croissante', emoji: '🌔' },
+    { max: 16.3, name: 'Pleine lune',       emoji: '🌕' },
+    { max: 22.1, name: 'Gibbeuse décroissante', emoji: '🌖' },
+    { max: 23.6, name: 'Dernier quartier',  emoji: '🌗' },
+    { max: 29.6, name: 'Dernier croissant', emoji: '🌘' },
+  ];
+  const ph = phases.find((p) => age < p.max) || phases[0];
+  return { age, illum, name: ph.name, emoji: ph.emoji };
+}
+
+// Note pêche d'un créneau de marée (1-5 étoiles). Basée sur :
+//  - coeff (gros coeff = brassage = poissons actifs)
+//  - phase lune (nouvelle/pleine = vives-eaux + activité solunaire max)
+//  - type marée (PM légèrement favorisé pour la surfcasting)
+export function fishingRating(coeff, moonIllum, type) {
+  let score = 2; // base : créneau de marée correct
+  if (coeff != null) {
+    if (coeff >= 95) score += 2;        // grande marée
+    else if (coeff >= 70) score += 1;   // bonne marée
+    else if (coeff < 40) score -= 1;    // morte-eau
+  }
+  // Bonus lune : éclairée à >0.95 ou <0.05 (pleine ou nouvelle) = solunaire max
+  if (moonIllum != null) {
+    if (moonIllum > 0.95 || moonIllum < 0.05) score += 1;
+    else if (moonIllum > 0.85 || moonIllum < 0.15) score += 0.5;
+  }
+  if (type === 'high') score += 0.3; // léger bonus PM
+  return Math.max(1, Math.min(5, Math.round(score)));
+}
+
+// Estimation du coefficient de marée (échelle SHOM Brest 20-120) à partir
+// de l'amplitude de la marée du jour. C'est une approximation : le vrai
+// coefficient se calcule depuis les composantes harmoniques M2/S2/N2/K1...
+// Sur la côte FR : amplitude ~1.5m (mortes-eaux) → coeff 20-40, amplitude
+// ~6m (vives-eaux d'équinoxe) → coeff 95-120. Cale différemment selon le
+// port (Brest amplitude max 8m, Marseille 0.4m → on normalise par l'amplitude
+// max observée localement sur la période fetch).
+export function estimateCoeff(tides) {
+  if (!tides || tides.length < 2) return null;
+  // Cherche la plus grande amplitude high-low consécutive du jour.
+  let maxAmpl = 0;
+  for (let i = 0; i < tides.length - 1; i++) {
+    const dh = Math.abs(tides[i + 1].height - tides[i].height);
+    if (dh > maxAmpl) maxAmpl = dh;
+  }
+  if (maxAmpl <= 0) return null;
+  // Référence Brest : amplitude max ~7m = coeff ~115, amplitude min ~1m = coeff ~20.
+  // Échelle linéaire grossière (pas calibrée par port — donne un ordre de
+  // grandeur fiable pour Atlantique/Manche, sous-estimé en Méditerranée).
+  const REF_AMPL_MIN = 1.0;
+  const REF_AMPL_MAX = 7.0;
+  const coeff = 20 + 95 * (maxAmpl - REF_AMPL_MIN) / (REF_AMPL_MAX - REF_AMPL_MIN);
+  return Math.round(Math.max(20, Math.min(120, coeff)));
+}
+
 // Marine forecast — only meaningful for coastal/sea points. Returns null when
 // the location has no marine data (inland) instead of throwing.
 export async function getMarine(lat, lon) {
@@ -214,7 +340,11 @@ export async function getMarine(lat, lon) {
         params: {
           latitude: lat, longitude: lon, timezone: 'auto',
           current: ['wave_height', 'wave_direction', 'wave_period', 'sea_surface_temperature'].join(','),
+          // sea_level_height_msl inclut la marée + l'effet barométrique inverse.
+          // En cherchant ses min/max horaires on retrouve pleines/basses mers.
+          hourly: ['sea_level_height_msl'].join(','),
           daily: ['wave_height_max'].join(','),
+          forecast_days: 3,
         },
       });
       return res.data;
@@ -330,6 +460,150 @@ export function uvRisk(uv) {
   return RISK.FAIBLE;
 }
 
+// Lifted Index (°C, more negative = more unstable). Standard SPC/Keraunos
+// thresholds: <=−7 extreme, <=−5 strong, <=−3 moderate, else faible.
+export function liftedRisk(li) {
+  if (li == null) return RISK.FAIBLE;
+  if (li <= -7) return RISK.EXTREME;
+  if (li <= -5) return RISK.ELEVE;
+  if (li <= -3) return RISK.MODERE;
+  return RISK.FAIBLE;
+}
+
+// Helpers for converting wind speed+direction to u/v components in m/s.
+// Meteorological convention: dir = direction wind comes FROM, so u (east)
+// and v (north) are negative of sin/cos.
+function windUV(spdKmh, dir) {
+  if (spdKmh == null || dir == null) return null;
+  const ms = spdKmh / 3.6;
+  const r = (dir * Math.PI) / 180;
+  return { u: -ms * Math.sin(r), v: -ms * Math.cos(r) };
+}
+
+// Storm-Relative Helicity 0-3 km (m²/s²). Measures the rotation potential
+// of the low-mid troposphere — proxy for tornadic / supercell-favouring
+// environments. Storm motion is estimated via the 30R75 method (Maddox 1976):
+// 30° to the right of the mean 0-6km wind, at 75% of its speed.
+//
+// Standard SPC thresholds (for the magnitude):
+//   <100  = weak rotation
+//   100-150 = marginal supercell
+//   150-250 = supercell probable
+//   >=250 = tornadic potential
+//
+// Returns null if any required level is missing.
+export function computeSRH(sfcSpdKmh, sfcDir, w925Spd, w925Dir, w850Spd, w850Dir, w700Spd, w700Dir, w500Spd, w500Dir) {
+  const sfc = windUV(sfcSpdKmh, sfcDir);
+  const w925 = windUV(w925Spd, w925Dir);
+  const w850 = windUV(w850Spd, w850Dir);
+  const w700 = windUV(w700Spd, w700Dir);
+  const w500 = windUV(w500Spd, w500Dir);
+  if (!sfc || !w925 || !w850 || !w700 || !w500) return null;
+
+  // Mean 0-6km wind (unweighted average of the 5 levels — coarse but
+  // adequate at this resolution; a proper pressure-weighted mean would
+  // need full sounding data).
+  const levels = [sfc, w925, w850, w700, w500];
+  const meanU = levels.reduce((s, l) => s + l.u, 0) / levels.length;
+  const meanV = levels.reduce((s, l) => s + l.v, 0) / levels.length;
+
+  // 30R75 storm motion: rotate mean wind 30° clockwise, scale by 0.75.
+  // Rotation of (u,v) by angle θ clockwise: (u·cosθ + v·sinθ, −u·sinθ + v·cosθ).
+  const theta = (30 * Math.PI) / 180;
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  const cu = 0.75 * (meanU * cos + meanV * sin);
+  const cv = 0.75 * (-meanU * sin + meanV * cos);
+
+  // SRH = Σ over layers in [0, 3km] of (du * (v_n - cv) - dv * (u_n - cu)).
+  // Levels covering 0-3km: sfc (10m) → 925 (~770m) → 850 (~1500m) → 700 (~3000m).
+  const layers = [sfc, w925, w850, w700];
+  let srh = 0;
+  for (let i = 0; i < layers.length - 1; i++) {
+    const du = layers[i + 1].u - layers[i].u;
+    const dv = layers[i + 1].v - layers[i].v;
+    srh += du * (layers[i].v - cv) - dv * (layers[i].u - cu);
+  }
+  return srh;
+}
+
+// Storm-Relative Helicity 0-1 km — the true tornadic predictor (rotation
+// at the surface, not just somewhere aloft). Same algorithm as computeSRH
+// but integrated over the sfc → 950 → 900 hPa layer (~0-1000 m AGL).
+// Storm motion still estimated via 30R75 from the deeper-layer mean wind.
+export function computeSRH01(sfcSpdKmh, sfcDir, w950Spd, w950Dir, w900Spd, w900Dir, w925Spd, w925Dir, w850Spd, w850Dir, w700Spd, w700Dir, w500Spd, w500Dir) {
+  const sfc = windUV(sfcSpdKmh, sfcDir);
+  const w950 = windUV(w950Spd, w950Dir);
+  const w900 = windUV(w900Spd, w900Dir);
+  const w925 = windUV(w925Spd, w925Dir);
+  const w850 = windUV(w850Spd, w850Dir);
+  const w700 = windUV(w700Spd, w700Dir);
+  const w500 = windUV(w500Spd, w500Dir);
+  if (!sfc || !w950 || !w900 || !w925 || !w850 || !w700 || !w500) return null;
+
+  // Storm motion: 30R75 on mean 0-6km wind (same as SRH 0-3 km).
+  const all = [sfc, w925, w850, w700, w500];
+  const meanU = all.reduce((s, l) => s + l.u, 0) / all.length;
+  const meanV = all.reduce((s, l) => s + l.v, 0) / all.length;
+  const theta = (30 * Math.PI) / 180;
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  const cu = 0.75 * (meanU * cos + meanV * sin);
+  const cv = 0.75 * (-meanU * sin + meanV * cos);
+
+  // SRH integrated only over the 0-1 km layer: sfc → 950 (~540m) → 900 (~990m).
+  const layers = [sfc, w950, w900];
+  let srh = 0;
+  for (let i = 0; i < layers.length - 1; i++) {
+    const du = layers[i + 1].u - layers[i].u;
+    const dv = layers[i + 1].v - layers[i].v;
+    srh += du * (layers[i].v - cv) - dv * (layers[i].u - cu);
+  }
+  return srh;
+}
+
+// Tornadic risk (rotation-based, 0-1 km AGL). Requires both surface
+// rotation (SRH 0-1km) AND instability (CAPE/LI) — pure shear without
+// convection produces nothing. Returns FAIBLE when instability is absent
+// even with high SRH.
+//
+// Thresholds calibrated for SRH 0-1 km (stricter than 0-3 km because surface
+// rotation is what actually drops a tornado):
+//   <50  weak/no rotation
+//   50-100 marginal mesocyclone (EF0 possible)
+//   100-150 EF0-EF1 likely if firing
+//   150-250 EF2+ possible (significant tornado threshold)
+//   >=250 significant tornado probable
+export function tornadicRisk(srh01, cape, lifted) {
+  if (srh01 == null) return RISK.FAIBLE;
+  const c = cape ?? 0;
+  const li = lifted == null ? 99 : lifted;
+  const hasInstab = c >= 1500 || li <= -5;
+  if (!hasInstab) return RISK.FAIBLE;
+  const abs = Math.abs(srh01);
+  if (abs >= 250) return RISK.EXTREME;
+  if (abs >= 150) return RISK.ELEVE;
+  if (abs >= 100) return RISK.MODERE;
+  if (abs >= 50)  return RISK.FAIBLE; // detectable but pas alerte
+  return RISK.FAIBLE;
+}
+
+// Deep-layer wind shear (sfc → 500 hPa) in knots, computed from the wind
+// vector difference. Returns null when either level is missing.
+//   <25 kt: pulse storms (short-lived)
+//   25-40 kt: multicells (organized)
+//   >=40 kt: supercells possible
+export function computeShearKt(sfcSpdKmh, sfcDir, w500SpdKmh, w500Dir) {
+  if (sfcSpdKmh == null || sfcDir == null || w500SpdKmh == null || w500Dir == null) return null;
+  const r = (d) => (d * Math.PI) / 180;
+  // Meteorological convention: dir = direction wind is FROM, so the wind
+  // vector points to (dir + 180). u = -spd*sin(dir), v = -spd*cos(dir).
+  const uSfc = -sfcSpdKmh * Math.sin(r(sfcDir));
+  const vSfc = -sfcSpdKmh * Math.cos(r(sfcDir));
+  const u500 = -w500SpdKmh * Math.sin(r(w500Dir));
+  const v500 = -w500SpdKmh * Math.cos(r(w500Dir));
+  const shearKmh = Math.hypot(u500 - uSfc, v500 - vSfc);
+  return shearKmh * 0.539957; // km/h → kt
+}
+
 // CAPE (J/kg) → storm risk (MUCAPE scale).
 export function capeRisk(cape) {
   if (cape == null) return RISK.FAIBLE;
@@ -347,16 +621,48 @@ export function wmoOrageRisk(code) {
   return RISK.FAIBLE;
 }
 
-// Combined hourly/daily storm risk: worst of WMO code and CAPE.
-export function stormRisk(code, cape) {
-  return maxRisk(wmoOrageRisk(code), capeRisk(cape ?? 0));
+// Combined hourly/daily storm risk: worst of WMO code, CAPE, and Lifted Index.
+// Keraunos-style: instability is described by multiple parameters, not just
+// CAPE (which can be high without convection actually firing). Backward
+// compatible — old callers can still pass just (code, cape).
+export function stormRisk(code, cape, lifted) {
+  return maxRisk(wmoOrageRisk(code), maxRisk(capeRisk(cape ?? 0), liftedRisk(lifted)));
 }
 
-// Severe (violent) storm risk — hail-bearing codes.
-export function severeStormRisk(code) {
-  if (code === 99) return RISK.ELEVE;
-  if (code === 96) return RISK.MODERE;
-  return RISK.FAIBLE;
+// Severe (violent) storm risk — Keraunos convective composite.
+//
+// Real severe storms require BOTH instability (energy) AND organization
+// (vertical wind shear). High CAPE alone gives short pulse storms, not
+// hail/wind/tornado producers. We score each ingredient 0-2 and combine:
+//   instab = CAPE ≥ 2500 OR LI ≤ −7  → 2
+//          | CAPE ≥ 1500 OR LI ≤ −5  → 1
+//   org    = shear ≥ 40 kt → 2 (supercell)
+//          | shear ≥ 25 kt → 1 (multicell)
+// Then: violent risk requires shear AND instability; pure CAPE-only stays
+// "Faible" because pulse storms aren't classified as violent.
+//
+// WMO hail codes (96 = small hail, 99 = heavy hail) still set a floor so we
+// don't underrate when the model explicitly forecasts grêle.
+export function severeStormRisk(code, cape, lifted, shearKt) {
+  let base = RISK.FAIBLE;
+  if (code === 99) base = RISK.ELEVE;
+  else if (code === 96) base = RISK.MODERE;
+
+  const c = cape ?? 0;
+  const li = lifted == null ? 99 : lifted; // 99 = stable
+  const sh = shearKt ?? 0;
+
+  const instab = (c >= 2500 || li <= -7) ? 2 : (c >= 1500 || li <= -5) ? 1 : 0;
+  const org    = sh >= 40 ? 2 : sh >= 25 ? 1 : 0;
+
+  let composite = RISK.FAIBLE;
+  if (instab >= 2 && org >= 2) composite = RISK.ELEVE;       // supercell potential
+  else if (instab >= 2 && org >= 1) composite = RISK.MODERE; // organized multicell
+  else if (instab >= 1 && org >= 2) composite = RISK.MODERE; // marginal but shear-driven
+  // instab without org = pulse storm = pas violent
+  // org without instab = stable, no convection = pas violent
+
+  return maxRisk(base, composite);
 }
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];

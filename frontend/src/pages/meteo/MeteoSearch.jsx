@@ -8,6 +8,12 @@ import MapEmbed from '../../components/meteo/MapEmbed';
 // Clear-sky atmosphere for the landing (no city selected yet).
 const PAGE_BG = 'radial-gradient(120% 80% at 50% 0%, #0f3a63 0%, #0a2238 45%, #06111d 100%)';
 
+// Same Meteociel France-wide radars as the city dashboard — kept in sync so
+// the landing shows the same 6 live maps as a result page.
+const METEOCIEL_RAIN_HD = 'https://www.meteociel.fr/observations-meteo/radarzoom.php?x=8229.39&y=8647.89&ech=11&zoom=3';
+const METEOCIEL_SNOW = 'https://www.meteociel.fr/observations-meteo/radarzoom.php?&x=7709.94&y=7625.72&zoom=2.1&ech=0&snow=1';
+const METEOCIEL_FOUDRE = 'https://www.meteociel.fr/observations-meteo/foudre-direct.php';
+
 export default function MeteoSearch() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -146,7 +152,7 @@ export default function MeteoSearch() {
             </a>
 
             <p className="text-[11px] font-heading font-bold uppercase tracking-[2px] text-white/45 mb-2.5">En direct · France</p>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <div className="flex items-center gap-1.5 mb-2 px-1 text-sky-300">
                   <CloudRain className="w-3.5 h-3.5" />
@@ -162,18 +168,29 @@ export default function MeteoSearch() {
                 <MapEmbed src={windyUrl(46.6, 2.4, 'wind', 5)} height={520} note="Windy · live" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200">
-                  <Snowflake className="w-3.5 h-3.5" />
-                  <span className="text-[11px] font-heading font-bold uppercase tracking-wider">Neige</span>
-                </div>
-                <MapEmbed src={windyUrl(46.6, 2.4, 'snowAccu', 5)} height={520} note="Windy · accumulation" />
-              </div>
-              <div>
                 <div className="flex items-center gap-1.5 mb-2 px-1 text-amber-300">
                   <Zap className="w-3.5 h-3.5" />
                   <span className="text-[11px] font-heading font-bold uppercase tracking-wider">Impacts foudre</span>
                 </div>
                 <MapEmbed src={blitzortungUrl(46.6, 2.4, 5)} height={520} note="Blitzortung · live" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 px-1 text-blue-300">
+                  <CloudRain className="w-3.5 h-3.5" />
+                  <span className="text-[11px] font-heading font-bold uppercase tracking-wider">Pluie HD · Meteociel</span>
+                </div>
+                <MapEmbed src={METEOCIEL_RAIN_HD} height={520} canvasCrop={{ x: 659, y: 345, w: 768, h: 808, frameW: 1900, fit: 'width' }} note="Meteociel · animation" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 px-1 text-cyan-200">
+                  <Snowflake className="w-3.5 h-3.5" />
+                  <span className="text-[11px] font-heading font-bold uppercase tracking-wider">Neige · Meteociel</span>
+                </div>
+                <MapEmbed src={METEOCIEL_SNOW} height={520} canvasCrop={{ x: 659, y: 345, w: 768, h: 808, frameW: 1900, fit: 'width' }} note="Meteociel · animation" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 px-1 text-yellow-300"><Zap className="w-3.5 h-3.5" /><span className="text-[11px] font-heading font-bold uppercase tracking-wider">Foudre en direct · Meteociel</span></div>
+                <MapEmbed src={METEOCIEL_FOUDRE} height={520} canvasCrop={{ x: 648, y: 322, w: 768, h: 808, frameW: 1900, fit: 'width' }} note="Meteociel · plein écran" />
               </div>
             </div>
           </motion.div>

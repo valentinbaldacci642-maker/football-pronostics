@@ -36,3 +36,6 @@ export function orageText(risk) {
 export function violentText(risk) {
   return risk.key === 'FAIBLE' ? 'Aucun risque violent' : `Violent ${risk.label}`;
 }
+export function tornadicText(risk) {
+  return risk.key === 'FAIBLE' ? 'Aucun risque tornadique' : `Tornadique ${risk.label}`;
+}

@@ -32,7 +32,7 @@ export default function Favorites() {
   const { favoriteTeams, clearTeams } = useFavoriteTeamsStore();
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-8">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       {/* Page header */}
       <div>
         <h1 className="font-display text-4xl text-white tracking-wide leading-none">

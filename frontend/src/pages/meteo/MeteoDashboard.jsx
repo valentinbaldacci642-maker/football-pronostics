@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Wind, Droplets, Sun, Thermometer, CloudRain, Zap, Snowflake, Gauge, Leaf, Waves, Bell, BellRing, ShieldAlert } from 'lucide-react';
-import { ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from 'recharts';
 import {
   getForecast, getAirQuality, getMarine, wmo, windRisk, rainRisk, uvRisk, stormRisk, severeStormRisk, maxRisk,
   dirToCompass, RISK, windyUrl, blitzortungUrl, tempColor, aqiLevel, pollenLevel, POLLENS,
-  isAlertCity, toggleAlertCity,
+  isAlertCity, toggleAlertCity, capeRisk, computeShearKt, computeSRH, computeSRH01, tornadicRisk,
+  computeTides, estimateCoeff, moonPhase, fishingRating,
 } from '../../services/meteo';
 import { weatherApi } from '../../services/api';
 import { syncWeatherCitiesToBackend } from '../../services/pushNotifications';
-import { InfoBadge, orageText, violentText } from '../../components/meteo/RiskUI';
+import { InfoBadge, orageText, violentText, tornadicText } from '../../components/meteo/RiskUI';
 import MapEmbed from '../../components/meteo/MapEmbed';
 import WeatherInsights from '../../components/meteo/WeatherInsights';
 
@@ -91,6 +92,28 @@ function buildDays(data) {
       precipProb: hourly.precipitation_probability?.[i] ?? 0,
       uvIndex: Math.round(hourly.uv_index?.[i] ?? 0),
       cape: hourly.cape?.[i] ?? 0,
+      lifted: hourly.lifted_index?.[i] ?? null,
+      cin: hourly.convective_inhibition?.[i] ?? null,
+      shearKt: computeShearKt(
+        hourly.wind_speed_10m?.[i], hourly.wind_direction_10m?.[i],
+        hourly.wind_speed_500hPa?.[i], hourly.wind_direction_500hPa?.[i],
+      ),
+      srh: computeSRH(
+        hourly.wind_speed_10m?.[i], hourly.wind_direction_10m?.[i],
+        hourly.wind_speed_925hPa?.[i], hourly.wind_direction_925hPa?.[i],
+        hourly.wind_speed_850hPa?.[i], hourly.wind_direction_850hPa?.[i],
+        hourly.wind_speed_700hPa?.[i], hourly.wind_direction_700hPa?.[i],
+        hourly.wind_speed_500hPa?.[i], hourly.wind_direction_500hPa?.[i],
+      ),
+      srh01: computeSRH01(
+        hourly.wind_speed_10m?.[i], hourly.wind_direction_10m?.[i],
+        hourly.wind_speed_950hPa?.[i], hourly.wind_direction_950hPa?.[i],
+        hourly.wind_speed_900hPa?.[i], hourly.wind_direction_900hPa?.[i],
+        hourly.wind_speed_925hPa?.[i], hourly.wind_direction_925hPa?.[i],
+        hourly.wind_speed_850hPa?.[i], hourly.wind_direction_850hPa?.[i],
+        hourly.wind_speed_700hPa?.[i], hourly.wind_direction_700hPa?.[i],
+        hourly.wind_speed_500hPa?.[i], hourly.wind_direction_500hPa?.[i],
+      ),
       wmoCode: hourly.weather_code?.[i],
     });
   });
@@ -117,8 +140,9 @@ function buildDays(data) {
 function HourRow({ h, tempUnit, windUnit }) {
   const gust = windRisk(h.gustKmh);
   const precip = rainRisk(h.precipMm);
-  const orage = stormRisk(h.wmoCode, h.cape);
-  const violent = severeStormRisk(h.wmoCode);
+  const orage = stormRisk(h.wmoCode, h.cape, h.lifted);
+  const violent = severeStormRisk(h.wmoCode, h.cape, h.lifted, h.shearKt);
+  const tornadic = tornadicRisk(h.srh01, h.cape, h.lifted);
   return (
     <div className="flex items-center gap-2 min-h-[46px] py-1.5 border-t border-white/[0.06]">
       <span className="text-xs font-mono w-8 flex-shrink-0 text-white/40">{String(h.hour).padStart(2, '0')}h</span>
@@ -133,6 +157,7 @@ function HourRow({ h, tempUnit, windUnit }) {
         {h.uvIndex >= 3 && <InfoBadge icon="☀️" risk={uvRisk(h.uvIndex)} text={`UV ${h.uvIndex}`} />}
         <InfoBadge icon="⛈️" risk={orage} text={orageText(orage)} />
         <InfoBadge icon="🌩️" risk={violent} text={violentText(violent)} />
+        <InfoBadge icon="🌪️" risk={tornadic} text={tornadicText(tornadic)} />
       </div>
     </div>
   );
@@ -143,13 +168,16 @@ function dayRisks(day) {
   const windR = windRisk(day.gustKmh);
   const precipR = rainRisk(maxHourPrecip);
   const orageR = day.hours.length
-    ? day.hours.reduce((a, h) => maxRisk(a, stormRisk(h.wmoCode, h.cape)), RISK.FAIBLE)
+    ? day.hours.reduce((a, h) => maxRisk(a, stormRisk(h.wmoCode, h.cape, h.lifted)), RISK.FAIBLE)
     : stormRisk(day.code, 0);
   const violentR = day.hours.length
-    ? day.hours.reduce((a, h) => maxRisk(a, severeStormRisk(h.wmoCode)), RISK.FAIBLE)
+    ? day.hours.reduce((a, h) => maxRisk(a, severeStormRisk(h.wmoCode, h.cape, h.lifted, h.shearKt)), RISK.FAIBLE)
     : severeStormRisk(day.code);
-  const top = [windR, precipR, orageR, violentR].reduce((a, b) => maxRisk(a, b), RISK.FAIBLE);
-  return { windR, precipR, orageR, violentR, top };
+  const tornadicR = day.hours.length
+    ? day.hours.reduce((a, h) => maxRisk(a, tornadicRisk(h.srh01, h.cape, h.lifted)), RISK.FAIBLE)
+    : RISK.FAIBLE;
+  const top = [windR, precipR, orageR, violentR, tornadicR].reduce((a, b) => maxRisk(a, b), RISK.FAIBLE);
+  return { windR, precipR, orageR, violentR, tornadicR, top };
 }
 
 function Pill({ risk, children }) {
@@ -163,7 +191,8 @@ function Pill({ risk, children }) {
 
 function ForecastRow({ day, isToday, tempUnit, windUnit }) {
   const [expanded, setExpanded] = useState(false);
-  const { windR, precipR, orageR, violentR, top } = dayRisks(day);
+  const { windR, precipR, orageR, violentR, tornadicR, top } = dayRisks(day);
+  const showTornadic = tornadicR.key !== 'FAIBLE';
   const showViolent = violentR.key !== 'FAIBLE';
   return (
     <>
@@ -199,9 +228,13 @@ function ForecastRow({ day, isToday, tempUnit, windUnit }) {
           <span className="font-semibold text-[13px] sm:text-sm" style={{ color: uvRisk(day.uvMax).color }}>{day.uvMax}</span>
         </td>
         <td className="pr-2 pl-1 sm:pr-3 sm:pl-2 py-2.5 text-right">
-          <Pill risk={orageR}>
-            <span className="sm:hidden">{showViolent ? `⚡${violentR.label}` : (orageR.key === 'FAIBLE' ? '✓' : orageR.label)}</span>
-            <span className="hidden sm:inline">{showViolent ? `⚡ ${violentR.label}` : orageText(orageR)}</span>
+          <Pill risk={showTornadic ? tornadicR : orageR}>
+            <span className="sm:hidden">
+              {showTornadic ? `🌪️${tornadicR.label}` : showViolent ? `⚡${violentR.label}` : (orageR.key === 'FAIBLE' ? '✓' : orageR.label)}
+            </span>
+            <span className="hidden sm:inline">
+              {showTornadic ? `🌪️ ${tornadicR.label}` : showViolent ? `⚡ ${violentR.label}` : orageText(orageR)}
+            </span>
           </Pill>
         </td>
       </tr>
@@ -409,25 +442,182 @@ function MarineCard({ marine, tempUnit }) {
   if (!c || (c.wave_height == null && c.sea_surface_temperature == null)) return null;
   const seaT = c.sea_surface_temperature;
   const seaTxt = seaT == null ? '–' : (tempUnit === 'K' ? `${Math.round(seaT + 273.15)} K` : `${Math.round(seaT)}°`);
+
+  // Marées : extrema horaires sur la fenêtre fetched (3 jours).
+  const allTides = computeTides(marine?.hourly?.time, marine?.hourly?.sea_level_height_msl);
+  const now = Date.now();
+  const upcoming = allTides.filter((t) => new Date(t.time).getTime() >= now - 30 * 60 * 1000).slice(0, 4);
+  // Coefficient estimé sur la marée du jour (24h glissantes).
+  const today = allTides.filter((t) => {
+    const dt = new Date(t.time).getTime();
+    return dt >= now - 12 * 3600 * 1000 && dt <= now + 12 * 3600 * 1000;
+  });
+  const coeff = estimateCoeff(today);
+  const fmtTideTime = (iso) => {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+  const isTomorrow = (iso) => {
+    const d = new Date(iso);
+    const n = new Date();
+    return d.getDate() !== n.getDate();
+  };
+
   return (
     <div>
       <p className={sectionLabel}>MER</p>
-      <div className="rounded-2xl p-4 backdrop-blur-md grid grid-cols-3 gap-2" style={glassCard}>
-        <div className="flex flex-col items-center gap-1">
-          <Thermometer className="w-4 h-4 text-cyan-300" />
-          <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Eau</span>
-          <span className="font-display text-lg" style={{ color: tempColor(seaT) }}>{seaTxt}</span>
+      <div className="rounded-2xl p-4 backdrop-blur-md space-y-3" style={glassCard}>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-col items-center gap-1">
+            <Thermometer className="w-4 h-4 text-cyan-300" />
+            <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Eau</span>
+            <span className="font-display text-lg" style={{ color: tempColor(seaT) }}>{seaTxt}</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <Waves className="w-4 h-4 text-sky-300" />
+            <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Vagues</span>
+            <span className="font-display text-lg text-white/90">{c.wave_height != null ? `${c.wave_height.toFixed(1)} m` : '–'}</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <RefreshCw className="w-4 h-4 text-sky-300" />
+            <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Période</span>
+            <span className="font-display text-lg text-white/90">{c.wave_period != null ? `${Math.round(c.wave_period)} s` : '–'}</span>
+          </div>
         </div>
-        <div className="flex flex-col items-center gap-1">
-          <Waves className="w-4 h-4 text-sky-300" />
-          <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Vagues</span>
-          <span className="font-display text-lg text-white/90">{c.wave_height != null ? `${c.wave_height.toFixed(1)} m` : '–'}</span>
+        {upcoming.length > 0 && (() => {
+          const moon = moonPhase(new Date());
+          // Créneau actif maintenant : si on est à ±90 min d'une marée.
+          const active = upcoming.find((t) => Math.abs(new Date(t.time).getTime() - now) <= 90 * 60 * 1000);
+          const activeStars = active ? fishingRating(coeff, moon.illum, active.type) : null;
+          const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
+          return (
+            <div className="pt-3 border-t border-white/[0.06]">
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-sky-300/80 font-heading font-bold">🎣 Pêche · Marées</span>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <span className="text-white/55" title={moon.name}>
+                    {moon.emoji} <span className="font-display text-sky-200">{Math.round(moon.illum * 100)}%</span>
+                  </span>
+                  {coeff != null && (
+                    <span className="text-white/55 uppercase tracking-wider">
+                      Coeff <span className="font-display text-sm text-sky-200">{coeff}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+              {active && (
+                <div className="mb-2 rounded-lg px-2.5 py-2 bg-sky-500/10 border border-sky-500/30">
+                  <p className="text-[11px] font-heading font-bold text-sky-200">
+                    🟢 Créneau actif ({active.type === 'high' ? 'pleine mer' : 'basse mer'} à {fmtTideTime(active.time)})
+                  </p>
+                  <p className="text-xs text-amber-300 font-display tracking-wide">{stars(activeStars)}</p>
+                </div>
+              )}
+              <div className="space-y-1">
+                {upcoming.map((t, i) => {
+                  const rating = fishingRating(coeff, moon.illum, t.type);
+                  return (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className={`font-heading font-bold w-14 ${t.type === 'high' ? 'text-sky-300' : 'text-cyan-400/70'}`}>
+                        {t.type === 'high' ? '▲ PM' : '▼ BM'}
+                      </span>
+                      <span className="text-white/70 font-mono w-20">
+                        {isTomorrow(t.time) ? `dem. ${fmtTideTime(t.time)}` : fmtTideTime(t.time)}
+                      </span>
+                      <span className="text-white/80 font-display w-12 text-right">{t.height.toFixed(1)}m</span>
+                      <span className="ml-auto text-amber-300/90 font-display tracking-wide text-[11px]">{stars(rating)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-white/35 mt-2 leading-snug">
+                Note pêche : coeff, phase de lune (vives-eaux + pleine/nouvelle lune = activité max). Fenêtre optimale : 1h avant à 1h après la marée.
+              </p>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
+// MUCAPE hourly forecast over the next 4 days — useful for spotting incoming
+// thunderstorm windows (CAPE = available convective energy, in J/kg).
+// Source: same Open-Meteo hourly feed as the rest of the dashboard.
+function MucapeCard({ days }) {
+  const now = Date.now();
+  const hours = (days || [])
+    .slice(0, 4)
+    .flatMap((d) => d.hours.map((h) => ({
+      t: new Date(`${d.date}T${String(h.hour).padStart(2, '0')}:00:00`).getTime(),
+      cape: Math.max(0, Math.round(h.cape || 0)),
+      date: d.date,
+      hour: h.hour,
+    })))
+    .filter((p) => p.t >= now - 60 * 60 * 1000)
+    .slice(0, 96);
+  if (hours.length === 0) return null;
+  const peak = hours.reduce((m, h) => h.cape > m.cape ? h : m, hours[0]);
+  // No point showing a flat-zero chart for stable air masses.
+  if (peak.cape < 100) return null;
+  const dayLabel = (ts) => {
+    const d = new Date(ts);
+    return `${DAYS_FR[d.getDay()]} ${d.getDate()}`;
+  };
+  // Hourly tick labels would be unreadable on mobile — only label the first
+  // hour of each calendar day so the X-axis stays clean.
+  const seenDays = new Set();
+  const formatTick = (ts) => {
+    const k = new Date(ts).toDateString();
+    if (seenDays.has(k)) return '';
+    seenDays.add(k);
+    return dayLabel(ts);
+  };
+  const peakRisk = capeRisk(peak.cape);
+  return (
+    <div>
+      <p className={sectionLabel}>ORAGE · MUCAPE 4 JOURS</p>
+      <div className="rounded-2xl p-4 backdrop-blur-md" style={glassCard}>
+        <div className="flex items-center justify-between mb-3 text-xs">
+          <span className="text-white/55">
+            Pic prévu&nbsp;: <span className="font-display text-base" style={{ color: peakRisk.color }}>{peak.cape}</span>
+            <span className="text-white/40"> J/kg · {dayLabel(peak.t)} {String(peak.hour).padStart(2, '0')}h</span>
+          </span>
+          <Pill risk={peakRisk}>{peakRisk.label}</Pill>
         </div>
-        <div className="flex flex-col items-center gap-1">
-          <RefreshCw className="w-4 h-4 text-sky-300" />
-          <span className="text-[10px] uppercase tracking-wider text-white/40 font-heading">Période</span>
-          <span className="font-display text-lg text-white/90">{c.wave_period != null ? `${Math.round(c.wave_period)} s` : '–'}</span>
+        {/* Inner min-width forces a horizontal scroll when the card column is
+            narrow (e.g. when MUCAPE sits under MER in the 2-col grid), so the
+            96 hourly bars stay readable instead of being squished. */}
+        <div className="overflow-x-auto -mx-2 px-2 pb-1 mucape-scroll">
+        <div style={{ minWidth: 720, height: 180 }}>
+        <ResponsiveContainer width="100%" height={180}>
+          <ComposedChart data={hours} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+            <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+            <XAxis dataKey="t" tickFormatter={formatTick} tick={{ fill: 'rgba(255,255,255,0.45)', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} />
+            <YAxis tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
+            <Tooltip
+              contentStyle={{ background: 'rgba(10,20,40,0.95)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 12, color: 'rgba(255,255,255,0.9)' }}
+              labelStyle={{ color: 'rgba(255,255,255,0.6)' }}
+              itemStyle={{ color: 'rgba(255,255,255,0.9)' }}
+              cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+              labelFormatter={(ts) => `${dayLabel(ts)} · ${String(new Date(ts).getHours()).padStart(2, '0')}h`}
+              formatter={(val) => [`${val} J/kg`, capeRisk(val).label]}
+            />
+            <ReferenceLine y={500} stroke="#facc15" strokeDasharray="3 3" strokeOpacity={0.4} />
+            <ReferenceLine y={1500} stroke="#fb923c" strokeDasharray="3 3" strokeOpacity={0.4} />
+            <ReferenceLine y={3000} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.4} />
+            <Bar dataKey="cape" radius={[2, 2, 0, 0]}>
+              {hours.map((h, i) => <Cell key={i} fill={capeRisk(h.cape).color} fillOpacity={0.75} />)}
+            </Bar>
+          </ComposedChart>
+        </ResponsiveContainer>
         </div>
+        </div>
+        <p className="text-[10px] text-white/40 mt-2 leading-relaxed">
+          MUCAPE = énergie convective disponible. <span className="text-amber-300">500</span> = orages possibles ·
+          <span className="text-orange-400"> 1500</span> = orages forts ·
+          <span className="text-red-400"> 3000+</span> = orages violents.
+        </p>
       </div>
     </div>
   );
@@ -529,7 +719,7 @@ export default function MeteoDashboard() {
   const sky = skyTheme(cur.weather_code ?? 0, cur.is_day ?? 1);
   const { emoji, label } = wmo(cur.weather_code);
 
-  const orageTile = today ? (today.hours.length ? today.hours.reduce((a, h) => maxRisk(a, stormRisk(h.wmoCode, h.cape)), RISK.FAIBLE) : stormRisk(today.code, 0)) : RISK.FAIBLE;
+  const orageTile = today ? (today.hours.length ? today.hours.reduce((a, h) => maxRisk(a, stormRisk(h.wmoCode, h.cape, h.lifted)), RISK.FAIBLE) : stormRisk(today.code, 0)) : RISK.FAIBLE;
   const pluieTile = today ? rainRisk(today.hours.length ? Math.max(...today.hours.map((h) => h.precipMm)) : today.precipMm) : RISK.FAIBLE;
   const ventTile = today ? windRisk(today.gustKmh) : RISK.FAIBLE;
   const todayCape = today?.hours?.reduce((m, h) => Math.max(m, h.cape), 0) || 0;
@@ -626,12 +816,19 @@ export default function MeteoDashboard() {
               <Meteogram data={data} tempUnit={tempUnit} />
             </motion.div>
 
-            {/* Air quality + pollen, marine (coastal), snow/ski (mountains) */}
+            {/* Air quality + pollen | marine (coastal) + MUCAPE outlook + snow/ski.
+                Explicit two-column stacks so MUCAPE sits under MER (filling the
+                empty space) instead of wrapping to the left column. */}
             {(aq?.current || marine?.current || data) && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }} className="mt-7 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <AirPollen aq={aq} />
-                <MarineCard marine={marine} tempUnit={tempUnit} />
-                <SnowSki data={data} days={days} tempUnit={tempUnit} />
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }} className="mt-7 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                <div className="space-y-4">
+                  <AirPollen aq={aq} />
+                </div>
+                <div className="space-y-4">
+                  <MarineCard marine={marine} tempUnit={tempUnit} />
+                  <MucapeCard days={days} />
+                  <SnowSki data={data} days={days} tempUnit={tempUnit} />
+                </div>
               </motion.div>
             )}
 
