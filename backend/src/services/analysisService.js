@@ -461,25 +461,33 @@ class AnalysisService {
     const valueBets = [];
     const tag = (vb) => ({ ...vb, sources: ['shin'] });
 
+    // `odd` = la cote qu'il faut RÉELLEMENT jouer pour obtenir cet edge,
+    // c'est-à-dire la meilleure du marché — celle sur laquelle detectValueBet
+    // a calculé l'espérance. Afficher la moyenne ici donnerait un edge
+    // incohérent avec la cote montrée (ex. +12% affiché en face d'une cote
+    // où le pari est en fait perdant). `oddAvg` garde le consensus pour
+    // situer l'écart.
     if (analysis.matchWinner?.valueBets) {
       const { home, draw, away } = analysis.matchWinner.valueBets;
       const odds = analysis.matchWinner.odds;
-      if (home?.isValue) valueBets.push(tag({ market: '1X2', selection: '1', ...home, odd: odds.home }));
-      if (draw?.isValue) valueBets.push(tag({ market: '1X2', selection: 'X', ...draw, odd: odds.draw }));
-      if (away?.isValue) valueBets.push(tag({ market: '1X2', selection: '2', ...away, odd: odds.away }));
+      const best = analysis.matchWinner.maxOdds || {};
+      if (home?.isValue) valueBets.push(tag({ market: '1X2', selection: '1', ...home, odd: best.home || odds.home, oddAvg: odds.home }));
+      if (draw?.isValue) valueBets.push(tag({ market: '1X2', selection: 'X', ...draw, odd: best.draw || odds.draw, oddAvg: odds.draw }));
+      if (away?.isValue) valueBets.push(tag({ market: '1X2', selection: '2', ...away, odd: best.away || odds.away, oddAvg: odds.away }));
     }
 
     if (analysis.btts?.valueBets) {
       const { yes, no } = analysis.btts.valueBets;
       const odds = analysis.btts.odds;
-      if (yes?.isValue) valueBets.push(tag({ market: 'BTTS', selection: 'Oui', ...yes, odd: odds.yes }));
-      if (no?.isValue) valueBets.push(tag({ market: 'BTTS', selection: 'Non', ...no, odd: odds.no }));
+      const best = analysis.btts.maxOdds || {};
+      if (yes?.isValue) valueBets.push(tag({ market: 'BTTS', selection: 'Oui', ...yes, odd: best.yes || odds.yes, oddAvg: odds.yes }));
+      if (no?.isValue) valueBets.push(tag({ market: 'BTTS', selection: 'Non', ...no, odd: best.no || odds.no, oddAvg: odds.no }));
     }
 
     if (analysis.goalsOverUnder?.lines['2.5']) {
       const { over, under } = analysis.goalsOverUnder.lines['2.5'];
-      if (over?.valueInfo?.isValue) valueBets.push(tag({ market: 'O/U 2.5', selection: 'Over 2.5', ...over.valueInfo, odd: over.odd }));
-      if (under?.valueInfo?.isValue) valueBets.push(tag({ market: 'O/U 2.5', selection: 'Under 2.5', ...under.valueInfo, odd: under.odd }));
+      if (over?.valueInfo?.isValue) valueBets.push(tag({ market: 'O/U 2.5', selection: 'Over 2.5', ...over.valueInfo, odd: over.best || over.odd, oddAvg: over.odd }));
+      if (under?.valueInfo?.isValue) valueBets.push(tag({ market: 'O/U 2.5', selection: 'Under 2.5', ...under.valueInfo, odd: under.best || under.odd, oddAvg: under.odd }));
     }
 
     return valueBets.sort((a, b) => b.edge - a.edge);
