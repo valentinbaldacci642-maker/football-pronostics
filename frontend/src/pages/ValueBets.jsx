@@ -447,6 +447,26 @@ export default function ValueBets() {
 
   return (
     <div className="space-y-6">
+      {/* Avertissement honnête — backtest sur 640 matchs (oct. 2026) : la
+          détection repose sur l'écart entre la meilleure cote du marché et le
+          consensus. En excluant les cotes aberrantes (> +5% du consensus), il
+          ne reste quasiment aucun signal : ce qui est détecté est donc souvent
+          une cote périmée ou une erreur de flux, pas une opportunité. Le ROI
+          simulé est négatif sur un échantillon encore réduit (41 paris).
+          Les probabilités, elles, sont vérifiées et calibrées. */}
+      <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-4 py-3">
+        <p className="text-[13px] leading-relaxed text-amber-200/80 font-heading">
+          <strong className="text-amber-300">Signal non validé.</strong> Ces value bets
+          comparent la meilleure cote du marché au consensus des bookmakers. Testée sur
+          640 matchs passés, cette méthode n'a <strong>pas</strong> démontré sa rentabilité —
+          elle se déclenche surtout sur des cotes isolées, souvent périmées.
+          <br />
+          Les probabilités affichées sont justes et vérifiées. Le choix de miser, lui,
+          reste un pari : suis d'abord ces signaux dans ton historique avant d'y engager
+          de l'argent.
+        </p>
+      </div>
+
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -456,7 +476,7 @@ export default function ValueBets() {
           </h1>
           <p className="text-sm text-white/35 font-heading font-medium capitalize">
             {format(new Date(selectedDay + 'T00:00:00'), "EEEE d MMMM yyyy", { locale: fr })}
-            {' · '}Tous les paris où Kelly s'active (edge ≥ 6%)
+            {' · '}Tous les paris où Kelly s'active (edge ≥ 2% d'espérance)
           </p>
         </div>
         <button

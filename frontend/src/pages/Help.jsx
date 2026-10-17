@@ -106,15 +106,30 @@ export default function Help() {
         </p>
 
         <Definition term="🎯 EDGE — ton avantage théorique AVANT le pari">
-          C'est l'écart entre la probabilité que ton modèle calcule et la probabilité
-          implicite de la cote du bookmaker.
-          <Formula>edge = ta vraie proba − proba implicite de la cote</Formula>
-          <strong className="text-white">Exemple :</strong> Roma cote 2.00 (impl. 50%),
-          notre modèle dit 60% → edge <span className="text-brand-400">+10%</span>.
+          C'est ton <strong>espérance de gain</strong> : ce que rapporte en moyenne
+          chaque euro misé, si ta probabilité est juste.
+          <Formula>edge = ta vraie proba × cote − 1</Formula>
+          <strong className="text-white">Exemple :</strong> Roma cote 2.10, notre modèle
+          dit 50% → 0,50 × 2,10 − 1 = edge <span className="text-brand-400">+5%</span>.
+          Sur 100€ misés, tu gagnes 5€ en moyenne.
           <br /><br />
           Affiché sur les cartes via le badge gold
-          <span className="text-gold-400 font-bold"> "VALUE +10%"</span>.
-          Si edge ≥ 6% → c'est un <strong>value bet</strong>, on parie. Sans edge → on ne parie pas.
+          <span className="text-gold-400 font-bold"> "VALUE +5%"</span>.
+          Si edge ≥ 2% → c'est un <strong>value bet</strong>, on parie. Sans edge → on ne parie pas.
+          <br /><br />
+          <strong className="text-white">À quoi s'attendre :</strong> les value bets réels
+          tournent entre <strong>+1% et +4%</strong>, rarement au-delà. Les cotes sont
+          comparées au consensus de tous les bookmakers, et ils s'alignent en permanence :
+          un écart de 10% n'existe quasiment jamais. Un pari à +3% est un bon pari.
+          <br /><br />
+          <span className="text-amber-300 font-bold">⚠️ Limite importante.</span> La
+          probabilité « juste » est calculée à partir du consensus des bookmakers.
+          Le modèle, c'est donc le marché lui-même — et on ne bat pas le marché avec
+          le marché. Un value bet signale ici qu'un bookmaker est décalé de ses
+          concurrents, ce qui est souvent une cote périmée plutôt qu'une opportunité.
+          Testée sur 640 matchs, la méthode n'a <strong>pas</strong> démontré sa
+          rentabilité. Les probabilités sont fiables ; le signal d'achat ne l'est pas
+          encore. Suis-le dans ton historique avant de miser dessus.
         </Definition>
 
         <Definition term="📊 ROI — ton gain RÉEL mesuré APRÈS plein de paris">
@@ -259,9 +274,9 @@ export default function Help() {
           <div className="p-3 rounded-lg bg-gold-500/10 border border-gold-500/30">
             <p className="font-heading font-bold text-gold-400 mb-1">Value bet</p>
             <p className="text-xs text-white/60">
-              Ex: Match nul @4.88 (26% chances réelles vs 20% implicite). Tu vas perdre 3 fois sur
-              4. Mais quand tu gagnes, tu touches 4.88× ta mise. La 4ème victoire compense
-              largement les 3 pertes. <strong>Pari moins probable mais gagnant long terme.</strong>
+              Ex: Match nul @3.55 (29% chances réelles → edge +3%). Tu vas perdre 7 fois sur
+              10. Mais quand tu gagnes, tu touches 3.55× ta mise, ce qui compense largement
+              les pertes. <strong>Pari moins probable mais gagnant long terme.</strong>
             </p>
           </div>
         </div>
@@ -313,7 +328,7 @@ export default function Help() {
             <p className="font-heading font-bold text-gold-400 mb-1">🔥 Value bets à parier</p>
             <p className="text-xs text-white/60 leading-relaxed">
               Bloc en dessous du pari principal listant tous les value bets détectés
-              sur le match (≥6% edge), sauf celui choisi comme principal.
+              sur le match (edge ≥ 2% d'espérance de gain), sauf celui choisi comme principal.
               <br /><br />
               Chaque ligne affiche la cote, le pari, l'edge, et la
               <strong> mise Kelly suggérée</strong>. C'est ici que se trouvent les

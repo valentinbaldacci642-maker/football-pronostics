@@ -285,9 +285,19 @@ class AnalysisService {
     const [homeFair, drawFair, awayFair] = removeMarginShin([homeOdd, drawOdd, awayOdd]);
     const overround = calculateOverround([homeOdd, drawOdd, awayOdd]);
 
-    const homeValue = detectValueBet(homeFair, homeOdd);
-    const drawValue = detectValueBet(drawFair, drawOdd);
-    const awayValue = detectValueBet(awayFair, awayOdd);
+    // Value bet = un bookmaker décalé par rapport au consensus du marché.
+    // La probabilité juste vient de la MOYENNE des bookmakers ; on la compare
+    // donc à la MEILLEURE cote disponible, pas à cette même moyenne.
+    // Comparer fair(avg) à avg est circulaire : retirer la marge donne
+    // toujours une probabilité inférieure à l'implicite, donc l'edge serait
+    // structurellement négatif et aucun value bet réel ne pourrait sortir.
+    const homeBest = market['Home']?.max || market['1']?.max || homeOdd;
+    const drawBest = market['Draw']?.max || market['X']?.max || drawOdd;
+    const awayBest = market['Away']?.max || market['2']?.max || awayOdd;
+
+    const homeValue = detectValueBet(homeFair, homeBest);
+    const drawValue = detectValueBet(drawFair, drawBest);
+    const awayValue = detectValueBet(awayFair, awayBest);
 
     return {
       odds: { home: homeOdd, draw: drawOdd, away: awayOdd },
@@ -304,10 +314,13 @@ class AnalysisService {
       },
       overround,
       valueBets: { home: homeValue, draw: drawValue, away: awayValue },
+      // Kelly se calcule sur la cote réellement jouable (la meilleure du
+      // marché), cohérent avec la détection de value ci-dessus. Sur la cote
+      // moyenne, la mise optimale est par construction nulle.
       kelly: {
-        home: kellyCriterion(homeFair, homeOdd),
-        draw: kellyCriterion(drawFair, drawOdd),
-        away: kellyCriterion(awayFair, awayOdd),
+        home: kellyCriterion(homeFair, homeBest),
+        draw: kellyCriterion(drawFair, drawBest),
+        away: kellyCriterion(awayFair, awayBest),
       },
     };
   }
@@ -323,6 +336,7 @@ class AnalysisService {
         const odd = market[key].avg;
         lines[val][type.toLowerCase()] = {
           odd,
+          best: market[key].max || odd, // meilleure cote du marché — sert à la détection de value
           impliedProb: parseFloat(oddsToImpliedProb(odd).toFixed(1)),
         };
       }
@@ -333,8 +347,9 @@ class AnalysisService {
       const [overFair, underFair] = removeMarginShin([lines['2.5'].over.odd, lines['2.5'].under.odd]);
       lines['2.5'].over.fairProb = parseFloat(overFair.toFixed(1));
       lines['2.5'].under.fairProb = parseFloat(underFair.toFixed(1));
-      lines['2.5'].over.valueInfo = detectValueBet(overFair, lines['2.5'].over.odd);
-      lines['2.5'].under.valueInfo = detectValueBet(underFair, lines['2.5'].under.odd);
+      // cf. _analyze1x2 : fair(moyenne) se compare à la meilleure cote, pas à la moyenne.
+      lines['2.5'].over.valueInfo = detectValueBet(overFair, lines['2.5'].over.best);
+      lines['2.5'].under.valueInfo = detectValueBet(underFair, lines['2.5'].under.best);
     }
 
     return { lines };
@@ -346,12 +361,16 @@ class AnalysisService {
     if (!yesOdd || !noOdd) return null;
 
     const [yesFair, noFair] = removeMarginShin([yesOdd, noOdd]);
+    // cf. _analyze1x2 : fair(moyenne) se compare à la meilleure cote, pas à la moyenne.
+    const yesBest = market['Yes']?.max || yesOdd;
+    const noBest = market['No']?.max || noOdd;
     return {
       odds: { yes: yesOdd, no: noOdd },
+      maxOdds: { yes: yesBest, no: noBest },
       fairProbs: { yes: parseFloat(yesFair.toFixed(1)), no: parseFloat(noFair.toFixed(1)) },
       valueBets: {
-        yes: detectValueBet(yesFair, yesOdd),
-        no: detectValueBet(noFair, noOdd),
+        yes: detectValueBet(yesFair, yesBest),
+        no: detectValueBet(noFair, noBest),
       },
     };
   }

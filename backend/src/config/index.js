@@ -17,17 +17,27 @@ module.exports = {
     ttlLeagues: 86400,                                    // 24 h, inchangé
   },
   valueBet: {
-    // 6% min edge sur le consensus Shin. Choisi après expérience pratique :
-    // un seuil 5% laissait passer trop de bruit (-26% ROI sur 51 paris) ;
-    // 6% filtre les edges marginaux qui rétrécissent souvent chez Unibet/
-    // Winamax où les cotes sont ~7% plus serrées que le consensus.
-    minEdge: 6,
+    // Critère = ESPÉRANCE DE GAIN : EV = prob_juste × cote − 1.
+    //
+    // L'ancien seuil `minEdge: 6` comparait un écart en POINTS
+    // (prob_juste − prob_implicite). Mesuré sur 120 matchs / 360 issues,
+    // cet écart plafonne à 0,99 point : le seuil était six fois au-dessus
+    // du maximum atteignable, donc structurellement infranchissable. Il ne
+    // passait avant que parce que la formule de Shin était fausse et
+    // gonflait les outsiders jusqu'à +8,9 points (d'où les -26% de ROI
+    // sur 51 paris, reproduits à -28,5% en backtest).
+    //
+    // 2% d'EV = seuil réaliste sur un marché liquide : ~1 à 3 détections
+    // par jour. Les garde-fous de cote restent inchangés.
+    minEV: 2,
     minProb: 25,
     minOdds: 1.4,
     maxOdds: 10.0,
   },
   analysis: {
     confidenceThreshold: 65,
-    strongValueThreshold: 10,
+    // EV à partir de laquelle un value bet est qualifié de "fort".
+    // Échelle EV (max observé ~3,6%), pas l'ancienne échelle en points.
+    strongValueThreshold: 4,
   },
 };

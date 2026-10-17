@@ -130,14 +130,21 @@ export const useUIStore = create((set) => ({
  * Kelly fraction defaults to 0.25 (quarter Kelly) — standard recommendation
  * to dampen variance vs full Kelly which is mathematically optimal but very volatile.
  *
- * edgeMode:
- *   - 'conservative': only pick value bets with edge ≥ 8% (fewer, higher quality)
- *   - 'standard'    : only pick value bets with edge ≥ 6% (recommended)
- *   - 'aggressive'  : show all pronostics including non-value picks (more volume)
+ * edgeMode — seuils exprimés en ESPÉRANCE DE GAIN (EV = prob_juste × cote − 1),
+ * la même unité que `vb.edge` depuis la correction de probabilityCalc.js.
+ *
+ * Les anciennes valeurs (8 / 6) étaient des écarts en POINTS de probabilité.
+ * Mesuré sur 120 matchs : cet écart plafonne à ~1 point et l'EV maximale
+ * observée est +3,08%. Des seuils à 6 et 8 ne laissaient donc rien passer,
+ * quel que soit le mode choisi.
+ *
+ *   - 'conservative': EV ≥ 4% — rare, quelques paris par mois
+ *   - 'standard'    : EV ≥ 2% — recommandé, ~1 détection tous les 2-3 jours
+ *   - 'aggressive'  : tous les pronostics, y compris sans value
  */
 export const EDGE_MODE_THRESHOLD = {
-  conservative: 8,
-  standard: 6,
+  conservative: 4,
+  standard: 2,
   aggressive: 0, // 0 = no edge requirement, show all pronos
 };
 

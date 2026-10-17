@@ -5,6 +5,7 @@ const apiFootball = require('./apiFootball');
 const weatherService = require('./weatherService');
 const tokenStore = require('./tokenStore');
 const logger = require('../utils/logger');
+const config = require('../config');
 
 // In-memory state. Render free tier stays warm via UptimeRobot ping so
 // these maps survive across requests. A deploy / crash resets them →
@@ -290,9 +291,11 @@ function extractVbs(pronostics) {
  * tokens. `minEdge` filters out low-edge VBs (default 7%). Returns a
  * summary used by the route handler / by UptimeRobot's response log.
  */
-// minEdge is expressed in percentage POINTS (e.g. 6 means 6%), matching
-// analysisService.js where `edge = trueProbPct - impliedPct` (both in %).
-async function scanAndNotify({ minEdge = 6, date = null, dryRun = false } = {}) {
+// minEdge filtre sur l'ESPÉRANCE DE GAIN (EV = prob_juste × cote − 1),
+// même unité que `vb.edge` depuis la correction de probabilityCalc.js.
+// L'ancienne valeur 6 était un écart en points, infranchissable en
+// pratique (max réel ~1 point) : aucune notification n'aurait pu partir.
+async function scanAndNotify({ minEdge = config.valueBet.minEV, date = null, dryRun = false } = {}) {
   lastScanAt = Date.now();
 
   const pronostics = await pronosticsService.getBestPronostics(false, date);

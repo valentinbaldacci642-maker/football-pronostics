@@ -583,8 +583,8 @@ export default function History() {
                 ))}
               </div>
               <p className="text-[11px] text-white/25 font-heading leading-relaxed pt-1">
-                {edgeMode === 'conservative' && 'Très peu de pronos par jour, edge confortable, variance faible. Idéal si tu débutes ou si tu veux des paris ultra-fiables.'}
-                {edgeMode === 'standard' && 'Recommandé. Volume modéré, edge minimum 5% (au-dessus de la marge d’erreur du modèle).'}
+                {edgeMode === 'conservative' && 'Espérance de gain ≥ 4%. Très rare — quelques paris par mois. Pour ne jouer que les écarts flagrants.'}
+                {edgeMode === 'standard' && 'Recommandé. Espérance de gain ≥ 2%, soit environ une détection tous les 2-3 jours. Un edge de 2-3% est le niveau réel d’un marché liquide.'}
                 {edgeMode === 'aggressive' && 'Tous les pronostics affichés (value bets + classiques). Beaucoup de volume mais variance élevée.'}
               </p>
             </div>
