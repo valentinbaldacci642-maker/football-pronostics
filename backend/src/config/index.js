@@ -4,15 +4,17 @@ module.exports = {
     key: process.env.API_FOOTBALL_KEY,
     timeout: 15000,
   },
+  // TTL recalibrés pour le plan Ultra (75 000 req/jour au lieu des 100 du
+  // plan gratuit, qui dictaient les anciennes valeurs très conservatrices).
   cache: {
-    ttl: parseInt(process.env.CACHE_TTL) || 600,        // default 10 min
+    ttl: parseInt(process.env.CACHE_TTL) || 300,        // default 5 min
     maxKeys: parseInt(process.env.CACHE_MAX_KEYS) || 1000,
-    ttlLive: 60,                                          // 1 min live data
-    ttlOdds: 900,                                         // 15 min — odds drift slowly
-    ttlFixtures: 1200,                                    // 20 min — fixture metadata stable
-    ttlTeams: 7200,                                       // 2 h — team profiles
-    ttlTransfers: 600,                                    // 10 min
-    ttlLeagues: 86400,                                    // 24 h
+    ttlLive: 15,                                          // 15 s — le front sonde toutes les 30 s : jamais de cache périmé
+    ttlOdds: 180,                                         // 3 min — les cotes bougent lentement, mais 15 min masquait les dérives
+    ttlFixtures: 300,                                     // 5 min — métadonnées stables, 20 min retardait les reports/annulations
+    ttlTeams: 7200,                                       // 2 h — profils d'équipe, inchangé
+    ttlTransfers: 600,                                    // 10 min, inchangé
+    ttlLeagues: 86400,                                    // 24 h, inchangé
   },
   valueBet: {
     // 6% min edge sur le consensus Shin. Choisi après expérience pratique :
